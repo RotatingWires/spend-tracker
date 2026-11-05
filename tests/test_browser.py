@@ -126,9 +126,10 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#monthCards")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
         expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")
 
-        # Search matches the start of words, not letters inside "Purchase" or "Cash".
+        # Search looks anywhere in merchant, description, note, tags, and amount, but not type, method, or people.
         rows = page.locator("#transactionsTable tbody tr:not(.empty-row)")
-        for query, expected in (("h", 0), ("din", 2), ("DINER dinner", 2), ("ven", 1), ("12.17", 1), ("alex", 3), ("refund", 1), ("zzz", 0)):
+        for query, expected in (("h", 0), ("inn", 2), ("DINER dinner", 2), ("enm", 1), ("12.17", 1), ("$40", 2), ("foo", 1),
+                                ("cash", 0), ("purchase", 0), ("alex", 0), ("zzz", 0)):
             page.fill("#searchInput", query)
             expect(rows).to_have_count(expected)
         page.fill("#searchInput", "")

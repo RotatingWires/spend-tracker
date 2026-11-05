@@ -233,23 +233,19 @@ function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
 }
 
-function searchWords(text) {
-  return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-}
-
 /**
- * Every searched word must be the start of a word in the transaction, so "din" finds "Diner" but "h" does not
- * match the "h" inside "Purchase" or "Cash". Amounts are searchable as typed, like "12.17".
+ * Searches only what the user typed or tagged: merchant, description, note, tags, and the amount (as 12.17 or
+ * $12.17). Each searched word can appear anywhere, as in TaskList and NewsReview. The type, payment method, and
+ * people are left out so a search like "h" does not match every "Purchase" or "Cash" row.
  */
 function matchesSearch(tx, query) {
-  const wanted = searchWords(query);
+  const wanted = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (wanted.length === 0) return true;
-  const words = searchWords([
-    tx.kind, tx.merchant, tx.description, tx.note, methodName(tx.paymentMethodId), centsToInput(tx.amountCents),
-    ...peopleOf(tx).map(personName),
+  const text = [
+    tx.merchant, tx.description, tx.note, centsToInput(tx.amountCents), formatMoney(tx.amountCents),
     ...tagIdsOf(tx).map(tagName)
-  ].join(' '));
-  return wanted.every(part => words.some(word => word.startsWith(part)));
+  ].join(' ').toLowerCase();
+  return wanted.every(part => text.includes(part));
 }
 
 function eventsOn(key) {
