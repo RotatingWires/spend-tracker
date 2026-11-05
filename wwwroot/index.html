@@ -62,10 +62,11 @@
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
         <div id="monthCards" class="stat-grid"></div>
-        <div class="panel-actions">
+        <form class="panel-actions" id="searchForm" role="search">
           <label for="searchInput" class="control-label">Search:</label>
           <input id="searchInput" class="retro-input" type="search" placeholder="Merchant, description, note, tag, amount" autocomplete="off">
-        </div>
+          <button type="submit">Search</button>
+        </form>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
       </section>
 

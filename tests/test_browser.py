@@ -131,8 +131,14 @@ class BrowserTests(unittest.TestCase):
         for query, expected in (("h", 0), ("inn", 2), ("DINER dinner", 2), ("enm", 1), ("12.17", 1), ("$40", 2), ("foo", 1),
                                 ("cash", 0), ("purchase", 0), ("alex", 0), ("zzz", 0)):
             page.fill("#searchInput", query)
+            page.click("#searchForm button[type=submit]")
             expect(rows).to_have_count(expected)
-        page.fill("#searchInput", "")
+        page.fill("#searchInput", "inn")
+        page.wait_for_timeout(200)
+        expect(rows).to_have_count(0)  # still showing the last search ("zzz") until Search or Enter
+        page.keyboard.press("Enter")
+        expect(rows).to_have_count(2)
+        page.fill("#searchInput", "")  # emptying the box shows every row without pressing Search
         expect(rows).to_have_count(4)
 
         # Invalid input shows the server's message and keeps the dialog open.
