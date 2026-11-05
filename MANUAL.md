@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.2.0 Manual
+# SpendTracker v0.2.1 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -116,6 +116,8 @@ Add, rename, archive/restore, and delete payment methods, people, and tags. **Us
 
 - **File:** New Transaction, Refresh, Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out.
 - **View:** switch tabs and choose the Light or Dark theme. The theme is saved in this browser.
+
+Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, …). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
 - **Help:** a short explanation of the concepts above.
 
 ## Statistics
@@ -398,6 +400,10 @@ python3 -m unittest discover -s tests -p "test_browser.py"
 They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 ## Release notes
+
+### v0.2.1
+
+- Rename the color tokens to the names shared with TaskList, TaskList Stats, and NewsReview (for example `--theme-text` → `--ink`, `--light` → `--light-edge`, `--teal` → `--desktop`), and make the dialog backdrop the `--backdrop` token. Nothing looks different.
 
 ### v0.2.0
 

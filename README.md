@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.2.0
+# SpendTracker v0.2.1
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 

@@ -4,7 +4,7 @@ body.login-page {
   place-items: center;
   min-height: 100dvh;
   padding: 10px;
-  background: var(--teal);
+  background: var(--desktop);
 }
 
 .login-window {
@@ -30,12 +30,12 @@ body.login-page {
 .login-form input[type="password"] {
   min-width: 0;
   padding: 6px 7px;
-  color: var(--theme-text);
-  background: var(--theme-surface);
-  border-top: 2px solid var(--dark);
-  border-left: 2px solid var(--dark);
-  border-right: 2px solid var(--light);
-  border-bottom: 2px solid var(--light);
+  color: var(--ink);
+  background: var(--surface);
+  border-top: 2px solid var(--dark-edge);
+  border-left: 2px solid var(--dark-edge);
+  border-right: 2px solid var(--light-edge);
+  border-bottom: 2px solid var(--light-edge);
   border-radius: 0;
   outline: none;
 }
@@ -47,7 +47,7 @@ body.login-page {
 
 .login-error {
   min-height: 18px;
-  color: var(--theme-error);
+  color: var(--error);
   font-weight: 700;
 }
 
