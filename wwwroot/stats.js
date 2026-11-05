@@ -71,7 +71,7 @@ function computeStats(range) {
     refunded,
     net: spent - refunded,
     paidBack,
-    forOthers: sum(purchases.filter(isForOthers)),
+    forOthers: purchases.reduce((total, tx) => total + othersShare(tx), 0),
     largest: largestOf(purchases),
     largestRefund: largestOf(refunds),
     days
@@ -132,7 +132,7 @@ function computeStats(range) {
   result.lowestMonth = months.filter(m => m.complete).reduce((best, m) => (!best || m.net < best.net ? m : best), null);
 
   result.byMethod = groupBy(transactions, tx => tx.paymentMethodId);
-  result.byPerson = groupBy(transactions, tx => personIdOf(tx));
+  result.byPerson = groupByPerson(transactions);
   result.byTag = new Map();
   result.untagged = { purchases: 0, spent: 0, refunded: 0 };
   for (const tx of [...purchases, ...refunds]) {
@@ -171,6 +171,28 @@ function computeStats(range) {
 
 function largestOf(transactions) {
   return transactions.reduce((best, tx) => (!best || tx.amountCents > best.amountCents ? tx : best), null);
+}
+
+/** Each purchase counts once for every person with a share, with that share as their spent amount. */
+function groupByPerson(transactions) {
+  const groups = new Map();
+  const bucket = personId => {
+    if (!groups.has(personId)) groups.set(personId, { purchases: 0, spent: 0, refunded: 0, paidBack: 0 });
+    return groups.get(personId);
+  };
+  for (const tx of transactions) {
+    if (tx.kind === 'Purchase') {
+      for (const share of tx.shares) {
+        bucket(share.personId).purchases++;
+        bucket(share.personId).spent += share.amountCents;
+      }
+    } else if (tx.kind === 'Refund') {
+      bucket(tx.personId).refunded += tx.amountCents;
+    } else {
+      bucket(tx.personId).paidBack += tx.amountCents;
+    }
+  }
+  return groups;
 }
 
 function groupBy(transactions, keyOf) {
@@ -220,7 +242,7 @@ function renderStats() {
     statCard('Net spent', formatMoney(stats.net), { title: 'Spent minus refunds.' }),
     statCard('Paid back to you', formatMoney(stats.paidBack), { title: 'Paybacks other people made to you in this period.' }),
     statCard('Net after paybacks', formatMoney(stats.net - stats.paidBack), { title: 'Net spent minus paybacks received in this period.' }),
-    statCard('Spent for others', formatMoney(stats.forOthers), { sub: share(stats.forOthers, stats.spent) + ' of spent', title: 'Purchases whose For Who is someone other than you.' }),
+    statCard('Spent for others', formatMoney(stats.forOthers), { sub: share(stats.forOthers, stats.spent) + ' of spent', title: 'The shares of purchases that belong to people other than you.' }),
     statCard('Average purchase', averageMoney(stats.spent, stats.purchases.length), { title: 'Spent divided by the number of purchases.' }),
     statCard('Largest purchase', stats.largest ? formatMoney(stats.largest.amountCents) : '—', {
       sub: stats.largest ? `${describeTransaction(stats.largest)} · ${formatDate(stats.largest.date)}` : '',

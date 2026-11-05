@@ -13,6 +13,7 @@ const TRANSACTION_FIELDS = [
   ['amountCents', 'Amount', value => formatMoney(value)],
   ['paymentMethodId', 'Method', value => methodName(value)],
   ['personId', 'Person', value => (value == null ? '—' : personName(value))],
+  ['shares', 'For who', value => (value?.length ? value.map(share => `${personName(share.personId)} ${formatMoney(share.amountCents)}`).join(', ') : '—')],
   ['linkedId', 'Linked to', value => (value == null ? '—' : `#${value}`)],
   ['merchant', 'Merchant', value => value || '—'],
   ['description', 'What', value => value || '—'],

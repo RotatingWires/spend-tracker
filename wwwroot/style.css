@@ -59,7 +59,14 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 }
 .title-left { justify-self: start; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-center { justify-self: center; min-width: 0; max-width: min(50vw, 520px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.title-buttons { justify-self: end; letter-spacing: 4px; white-space: nowrap; }
+.title-buttons { justify-self: end; display: flex; align-items: center; gap: 7px; }
+/* Equal boxes keep the drawn window controls aligned regardless of font glyph metrics. */
+.title-buttons > span { position: relative; width: 11px; height: 11px; }
+.title-minimize::before { content: ""; position: absolute; left: 1px; right: 1px; bottom: 0; height: 2px; background: currentColor; }
+.title-maximize { border: 1px solid currentColor; border-top-width: 2px; }
+.title-close::before,
+.title-close::after { content: ""; position: absolute; left: -1px; right: -1px; top: 50%; height: 2px; margin-top: -1px; background: currentColor; transform: rotate(45deg); }
+.title-close::after { transform: rotate(-45deg); }
 
 .menubar, .toolbar, .statusbar { flex: 0 0 auto; }
 .menubar {
@@ -135,6 +142,7 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
   line-height: 1;
 }
 .menu-dropdown button[role="menuitemcheckbox"][aria-checked="true"] .menu-check::before { content: "✓"; }
+.multi-select-dropdown button[role="menuitemcheckbox"] .menu-check::before { border: 0; width: auto; height: auto; font-size: 13px; }
 .menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-heading {
   padding: 4px 8px 2px 24px;
@@ -164,7 +172,6 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 .toolbar-label { font-weight: 700; }
 .toolbar-group { display: flex; align-items: center; gap: 5px; }
 .toolbar-separator { width: 2px; height: 24px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--light-edge); margin: 0 3px; }
-.toolbar-status { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: auto; }
 .icon-button { min-width: 30px; padding: 4px 7px; }
 
 /* ---------- controls ---------- */
@@ -516,13 +523,10 @@ button.calendar-day:active {
 .form-grid .inline-select-menu { min-width: 0; }
 .form-grid .retro-select { min-width: 0; }
 .form-grid .full { grid-column: 1 / -1; }
-.kind-choices { display: flex; flex-wrap: wrap; gap: 4px 14px; border: 0; margin: 0; padding: 0; }
-.kind-choices label { display: flex; align-items: center; gap: 4px; }
-.tag-choices { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.tag-choices label { display: flex; align-items: center; gap: 4px; }
-.tag-add { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.tag-add button { white-space: nowrap; }
-.tag-add .retro-input { flex: 1 1 auto; min-width: 0; }
+.share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 4px 8px; align-items: center; margin-top: 6px; }
+.share-rows .retro-input { width: 100%; text-align: right; }
+.share-rows .share-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .form-hint { font-size: 12px; color: var(--muted); }
 .form-error { min-height: 18px; margin-top: 8px; }
 .prompt-input { display: block; width: 100%; margin-top: 6px; }
@@ -544,7 +548,6 @@ textarea:focus-visible,
 
 @media (max-width: 780px) {
   .toolbar-separator { display: none; }
-  .toolbar-status { flex-basis: 100%; margin-left: 0; }
   .two-column { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { padding: 5px; }

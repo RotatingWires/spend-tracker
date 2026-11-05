@@ -15,7 +15,7 @@
 </head>
 <body>
   <main class="window" id="appWindow">
-    <header class="titlebar"><span class="title-left">SpendTracker</span><span class="title-center" id="titleScope"></span><span class="title-buttons" aria-hidden="true">_ □ ×</span></header>
+    <header class="titlebar"><span class="title-left">SpendTracker</span><span class="title-center" id="titleScope"></span><span class="title-buttons" aria-hidden="true"><span class="title-minimize"></span><span class="title-maximize"></span><span class="title-close"></span></span></header>
 
     <nav class="menubar" aria-label="Application menu">
       <div class="menu-wrap">
@@ -50,7 +50,6 @@
         <span class="toolbar-separator" aria-hidden="true"></span>
       </div>
       <button type="button" id="newTransactionButton">New Transaction</button>
-      <span id="toolbarStatus" class="toolbar-status" role="status" aria-live="polite">Loading...</span>
     </section>
 
     <section class="tabs" role="tablist" aria-label="Sections">
@@ -140,7 +139,7 @@
       </section>
     </section>
 
-    <footer class="statusbar"><span id="statusLeft">SpendTracker</span><span id="statusRight"></span></footer>
+    <footer class="statusbar"><span id="statusLeft" role="status" aria-live="polite">Loading...</span><span id="statusRight"></span></footer>
   </main>
 
   <dialog id="transactionDialog" class="retro-dialog wide" aria-labelledby="transactionDialogTitle">
@@ -149,11 +148,7 @@
       <div class="dialog-body">
         <div class="form-grid">
           <span class="form-label" id="txKindLabel">Type</span>
-          <fieldset class="kind-choices" aria-labelledby="txKindLabel">
-            <label><input type="radio" name="txKind" value="Purchase" checked> Purchase</label>
-            <label><input type="radio" name="txKind" value="Refund"> Refund / return</label>
-            <label><input type="radio" name="txKind" value="Payback"> Payback to me</label>
-          </fieldset>
+          <div id="txKind" aria-labelledby="txKindLabel"></div>
 
           <label for="txDate">Date</label>
           <input id="txDate" class="retro-input" type="date" required>
@@ -164,7 +159,13 @@
           <span class="form-label" id="txLinkedLabel">Refund of</span>
           <div id="txLinkedRow"><div id="txLinked" aria-labelledby="txLinkedLabel"></div><div class="form-hint" id="txLinkedHint"></div></div>
 
-          <span class="form-label" id="txPersonLabel">For who</span>
+          <span class="form-label" id="txPeopleLabel">For who</span>
+          <div id="txPeopleRow">
+            <div id="txPeople" aria-labelledby="txPeopleLabel"></div>
+            <div id="txShares" class="share-rows" hidden></div>
+          </div>
+
+          <span class="form-label" id="txPersonLabel">Paid back by</span>
           <div id="txPerson" aria-labelledby="txPersonLabel"></div>
 
           <span class="form-label" id="txMethodLabel">Paid with</span>
@@ -177,10 +178,7 @@
           <input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was">
 
           <span class="form-label" id="txTagsLabel">Tags</span>
-          <div>
-            <div id="txTags" class="tag-choices" role="group" aria-labelledby="txTagsLabel"></div>
-            <div class="tag-add"><input id="txNewTag" class="retro-input" type="text" maxlength="60" placeholder="New tag" aria-label="New tag name"><button type="button" id="txAddTagButton">Add Tag</button></div>
-          </div>
+          <div id="txTags" aria-labelledby="txTagsLabel"></div>
 
           <label for="txNote">Note</label>
           <textarea id="txNote" class="retro-input" rows="2" maxlength="2000"></textarea>
@@ -250,11 +248,12 @@
       <div class="dialog-title" id="aboutTitle">About SpendTracker</div>
       <div class="dialog-body">
         <p>A self-hosted spending tracker. Every statistic comes from entries you recorded; SpendTracker never guesses categories or fills in data for you.</p>
-        <p><strong>Purchase:</strong> money you spent. <strong>For who</strong> says who it was for; a purchase for someone else counts toward what they owe you.</p>
-        <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase, uses that purchase's person and tags, and reduces net spent on the date it was refunded.</p>
-        <p><strong>Payback to me:</strong> money someone else gave you for something you paid for. Link it to a purchase to settle that purchase, or leave it unlinked to reduce their overall balance. Paybacks do not change net spent; Stats shows them separately.</p>
+        <p><strong>Purchase:</strong> money you spent. <strong>For who</strong> says who it was for. Pick several people to split it; each friend's share counts toward what they owe you.</p>
+        <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase and one person's share of it, uses that purchase's tags, and reduces net spent on the date it was refunded.</p>
+        <p><strong>Payback to me:</strong> money someone else gave you for something you paid for. Link it to a purchase to settle their share of it, or leave it unlinked to reduce their overall balance. Paybacks do not change net spent; Stats shows them separately.</p>
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
         <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
+        <p><strong>Archiving</strong> a payment method, person, or tag under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats.</p>
         <p>Amounts are shown in US dollars.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>

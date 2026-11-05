@@ -105,14 +105,13 @@ function renderDayDialog() {
 
   renderTable($('#dayTable'), [{ label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],
     rows.map(tx => {
-      const personId = personIdOf(tx);
       const direction = tx.kind === 'Purchase' ? 'out' : tx.kind === 'Refund' ? 'refund' : 'in';
       return {
         onClick: () => {
           $('#dayDialog').close();
           openTransactionEditor(tx);
         },
-        cells: [KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', personId == null ? '' : personName(personId), methodName(tx.paymentMethodId), moneyCell(tx.amountCents, { direction })]
+        cells: [KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', whoLabel(tx), methodName(tx.paymentMethodId), moneyCell(tx.amountCents, { direction })]
       };
     }),
     {

@@ -80,7 +80,18 @@ var authPath = Path.Combine(dataDir, "auth.json");
 const int PasswordIterations = 600_000;
 
 var store = new Store(Path.Combine(dataDir, "spend-tracker.db"));
-var journalMode = store.Initialize();
+string journalMode;
+try
+{
+    journalMode = store.Initialize();
+}
+catch (InvalidOperationException error)
+{
+    // A database this version cannot use: say why and stop, without touching the file.
+    app.Logger.LogError("{Error}", error.Message);
+    Environment.ExitCode = 1;
+    return;
+}
 app.Logger.LogInformation("SpendTracker v{Version} database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", appVersion, journalMode);
 
 string? setupToken = PasswordConfigured(authPath) ? null : GenerateSetupToken();
@@ -237,7 +248,7 @@ api.MapDelete("/people/{id:long}", (long id) =>
 });
 
 api.MapPost("/tags", (NameRequest request) => Results.Ok(store.CreateTag(request)));
-api.MapPatch("/tags/{id:long}", (long id, TagUpdateRequest request) => Results.Ok(store.UpdateTag(id, request)));
+api.MapPatch("/tags/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateTag(id, request)));
 api.MapDelete("/tags/{id:long}", (long id) =>
 {
     store.DeleteTag(id);

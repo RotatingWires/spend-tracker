@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.2.2 Manual
+# SpendTracker v0.3.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -111,27 +111,29 @@ Every entry is one of three types. All amounts are positive; the type decides wh
 
 | Type | Meaning | Required links |
 |---|---|---|
-| **Purchase** | Money you spent. **For who** records who it was for. | none |
+| **Purchase** | Money you spent. **For who** records who it was for: one or more people, each with their share. | none |
 | **Refund / return** | Money a store gave back for a purchase. | the purchase it refunds |
 | **Payback to me** | Money another person gave you for something you paid for. | optionally, the purchase it pays for |
 
 Each transaction also has a date, an amount, a payment method, a merchant and/or a description (at least one is required), optional tags (purchases only), and an optional note.
 
-**Refunds** never have their own person or tags. They always belong to the person and tags of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*, and a refund on something bought for a friend reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
+**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
-**Paybacks** come from someone other than you. Linking a payback to a purchase marks that purchase as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
+**Refunds** never have their own tags; they count under the tags and merchant of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*. Each refund is for one person's share of the purchase: picked automatically when the purchase was for one person, and chosen by you when it was split, so a refund on a friend's share reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
+
+**Paybacks** come from someone other than you. Linking a payback to a purchase marks that person's share as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
 
 The server enforces these rules on every save:
 
 - a refund or payback can only link to a purchase, and cannot be dated before it;
-- refunds plus linked paybacks for one purchase can never exceed its amount;
-- a linked payback must come from the person the purchase was for;
-- a purchase with linked refunds/paybacks must stay a purchase, cannot drop below what is linked to it, cannot move to a date after them, and cannot change person while it has paybacks;
+- a purchase's shares add up exactly to its amount, each person appears once, and each share is at least $0.01;
+- a refund or linked payback is for someone with a share of that purchase, and refunds plus linked paybacks for one person's share can never exceed that share;
+- a purchase with linked refunds/paybacks must stay a purchase, cannot move to a date after them, must keep everyone who has linked entries, and cannot give anyone a share smaller than what is linked to it;
 - a purchase with linked entries cannot be deleted until those entries are deleted.
 
 ### People
 
-You are the one person marked *(you)*, initially named "Me" (rename it under Manage). Add other people under **Manage → People** and choose them as **For who** on purchases you make for them. You cannot archive or delete yourself.
+You are the one person marked *(you)*, initially named "Me" (rename it under Manage). Add other people under **Manage → People** and choose them as **For who** on purchases you make for them, alone or together with yourself and others. You cannot archive or delete yourself.
 
 ### Payment methods
 
@@ -147,7 +149,9 @@ Events are named date ranges, such as a trip, a move, or a holiday week. They ne
 
 ### Archiving and deleting
 
-Payment methods and people that are used by transactions cannot be deleted. **Archive** them instead: archived items stay on existing transactions but are not offered for new entries. Unused items can be deleted. Deleting a tag removes it from every transaction that had it; the transactions themselves are kept and History records how many were affected.
+Payment methods, people, and tags can be **archived** under Manage. An archived item is no longer offered when adding or editing transactions, but nothing else changes: it stays on every transaction that already has it, and it is still searchable and counted in Stats, People, History, CSV exports, and backups. Editing an old transaction keeps its archived choices. **Restore** makes it available again.
+
+Payment methods and people that are used by transactions cannot be deleted; archive them instead. Unused items can be deleted. Deleting a tag removes it from every transaction that had it; the transactions themselves are kept and History records how many were affected.
 
 ## Using the app
 
@@ -159,11 +163,13 @@ The default tab is a monthly ledger. Use **◀ / ▶** or the month dropdown in 
 
 Select a row (click, or focus it and press Enter) to edit it. **New Transaction** (toolbar or File menu) opens an empty editor. New entries default to today, or to the first day of the viewed month when you are looking at another month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
-In the editor:
+In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
 
 - **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
-- **Payback to me** asks who paid you and, optionally, which of their purchases it was for, showing how much of that purchase is still unpaid.
-- **Tags** lists your tags as checkboxes. **Add Tag** creates a new tag immediately.
+- **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person, with **Split Evenly** and a running total; Save refuses shares that do not add up to the amount.
+- **Refund / return** on a split purchase also asks **Whose share** it refunds.
+- **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid.
+- **Tags** is a dropdown of check items, so a purchase can have several. Tags are created, renamed, archived, and deleted only under **Manage**.
 - Errors from the server are shown in the dialog exactly as returned; nothing is saved until the server accepts the entry.
 
 ### Calendar
@@ -176,7 +182,7 @@ Choose a **Period**: all time, a year, a month, or an event. See [Statistics](#s
 
 ### People
 
-One row per other person: purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases and paybacks, each purchase's unpaid amount, and **Record Payback**.
+One row per other person: purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each share's unpaid amount, and **Record Payback**.
 
 ### Events
 
@@ -196,6 +202,7 @@ Add, rename, archive/restore, and delete payment methods, people, and tags. **Us
 - **View:** switch tabs and choose the Light or Dark theme. The theme is saved in this browser.
 
 Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, …). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
+- **Status bar:** messages such as "Added purchase …" appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList.
 - **Help:** a short explanation of the concepts above, ending with about.lehighradio.com above the version, as in TaskList, TaskList Stats, and NewsReview.
 
 ## Statistics
@@ -211,7 +218,7 @@ All statistics cover the selected period. A transaction is in a period when its 
 | Net spent | Spent − refunds. |
 | Paid back to you | Sum of paybacks. |
 | Net after paybacks | Net spent − paid back to you. |
-| Spent for others | Sum of purchases whose For Who is not you, with its share of spent. |
+| Spent for others | Sum of the shares of purchases that belong to people other than you, with its share of spent. |
 | Average purchase | Spent ÷ number of purchases. |
 | Largest purchase / refund | The single biggest one. |
 | Days counted | See above. |
@@ -229,7 +236,7 @@ All statistics cover the selected period. A transaction is in a period when its 
 Breakdown tables:
 
 - **By Payment Method:** purchases, spent, refunds, and net per method, and each method's share of spent.
-- **By Person:** purchases for each person, refunds on them, net, and paybacks from them.
+- **By Person:** for each person, the purchases they had a share of and the total of their shares, refunds on their shares, net, and paybacks from them.
 - **By Tag:** purchases, spent, refunds, and net per tag, plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
 - **Day of Week:** purchases and net per weekday, and the average per occurrence of that weekday in the counted days.
 - **Merchants:** visits (purchases), spent, refunds, net, average purchase, and last purchase date. Merchant names are grouped ignoring capitalization and shown with their latest spelling. Refunds count under their purchase's merchant.
@@ -276,7 +283,7 @@ Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0
 
 ### Export Transactions CSV
 
-**File → Export Transactions CSV** downloads every transaction with date, type, for who, merchant, description, tags, payment method, amount, linked transaction, and note. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
+**File → Export Transactions CSV** downloads every transaction with date, type, for who (with each person's amount when a purchase was split), merchant, description, tags, payment method, amount, linked transaction, and note. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
 
 ### Copying the database directly
 
@@ -284,7 +291,7 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 
 ### Schema and migrations
 
-The database records its schema version in `PRAGMA user_version` (currently 1). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Future versions will upgrade older schemas in place at startup.
+The database records its schema version in `PRAGMA user_version` (currently 2). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
 
 ## Authentication
 
@@ -325,8 +332,7 @@ All endpoints are under `/api`, use JSON, and require a session except `auth/sta
 | `PUT /api/transactions/{id}` | replace all fields |
 | `DELETE /api/transactions/{id}` | delete |
 | `POST /api/payment-methods`, `/api/people`, `/api/tags` | `{ name }` |
-| `PATCH /api/payment-methods/{id}`, `/api/people/{id}` | `{ name?, archived? }` |
-| `PATCH /api/tags/{id}` | `{ name }` |
+| `PATCH /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}` | `{ name?, archived? }` |
 | `DELETE /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}` | delete when allowed |
 | `POST /api/events`, `PUT /api/events/{id}` | `{ name, startDate, endDate, note }` |
 | `DELETE /api/events/{id}` | delete |
@@ -342,16 +348,17 @@ A transaction body is:
   "date": "2026-10-01",
   "amountCents": 1217,
   "paymentMethodId": 2,
-  "personId": 1,
+  "personId": null,
   "linkedId": null,
   "merchant": "BK",
   "description": "food",
   "note": "",
-  "tagIds": [3]
+  "tagIds": [3],
+  "shares": [{ "personId": 1, "amountCents": 617 }, { "personId": 2, "amountCents": 600 }]
 }
 ```
 
-Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Refunds send `personId: null` and a `linkedId`. Only purchases may have `tagIds`. Limits: names 60 characters, merchant 120, description 500, note 2000, amount $0.01–$10,000,000.00.
+Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares`; refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds`. Limits: names 60 characters, merchant 120, description 500, note 2000, amount $0.01–$10,000,000.00.
 
 ## Security and privacy
 
@@ -365,7 +372,6 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 
 - One user per installation.
 - Amounts are shown in US dollars; there is no currency setting.
-- A purchase has one For Who; splitting one purchase between people is not supported yet.
 - Transfers between your own accounts (paying off a card, withdrawing cash) are not tracked; record only real spending.
 - No automatic import yet. Entries are added by hand.
 - Stats are computed in the browser from the full snapshot, which is fine for years of personal data but not designed for very large datasets.
@@ -383,6 +389,10 @@ Setup and login allow 5 attempts per IP per minute. Wait a minute.
 ### "spend-tracker.db uses schema version N"
 
 The database was created by a newer SpendTracker. Update SpendTracker; it will not modify a newer database.
+
+### "spend-tracker.db was created by SpendTracker 0.2"
+
+This version stores split purchases differently and does not upgrade 0.2 databases. Stop SpendTracker, move or delete `data/spend-tracker.db`, and start it again to create a new database.
 
 ### A save is refused
 
@@ -403,7 +413,7 @@ dotnet build
 python3 -m unittest discover -s tests -p "test_api.py"
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, edits that would break links, archiving and deletion rules, tag deletion, events, history, and backup ZIP round trips plus 23 kinds of rejected restore (damaged ZIPs, wrong manifests, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules), each leaving data unchanged. It uses only the Python standard library.
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, events, history, and backup ZIP round trips plus 23 kinds of rejected restore (damaged ZIPs, wrong manifests, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -416,6 +426,15 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.3.0
+
+- Split a purchase between several people: **For who** takes one or more people, each with a share; **Split Evenly** fills equal shares. Refunds and paybacks apply to one person's share. This is database schema 2; databases and backups from 0.2 are not upgraded.
+- Archive and restore tags under Manage, like payment methods and people. Archived items stay on existing transactions and in search and Stats, but are not offered for new entries.
+- Choose tags from a dropdown of check items; tags are only created under Manage.
+- Use Windows 95-style dropdowns for Type, For who, and Tags, like TaskList and TaskList Stats.
+- Show status messages at the bottom left with totals at the bottom right, and draw the title-bar window icons the same way as the other apps.
+- Fix Escape closing the whole editor when a dropdown inside it was open, and fill a new refund from its purchase when that purchase is the only choice.
 
 ### v0.2.2
 

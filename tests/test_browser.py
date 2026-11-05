@@ -60,16 +60,29 @@ class BrowserTests(unittest.TestCase):
         else:
             page.fill("#password", PASSWORD)
             page.click("#loginButton")
-        expect(page.locator("#toolbarStatus")).to_have_text("Ready")
+        expect(page.locator("#statusLeft")).to_have_text("Ready")
 
     def pick(self, page, host, label):
         page.click(f"{host} .retro-select")
         page.locator(f"{host} .menu-dropdown button", has_text=label).first.click()
 
-    def add_transaction(self, page, kind="Purchase", amount=None, merchant=None, description=None, person=None, linked=None):
+    KIND_LABELS = {"Purchase": "Purchase", "Refund": "Refund / return", "Payback": "Payback to me"}
+
+    def set_checks(self, page, host, names):
+        """Makes exactly these items checked in a multi-select dropdown, then closes it."""
+        page.click(f"{host} .retro-select")
+        for item in page.locator(f"{host} .menu-dropdown button").all():
+            wanted = item.inner_text().strip() in names
+            if (item.get_attribute("aria-checked") == "true") != wanted:
+                item.click()
+        page.keyboard.press("Escape")
+
+    def add_transaction(self, page, kind="Purchase", amount=None, merchant=None, description=None, people=None, person=None, linked=None):
         """Fills only the given fields, so values the editor copies from a linked purchase are kept."""
         page.click("#newTransactionButton")
-        page.check(f'input[name="txKind"][value="{kind}"]')
+        self.pick(page, "#txKind", self.KIND_LABELS[kind])
+        if people:
+            self.set_checks(page, "#txPeople", people)
         if person:
             self.pick(page, "#txPerson", person)
         if linked:
@@ -78,6 +91,7 @@ class BrowserTests(unittest.TestCase):
             if value is not None:
                 page.fill(selector, value)
         page.click("#txSaveButton")
+        expect(page.locator("#txError")).to_have_text("")
         expect(page.locator("#transactionDialog")).not_to_be_visible()
 
     def test_full_workflow_in_both_themes_and_phone_width(self):
@@ -99,11 +113,13 @@ class BrowserTests(unittest.TestCase):
         page.fill("#txAmount", "12.17")
         page.fill("#txMerchant", "BK")
         page.fill("#txDescription", "food")
-        page.locator("#txTags label", has_text="food").locator("input").check()
+        expect(page.locator("#txNewTag")).to_have_count(0)  # tags are only created under Manage
+        self.set_checks(page, "#txTags", ["food"])
+        expect(page.locator("#txTags .retro-select")).to_have_text("food▼")
         page.click("#txSaveButton")
         expect(page.locator("#transactionsTable")).to_contain_text("BK — food")
 
-        self.add_transaction(page, amount="$40", merchant="Diner", description="dinner", person="Alex")
+        self.add_transaction(page, amount="$40", merchant="Diner", description="dinner", people=["Alex"])
         self.add_transaction(page, kind="Refund", linked="Diner")
         page.locator("#transactionsTable tbody tr", has_text="Refund:").first.wait_for()
         self.add_transaction(page, kind="Payback", amount="10", description="Venmo", person="Alex")
@@ -172,7 +188,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#fileMenuButton")
         page.set_input_files("#restoreFileInput", str(backup_path))
         page.click("#confirmOkButton")
-        expect(page.locator("#toolbarStatus")).to_contain_text("Restored 4 transactions")
+        expect(page.locator("#statusLeft")).to_contain_text("Restored 4 transactions")
         expect(page.locator("#transactionsTable")).not_to_contain_text("After backup")
         expect(page.locator("#transactionsTable")).to_contain_text("BK — food")
 
@@ -182,6 +198,32 @@ class BrowserTests(unittest.TestCase):
         page.wait_for_url(re.compile(r"/login\.html"))
         page.goto(self.server.url + "/")
         page.wait_for_url(re.compile(r"/login\.html"))
+
+    def test_split_purchase_in_editor(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        page.click("#newTransactionButton")
+        page.fill("#txAmount", "30.01")
+        page.fill("#txMerchant", "Pizza")
+        self.set_checks(page, "#txPeople", ["Me", "Alex"])
+        expect(page.locator("#txShares")).to_be_visible()
+        page.locator("#txShares button", has_text="Split Evenly").click()
+        expect(page.locator("#txShares input").nth(0)).to_have_value("15.01")  # the first person listed gets the leftover cent
+        expect(page.locator("#txShares input").nth(1)).to_have_value("15.00")
+        expect(page.locator("#txShareTotal")).to_have_text("Assigned $30.01 of $30.01")
+        page.locator("#txShares input").nth(1).fill("10.00")
+        expect(page.locator("#txShareTotal")).to_contain_text("$5.00 left")
+        page.click("#txSaveButton")
+        expect(page.locator("#txError")).to_contain_text("add up to $25.01")
+        page.locator("#txShares input").nth(0).fill("20.01")
+        page.click("#txSaveButton")
+        expect(page.locator("#transactionDialog")).not_to_be_visible()
+        expect(page.locator("#transactionsTable tbody tr", has_text="Pizza")).to_contain_text("Me, Alex")
+        page.click('.tabs [data-tab="people"]')
+        page.locator("#peopleTable tbody tr", has_text="Alex").click()
+        expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("$10.00")
+        expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
+        self.shot(page, "split-people")
 
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
@@ -194,15 +236,16 @@ class BrowserTests(unittest.TestCase):
         groceries = api.post("/api/tags", {"name": "groceries"})["id"]
 
         def add(kind, date, cents, method, person=None, linked=None, merchant="", tags=()):
+            shares = [{"personId": person, "amountCents": cents}] if kind == "Purchase" else []
             return api.post("/api/transactions", {
-                "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": method, "personId": person,
-                "linkedId": linked, "merchant": merchant, "description": "x", "note": "", "tagIds": list(tags)})
+                "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": method, "personId": None if kind == "Purchase" else person,
+                "linkedId": linked, "merchant": merchant, "description": "x", "note": "", "tagIds": list(tags), "shares": shares})
 
         # March 2025 has 31 days. Purchases on the 1st, 10th, and 31st; a refund on the 12th is not spending.
         add("Purchase", "2025-03-01", 1000, cash, me, merchant="Market")
         add("Purchase", "2025-03-01", 500, card, friend, merchant="Cafe")
         big = add("Purchase", "2025-03-10", 2000, card, me, merchant="market", tags=[groceries])
-        add("Refund", "2025-03-12", 500, card, linked=big["id"], merchant="Returned desk")
+        add("Refund", "2025-03-12", 500, card, me, linked=big["id"], merchant="Returned desk")
         add("Purchase", "2025-03-31", 100, cash, me, merchant="Market")
 
         page.click("#fileMenuButton")

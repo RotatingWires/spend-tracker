@@ -8,15 +8,13 @@ const MANAGED = {
     singular: 'payment method',
     items: () => state.snapshot.paymentMethods,
     uses: id => state.model.transactions.filter(tx => tx.paymentMethodId === id).length,
-    hasStatus: true,
     archivable: () => true
   },
   people: {
     table: '#peopleManageTable',
     singular: 'person',
     items: () => state.snapshot.people,
-    uses: id => state.model.transactions.filter(tx => tx.personId === id).length,
-    hasStatus: true,
+    uses: id => state.model.transactions.filter(tx => peopleOf(tx).includes(id)).length,
     archivable: item => !item.isSelf
   },
   tags: {
@@ -24,8 +22,7 @@ const MANAGED = {
     singular: 'tag',
     items: () => state.snapshot.tags,
     uses: id => state.model.transactions.filter(tx => tx.tagIds.includes(id)).length,
-    hasStatus: false,
-    archivable: () => false
+    archivable: () => true
   }
 };
 
@@ -39,15 +36,12 @@ function renderManage() {
       if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
 
       const name = item.isSelf ? `${item.name} (you)` : item.name;
-      const cells = [name, { text: numberFormat.format(uses), num: true }];
-      if (config.hasStatus) cells.push(item.archived ? 'Archived' : 'Active');
-      cells.push(rowActionButtons(actions));
-      return { cells };
+      return { cells: [name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
     });
     renderTable($(config.table), [
       { label: 'Name' },
       { label: 'Used By', num: true, title: 'Number of transactions that use it.' },
-      ...(config.hasStatus ? [{ label: 'Status', title: 'Archived items stay on old transactions but are hidden when adding new ones.' }] : []),
+      { label: 'Status', title: 'Archived items stay on old transactions and in search and stats, but are not offered for new ones.' },
       { label: '' }
     ], rows);
   }

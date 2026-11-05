@@ -4,13 +4,14 @@
 
 let personDialogId = null;
 
+/** A person's balance: their shares of purchases, minus refunds on their shares, minus what they paid back. */
 function personLedger(personId) {
   const ledger = { fronted: 0, refunded: 0, paidBack: 0, purchases: 0, lastPayback: null, entries: [] };
   for (const tx of state.model.transactions) {
-    if (personIdOf(tx) !== personId) continue;
+    if (!peopleOf(tx).includes(personId)) continue;
     ledger.entries.push(tx);
     if (tx.kind === 'Purchase') {
-      ledger.fronted += tx.amountCents;
+      ledger.fronted += shareOf(tx, personId);
       ledger.purchases++;
     } else if (tx.kind === 'Refund') {
       ledger.refunded += tx.amountCents;
@@ -79,9 +80,12 @@ function renderPersonDialog() {
 
   const rows = [...ledger.entries].reverse().map(tx => {
     let status = '';
+    let amount = tx.amountCents;
     if (tx.kind === 'Purchase') {
-      const remaining = purchaseRemaining(tx);
+      amount = shareOf(tx, personId);
+      const remaining = shareRemaining(tx, personId);
       status = remaining > 0 ? `${formatMoney(remaining)} unpaid` : 'Covered';
+      if (tx.shares.length > 1) status += ` · share of ${formatMoney(tx.amountCents)}`;
     } else if (tx.kind === 'Payback') {
       status = tx.linkedId == null ? 'Not linked' : `For #${tx.linkedId}`;
     } else {
@@ -93,10 +97,10 @@ function renderPersonDialog() {
         $('#personDialog').close();
         openTransactionEditor(tx);
       },
-      cells: [formatDate(tx.date), `#${tx.id} ${KIND_LABELS[tx.kind]}`, describeTransaction(tx) || '(no description)', moneyCell(tx.amountCents, { direction }), status]
+      cells: [formatDate(tx.date), `#${tx.id} ${KIND_LABELS[tx.kind]}`, describeTransaction(tx) || '(no description)', moneyCell(amount, { direction }), status]
     };
   });
-  renderTable($('#personTable'), [{ label: 'When' }, { label: 'Entry' }, { label: 'What' }, { label: 'Amount', num: true }, { label: 'Status', title: 'Unpaid amounts count refunds and paybacks linked to that purchase. Unlinked paybacks reduce the overall balance only.' }], rows, { empty: 'No purchases or paybacks for this person yet.' });
+  renderTable($('#personTable'), [{ label: 'When' }, { label: 'Entry' }, { label: 'What' }, { label: 'Amount', num: true }, { label: 'Status', title: 'For a purchase, Amount is this person\'s share. Unpaid amounts count refunds and paybacks linked to their share. Unlinked paybacks reduce the overall balance only.' }], rows, { empty: 'No purchases or paybacks for this person yet.' });
   $('#personPaybackButton').disabled = state.model.people.get(personId).archived;
 }
 

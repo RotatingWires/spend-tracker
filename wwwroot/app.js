@@ -171,8 +171,13 @@ function buildModel(snapshot) {
   return { methods, people, tags, byId, self, linked, transactions: snapshot.transactions, events: snapshot.events };
 }
 
-function personIdOf(tx) {
-  return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.personId ?? null : tx.personId;
+/** Everyone a purchase was for (its shares), or the one person a refund or payback is about. */
+function peopleOf(tx) {
+  return tx.kind === 'Purchase' ? tx.shares.map(share => share.personId) : [tx.personId];
+}
+
+function shareOf(purchase, personId) {
+  return purchase.shares.find(share => share.personId === personId)?.amountCents ?? 0;
 }
 
 function tagIdsOf(tx) {
@@ -191,9 +196,19 @@ function tagName(id) {
   return state.model.tags.get(id)?.name ?? `Tag #${id}`;
 }
 
-function isForOthers(tx) {
-  const personId = personIdOf(tx);
-  return personId != null && personId !== state.model.self.id;
+/** The part of a purchase bought for people other than you. */
+function othersShare(purchase) {
+  return purchase.shares.filter(share => share.personId !== state.model.self.id).reduce((sum, share) => sum + share.amountCents, 0);
+}
+
+/** "Me", "Me, Alex", "From Alex", or "Alex's share" — who a row is about, as shown in tables. */
+function whoLabel(tx) {
+  if (tx.kind === 'Payback') return `From ${personName(tx.personId)}`;
+  if (tx.kind === 'Refund') {
+    const purchase = state.model.byId.get(tx.linkedId);
+    return purchase && purchase.shares.length > 1 ? `${personName(tx.personId)}'s share` : personName(tx.personId);
+  }
+  return tx.shares.map(share => personName(share.personId)).join(', ');
 }
 
 /** Short human label: "Merchant — description", whichever parts exist. */
@@ -201,21 +216,17 @@ function describeTransaction(tx) {
   return [tx.merchant, tx.description].filter(Boolean).join(' — ');
 }
 
-function linkedTotals(purchaseId, excludingId = null) {
-  let refunded = 0;
-  let paidBack = 0;
-  for (const tx of state.model.linked.get(purchaseId) ?? []) {
-    if (tx.id === excludingId) continue;
-    if (tx.kind === 'Refund') refunded += tx.amountCents;
-    if (tx.kind === 'Payback') paidBack += tx.amountCents;
+/** A person's share of a purchase not yet covered by refunds or paybacks linked to that share. */
+function shareRemaining(purchase, personId, excludingId = null) {
+  let covered = 0;
+  for (const tx of state.model.linked.get(purchase.id) ?? []) {
+    if (tx.id !== excludingId && tx.personId === personId) covered += tx.amountCents;
   }
-  return { refunded, paidBack };
+  return shareOf(purchase, personId) - covered;
 }
 
-/** Amount of a purchase not yet covered by refunds or linked paybacks. */
 function purchaseRemaining(purchase, excludingId = null) {
-  const { refunded, paidBack } = linkedTotals(purchase.id, excludingId);
-  return purchase.amountCents - refunded - paidBack;
+  return purchase.shares.reduce((sum, share) => sum + shareRemaining(purchase, share.personId, excludingId), 0);
 }
 
 function transactionsInRange(start, end) {
@@ -224,10 +235,9 @@ function transactionsInRange(start, end) {
 
 function matchesSearch(tx, query) {
   if (!query) return true;
-  const personId = personIdOf(tx);
   const haystack = [
     tx.kind, tx.merchant, tx.description, tx.note, methodName(tx.paymentMethodId),
-    personId == null ? '' : personName(personId),
+    ...peopleOf(tx).map(personName),
     ...tagIdsOf(tx).map(tagName)
   ].join(' ').toLowerCase();
   return query.toLowerCase().split(/\s+/).filter(Boolean).every(word => haystack.includes(word));

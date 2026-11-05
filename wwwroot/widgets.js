@@ -96,6 +96,74 @@ function createSingleSelect(host, { onChange = () => {} } = {}) {
 }
 
 /**
+ * A Win95 dropdown of check items, like the TaskList Stats list filter. The menu stays open while items are
+ * toggled. Options are [{ value, label }]; the button summarizes the selection.
+ */
+function createMultiSelect(host, { empty = 'None', onChange = () => {} } = {}) {
+  host.classList.add('menu-wrap', 'inline-select-menu');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'retro-select';
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  const labelledBy = host.getAttribute('aria-labelledby');
+  if (labelledBy) button.setAttribute('aria-labelledby', labelledBy);
+  const label = document.createElement('span');
+  const arrow = document.createElement('span');
+  arrow.className = 'select-arrow';
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = '▼';
+  button.append(label, arrow);
+  const menu = document.createElement('div');
+  menu.className = 'menu-dropdown single-select-dropdown multi-select-dropdown';
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  host.replaceChildren(button, menu);
+
+  let options = [];
+  let selected = new Set();
+
+  function render() {
+    const names = options.filter(option => selected.has(option.value)).map(option => option.label);
+    label.textContent = names.length ? names.join(', ') : empty;
+    button.title = label.textContent;
+    button.disabled = options.length === 0;
+    menu.replaceChildren(...options.map(option => {
+      const item = menuButton(option.label, {
+        role: 'menuitemcheckbox',
+        checked: selected.has(option.value),
+        onClick: event => {
+          event.stopPropagation();
+          if (selected.has(option.value)) selected.delete(option.value);
+          else selected.add(option.value);
+          render();
+          menu.querySelectorAll('button')[options.indexOf(option)]?.focus();
+          onChange(values());
+        }
+      });
+      return item;
+    }));
+  }
+
+  const values = () => options.filter(option => selected.has(option.value)).map(option => option.value);
+
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    toggleMenu(button, menu);
+  });
+  menu.addEventListener('click', event => event.stopPropagation());
+
+  return {
+    get values() { return values(); },
+    setOptions(nextOptions, chosen = values()) {
+      options = nextOptions.map(option => ({ value: String(option.value), label: String(option.label) }));
+      selected = new Set(chosen.map(String).filter(value => options.some(option => option.value === value)));
+      render();
+    }
+  };
+}
+
+/**
  * Renders a table. columns: [{ label, num, title }]. rows: [{ cells: [string | Node | { text, num, className, title }], onClick, className }].
  */
 function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer = null } = {}) {
@@ -262,5 +330,5 @@ function showError(message) {
 }
 
 function setStatus(message) {
-  $('#toolbarStatus').textContent = message;
+  $('#statusLeft').textContent = message;
 }

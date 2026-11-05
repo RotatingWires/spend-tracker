@@ -50,9 +50,9 @@ function renderAll() {
   if ($('#dayDialog').open) renderDayDialog();
 
   const count = state.model.transactions.length;
-  $('#statusLeft').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')}`;
-  $('#statusRight').textContent = `Loaded ${new Date().toLocaleTimeString()}`;
-  if ($('#toolbarStatus').textContent === 'Loading...') setStatus('Ready');
+  // Messages go on the left and totals on the right, as in TaskList.
+  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')}`;
+  if ($('#statusLeft').textContent === 'Loading...') setStatus('Ready');
 }
 
 function switchTab(name) {
@@ -305,9 +305,12 @@ function startApp() {
   });
   $$('.tabs [role="tab"]').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   document.addEventListener('click', closeMenus);
+  // Escape closes an open dropdown first, without also closing the dialog it sits in.
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeMenus();
-  });
+    if (event.key !== 'Escape' || !$$('.menu-dropdown').some(menu => !menu.hidden)) return;
+    event.preventDefault();
+    closeMenus();
+  }, true);
   window.addEventListener('spend-theme-change', () => {
     if (state.activeTab === 'stats') renderStats();
   });

@@ -14,10 +14,10 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed class Store
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
-    public static readonly string[] Tables = ["payment_methods", "people", "tags", "events", "transactions", "transaction_tags", "history"];
+    public static readonly string[] Tables = ["payment_methods", "people", "tags", "events", "transactions", "transaction_shares", "transaction_tags", "history"];
 
     const long MaxAmountCents = 1_000_000_000; // $10,000,000.00 — far above any real purchase, small enough to stay exact in JavaScript.
     const int MaxNameLength = 60;
@@ -53,6 +53,8 @@ sealed class Store
         if (version > SchemaVersion)
             throw new InvalidOperationException($"spend-tracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
         if (version == SchemaVersion) return journalMode;
+        if (version != 0)
+            throw new InvalidOperationException($"spend-tracker.db was created by SpendTracker 0.2 (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
 
         using var transaction = connection.BeginTransaction();
         Execute(connection, transaction, """
@@ -74,6 +76,7 @@ sealed class Store
             CREATE TABLE tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
                 created_at TEXT NOT NULL
             );
             CREATE TABLE transactions (
@@ -82,6 +85,8 @@ sealed class Store
                 date TEXT NOT NULL CHECK(date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
                 amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
                 payment_method_id INTEGER NOT NULL REFERENCES payment_methods(id),
+                -- Payback: who paid you back. Refund: whose share of the purchase it refunds.
+                -- Purchase: NULL; who it was for, and how much each, is in transaction_shares.
                 person_id INTEGER NULL REFERENCES people(id),
                 linked_id INTEGER NULL REFERENCES transactions(id),
                 merchant TEXT NOT NULL DEFAULT '',
@@ -89,13 +94,18 @@ sealed class Store
                 note TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NULL,
-                -- A refund belongs to whoever the original purchase was for, so it never stores its own person.
-                CHECK((kind = 'Refund') = (person_id IS NULL)),
+                CHECK((kind = 'Purchase') = (person_id IS NULL)),
                 CHECK(kind <> 'Refund' OR linked_id IS NOT NULL),
                 CHECK(kind <> 'Purchase' OR linked_id IS NULL)
             );
             CREATE INDEX idx_transactions_date ON transactions(date, id);
             CREATE INDEX idx_transactions_linked ON transactions(linked_id);
+            CREATE TABLE transaction_shares (
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                person_id INTEGER NOT NULL REFERENCES people(id),
+                amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+                PRIMARY KEY (transaction_id, person_id)
+            );
             CREATE TABLE transaction_tags (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
@@ -203,10 +213,10 @@ sealed class Store
     static List<Tag> ReadTags(SqliteConnection connection, SqliteTransaction? transaction)
     {
         var tags = new List<Tag>();
-        using var command = Sql(connection, transaction, "SELECT id, name, created_at FROM tags ORDER BY name COLLATE NOCASE, id;");
+        using var command = Sql(connection, transaction, "SELECT id, name, archived, created_at FROM tags ORDER BY name COLLATE NOCASE, id;");
         using var reader = command.ExecuteReader();
         while (reader.Read())
-            tags.Add(new Tag(reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+            tags.Add(new Tag(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2) != 0, reader.GetString(3)));
         return tags;
     }
 
@@ -241,6 +251,21 @@ sealed class Store
             }
         }
 
+        var sharesByTransaction = new Dictionary<long, List<Share>>();
+        using (var shareCommand = Sql(connection, transaction,
+            "SELECT transaction_id, person_id, amount_cents FROM transaction_shares WHERE $id IS NULL OR transaction_id = $id ORDER BY transaction_id, person_id;",
+            ("$id", onlyId)))
+        using (var reader = shareCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var transactionId = reader.GetInt64(0);
+                if (!sharesByTransaction.TryGetValue(transactionId, out var shares))
+                    sharesByTransaction[transactionId] = shares = [];
+                shares.Add(new Share(reader.GetInt64(1), reader.GetInt64(2)));
+            }
+        }
+
         var transactions = new List<SpendTransaction>();
         using var command = Sql(connection, transaction, """
             SELECT id, kind, date, amount_cents, payment_method_id, person_id, linked_id,
@@ -265,6 +290,7 @@ sealed class Store
                 rows.GetString(8),
                 rows.GetString(9),
                 tagsByTransaction.TryGetValue(id, out var tagIds) ? tagIds : [],
+                sharesByTransaction.TryGetValue(id, out var shares) ? shares : [],
                 rows.GetString(10),
                 NullableString(rows, 11)));
         }
@@ -334,10 +360,13 @@ sealed class Store
                     description = $description, note = $note, updated_at = $now
                 WHERE id = $id;
                 """, [.. TransactionParameters(values, now), ("$id", savedId)]);
-            Execute(connection, transaction, "DELETE FROM transaction_tags WHERE transaction_id = $id;", ("$id", savedId));
+            Execute(connection, transaction, "DELETE FROM transaction_tags WHERE transaction_id = $id; DELETE FROM transaction_shares WHERE transaction_id = $id;", ("$id", savedId));
         }
         foreach (var tagId in values.TagIds)
             Execute(connection, transaction, "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($id, $tag);", ("$id", savedId), ("$tag", tagId));
+        foreach (var share in values.Shares)
+            Execute(connection, transaction, "INSERT INTO transaction_shares (transaction_id, person_id, amount_cents) VALUES ($id, $person, $amount);",
+                ("$id", savedId), ("$person", share.PersonId), ("$amount", share.AmountCents));
 
         var after = ReadTransactions(connection, transaction, savedId).Single();
         RecordHistory(connection, transaction, before is null ? "Created" : "Edited", "Transaction", savedId, before, after);
@@ -349,7 +378,7 @@ sealed class Store
         before.Kind == values.Kind && before.Date == values.Date && before.AmountCents == values.AmountCents &&
         before.PaymentMethodId == values.PaymentMethodId && before.PersonId == values.PersonId && before.LinkedId == values.LinkedId &&
         before.Merchant == values.Merchant && before.Description == values.Description && before.Note == values.Note &&
-        before.TagIds.SequenceEqual(values.TagIds);
+        before.TagIds.SequenceEqual(values.TagIds) && before.Shares.SequenceEqual(values.Shares);
 
     static (string Name, object? Value)[] TransactionParameters(TransactionValues values, string now) =>
     [
@@ -384,28 +413,32 @@ sealed class Store
             throw RequestException.Invalid("Only purchases have tags. Refunds count under their purchase's tags.");
         foreach (var tagId in tagIds)
         {
-            if (Scalar(connection, transaction, "SELECT 1 FROM tags WHERE id = $id;", ("$id", tagId)) is null)
-                throw RequestException.Invalid("One of the selected tags no longer exists. Refresh and try again.");
+            var tagArchived = Scalar(connection, transaction, "SELECT archived FROM tags WHERE id = $id;", ("$id", tagId))
+                ?? throw RequestException.Invalid("One of the selected tags no longer exists. Refresh and try again.");
+            if (Convert.ToInt64(tagArchived, CultureInfo.InvariantCulture) != 0 && before?.TagIds.Contains(tagId) != true)
+                throw RequestException.Invalid("That tag is archived. Restore it under Manage to use it again.");
         }
 
         long? personId = request.PersonId;
         long? linkedId = request.LinkedId;
+        List<Share> shares = [];
+        if (kind != "Purchase" && request.Shares is { Count: > 0 })
+            throw RequestException.Invalid("Only purchases are split between people.");
         switch (kind)
         {
             case "Purchase":
                 if (linkedId is not null) throw RequestException.Invalid("A purchase cannot be linked to another transaction.");
-                RequireUsablePerson(connection, transaction, personId, before?.PersonId, "Choose who this purchase was for.");
+                if (personId is not null) throw RequestException.Invalid("A purchase lists who it was for in its shares, not in personId.");
+                shares = ValidateShares(connection, transaction, request.Shares, amount, before);
                 break;
 
             case "Refund":
-                if (personId is not null) throw RequestException.Invalid("A refund belongs to the person on its original purchase; do not set For Who.");
                 var refunded = RequireLinkedPurchase(connection, transaction, id, linkedId, "Choose the purchase this refund is for.");
                 if (string.CompareOrdinal(date, refunded.Date) < 0)
                     throw RequestException.Invalid("A refund cannot be dated before its purchase.");
-                var otherRefunds = LinkedTotal(connection, transaction, refunded.Id, "Refund", id);
-                var refundPaybacks = LinkedTotal(connection, transaction, refunded.Id, "Payback", id);
-                if (otherRefunds + refundPaybacks + amount > refunded.AmountCents)
-                    throw RequestException.Invalid($"Refunds and paybacks for that purchase would total more than its {FormatCents(refunded.AmountCents)}.");
+                var refundShare = RequireShare(connection, transaction, refunded.Id, personId, "Choose whose share of the purchase this refund is for.");
+                if (LinkedShareTotal(connection, transaction, refunded.Id, personId!.Value, id) + amount > refundShare)
+                    throw RequestException.Invalid($"Refunds and paybacks for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(refundShare)}.");
                 break;
 
             case "Payback":
@@ -414,37 +447,61 @@ sealed class Store
                 if (linkedId is not null)
                 {
                     var repaid = RequireLinkedPurchase(connection, transaction, id, linkedId, "Choose the purchase this payback is for.");
-                    if (repaid.PersonId != personId)
-                        throw RequestException.Invalid("A payback can only be linked to a purchase made for the same person.");
                     if (string.CompareOrdinal(date, repaid.Date) < 0)
                         throw RequestException.Invalid("A payback cannot be dated before its purchase.");
-                    var refunds = LinkedTotal(connection, transaction, repaid.Id, "Refund", id);
-                    var otherPaybacks = LinkedTotal(connection, transaction, repaid.Id, "Payback", id);
-                    if (refunds + otherPaybacks + amount > repaid.AmountCents)
-                        throw RequestException.Invalid($"Refunds and paybacks for that purchase would total more than its {FormatCents(repaid.AmountCents)}.");
+                    var paybackShare = RequireShare(connection, transaction, repaid.Id, personId,
+                        "A payback can only be linked to a purchase that person had a share of.");
+                    if (LinkedShareTotal(connection, transaction, repaid.Id, personId!.Value, id) + amount > paybackShare)
+                        throw RequestException.Invalid($"Refunds and paybacks for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(paybackShare)}.");
                 }
                 break;
         }
 
         if (before?.Kind == "Purchase" && id is not null)
-            ValidatePurchaseDependents(connection, transaction, id.Value, kind, date, amount, personId);
+            ValidatePurchaseDependents(connection, transaction, id.Value, kind, date, shares);
 
-        return new TransactionValues(kind, date, amount, methodId, personId, linkedId, merchant, description, note, tagIds);
+        return new TransactionValues(kind, date, amount, methodId, personId, linkedId, merchant, description, note, tagIds, shares);
+    }
+
+    /// <summary>Who a purchase was for: each person once, each share at least a cent, adding up exactly to the amount.</summary>
+    static List<Share> ValidateShares(SqliteConnection connection, SqliteTransaction transaction, List<ShareRequest>? requested, long amount, SpendTransaction? before)
+    {
+        if (requested is null || requested.Count == 0) throw RequestException.Invalid("Choose who this purchase was for.");
+        var shares = new List<Share>();
+        foreach (var share in requested)
+        {
+            var personId = share.PersonId ?? throw RequestException.Invalid("Every share needs a person.");
+            var cents = share.AmountCents ?? throw RequestException.Invalid("Every share needs an amount.");
+            if (cents < 1) throw RequestException.Invalid("Each person's share must be at least $0.01.");
+            if (shares.Any(s => s.PersonId == personId)) throw RequestException.Invalid("Each person can only be on a purchase once.");
+            var wasOnPurchase = before?.Shares.Any(s => s.PersonId == personId) == true;
+            RequireUsablePerson(connection, transaction, personId, wasOnPurchase ? personId : null, "Choose who this purchase was for.");
+            shares.Add(new Share(personId, cents));
+        }
+        var total = shares.Sum(s => s.AmountCents);
+        if (total != amount)
+            throw RequestException.Invalid($"The shares add up to {FormatCents(total)}, but the purchase is {FormatCents(amount)}.");
+        return shares.OrderBy(s => s.PersonId).ToList();
     }
 
     /// <summary>Editing a purchase must keep every refund and payback that points at it valid.</summary>
-    static void ValidatePurchaseDependents(SqliteConnection connection, SqliteTransaction transaction, long id, string kind, string date, long amount, long? personId)
+    static void ValidatePurchaseDependents(SqliteConnection connection, SqliteTransaction transaction, long id, string kind, string date, List<Share> shares)
     {
         var dependents = ReadDependents(connection, transaction, id);
         if (dependents.Count == 0) return;
         if (kind != "Purchase")
             throw RequestException.Invalid("This purchase has linked refunds or paybacks, so it must stay a purchase.");
-        if (dependents.Sum(d => d.AmountCents) > amount)
-            throw RequestException.Invalid($"Linked refunds and paybacks already total {FormatCents(dependents.Sum(d => d.AmountCents))}; the purchase cannot be less than that.");
         if (dependents.Any(d => string.CompareOrdinal(d.Date, date) < 0))
             throw RequestException.Invalid("A linked refund or payback is dated before that date.");
-        if (dependents.Any(d => d.Kind == "Payback" && d.PersonId != personId))
-            throw RequestException.Invalid("This purchase has paybacks from its current person, so For Who cannot change.");
+        foreach (var group in dependents.GroupBy(d => d.PersonId!.Value))
+        {
+            var name = PersonName(connection, transaction, group.Key);
+            var share = shares.FirstOrDefault(s => s.PersonId == group.Key)
+                ?? throw RequestException.Invalid($"{name} has linked refunds or paybacks on this purchase, so they must stay on it.");
+            var linked = group.Sum(d => d.AmountCents);
+            if (linked > share.AmountCents)
+                throw RequestException.Invalid($"Refunds and paybacks for {name}'s share already total {FormatCents(linked)}; their share cannot be less than that.");
+        }
     }
 
     public void DeleteTransaction(long id)
@@ -470,21 +527,33 @@ sealed class Store
         return dependents;
     }
 
-    static (long Id, string Date, long AmountCents, long? PersonId) RequireLinkedPurchase(SqliteConnection connection, SqliteTransaction transaction, long? selfId, long? linkedId, string missingMessage)
+    static (long Id, string Date) RequireLinkedPurchase(SqliteConnection connection, SqliteTransaction transaction, long? selfId, long? linkedId, string missingMessage)
     {
         if (linkedId is null) throw RequestException.Invalid(missingMessage);
         if (linkedId == selfId) throw RequestException.Invalid("A transaction cannot be linked to itself.");
-        using var command = Sql(connection, transaction, "SELECT id, kind, date, amount_cents, person_id FROM transactions WHERE id = $id;", ("$id", linkedId));
+        using var command = Sql(connection, transaction, "SELECT id, kind, date FROM transactions WHERE id = $id;", ("$id", linkedId));
         using var reader = command.ExecuteReader();
         if (!reader.Read()) throw RequestException.Invalid("The linked purchase no longer exists.");
         if (reader.GetString(1) != "Purchase") throw RequestException.Invalid("Refunds and paybacks can only be linked to a purchase.");
-        return (reader.GetInt64(0), reader.GetString(2), reader.GetInt64(3), reader.IsDBNull(4) ? null : reader.GetInt64(4));
+        return (reader.GetInt64(0), reader.GetString(2));
     }
 
-    static long LinkedTotal(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, string kind, long? excludingId) =>
+    /// <summary>The share a person had of a purchase; refunds and paybacks are always for one person's share.</summary>
+    static long RequireShare(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long? personId, string missingMessage)
+    {
+        if (personId is null) throw RequestException.Invalid(missingMessage);
+        var share = Scalar(connection, transaction, "SELECT amount_cents FROM transaction_shares WHERE transaction_id = $purchase AND person_id = $person;",
+            ("$purchase", purchaseId), ("$person", personId));
+        return share is null ? throw RequestException.Invalid(missingMessage) : Convert.ToInt64(share, CultureInfo.InvariantCulture);
+    }
+
+    static long LinkedShareTotal(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long personId, long? excludingId) =>
         Convert.ToInt64(Scalar(connection, transaction,
-            "SELECT COALESCE(SUM(amount_cents), 0) FROM transactions WHERE linked_id = $purchase AND kind = $kind AND ($exclude IS NULL OR id <> $exclude);",
-            ("$purchase", purchaseId), ("$kind", kind), ("$exclude", excludingId)), CultureInfo.InvariantCulture);
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM transactions WHERE linked_id = $purchase AND person_id = $person AND ($exclude IS NULL OR id <> $exclude);",
+            ("$purchase", purchaseId), ("$person", personId), ("$exclude", excludingId)), CultureInfo.InvariantCulture);
+
+    static string PersonName(SqliteConnection connection, SqliteTransaction transaction, long personId) =>
+        Convert.ToString(Scalar(connection, transaction, "SELECT name FROM people WHERE id = $id;", ("$id", personId)), CultureInfo.InvariantCulture) ?? $"Person #{personId}";
 
     static (long Id, bool IsSelf) RequireUsablePerson(SqliteConnection connection, SqliteTransaction transaction, long? personId, long? previousPersonId, string missingMessage)
     {
@@ -589,7 +658,10 @@ sealed class Store
         using var transaction = connection.BeginTransaction();
         var before = ReadPeople(connection, transaction).SingleOrDefault(p => p.Id == id) ?? throw RequestException.NotFound("Person not found.");
         if (before.IsSelf) throw RequestException.Invalid("You cannot delete yourself.");
-        var uses = Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM transactions WHERE person_id = $id;", ("$id", id)), CultureInfo.InvariantCulture);
+        var uses = Convert.ToInt64(Scalar(connection, transaction, """
+            SELECT COUNT(*) FROM transactions t
+            WHERE t.person_id = $id OR EXISTS (SELECT 1 FROM transaction_shares s WHERE s.transaction_id = t.id AND s.person_id = $id);
+            """, ("$id", id)), CultureInfo.InvariantCulture);
         if (uses > 0) throw RequestException.Invalid($"{before.Name} is on {uses} transaction{(uses == 1 ? "" : "s")}. Archive them instead to hide them from new entries.");
         Execute(connection, transaction, "DELETE FROM people WHERE id = $id;", ("$id", id));
         RecordHistory(connection, transaction, "Deleted", "Person", id, before, null);
@@ -611,16 +683,18 @@ sealed class Store
         return created;
     }
 
-    public Tag UpdateTag(long id, TagUpdateRequest request)
+    public Tag UpdateTag(long id, UpdateNameRequest request)
     {
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         var before = ReadTags(connection, transaction).SingleOrDefault(t => t.Id == id) ?? throw RequestException.NotFound("Tag not found.");
-        var name = RequireName(request.Name, "Tag name");
+        var name = request.Name is null ? before.Name : RequireName(request.Name, "Tag name");
+        var archived = request.Archived ?? before.Archived;
         EnsureNameFree(connection, transaction, "tags", name, id, "A tag with that name already exists.");
-        var after = before with { Name = name };
+        var after = before with { Name = name, Archived = archived };
         if (after == before) return before;
-        Execute(connection, transaction, "UPDATE tags SET name = $name WHERE id = $id;", ("$name", name), ("$id", id));
+        Execute(connection, transaction, "UPDATE tags SET name = $name, archived = $archived WHERE id = $id;",
+            ("$name", name), ("$archived", archived ? 1 : 0), ("$id", id));
         RecordHistory(connection, transaction, "Edited", "Tag", id, before, after);
         transaction.Commit();
         return after;
@@ -634,7 +708,7 @@ sealed class Store
         var before = ReadTags(connection, transaction).SingleOrDefault(t => t.Id == id) ?? throw RequestException.NotFound("Tag not found.");
         var uses = Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM transaction_tags WHERE tag_id = $id;", ("$id", id)), CultureInfo.InvariantCulture);
         Execute(connection, transaction, "DELETE FROM tags WHERE id = $id;", ("$id", id));
-        RecordHistory(connection, transaction, "Deleted", "Tag", id, new { before.Id, before.Name, before.CreatedAt, RemovedFromTransactions = uses }, null);
+        RecordHistory(connection, transaction, "Deleted", "Tag", id, new { before.Id, before.Name, before.Archived, before.CreatedAt, RemovedFromTransactions = uses }, null);
         transaction.Commit();
     }
 
@@ -794,6 +868,10 @@ sealed class Store
             """);
         if (badTransaction is not null) throw RequestException.Invalid($"Transaction #{badTransaction} in the backup has an invalid value.");
 
+        var badShare = Scalar(connection, transaction,
+            "SELECT transaction_id FROM transaction_shares WHERE typeof(person_id) <> 'integer' OR typeof(amount_cents) <> 'integer' LIMIT 1;");
+        if (badShare is not null) throw RequestException.Invalid($"Transaction #{badShare} in the backup has an invalid share.");
+
         var taggedNonPurchase = Scalar(connection, transaction,
             "SELECT t.transaction_id FROM transaction_tags t JOIN transactions x ON x.id = t.transaction_id WHERE x.kind <> 'Purchase' LIMIT 1;");
         if (taggedNonPurchase is not null) throw RequestException.Invalid($"Transaction #{taggedNonPurchase} in the backup has tags, but only purchases can.");
@@ -838,24 +916,37 @@ sealed class Store
             SELECT x.id FROM transactions x JOIN transactions p ON p.id = x.linked_id
             WHERE p.kind <> 'Purchase' LIMIT 1;
             """,
-            // A linked payback comes from the person the purchase was for.
+            // A purchase's shares add up exactly to its amount; only purchases have shares.
             """
-            SELECT x.id FROM transactions x JOIN transactions p ON p.id = x.linked_id
-            WHERE x.kind = 'Payback' AND x.person_id IS NOT p.person_id LIMIT 1;
+            SELECT t.id FROM transactions t
+            LEFT JOIN (SELECT transaction_id, SUM(amount_cents) AS total FROM transaction_shares GROUP BY transaction_id) s ON s.transaction_id = t.id
+            WHERE t.kind = 'Purchase' AND (s.total IS NULL OR s.total <> t.amount_cents) LIMIT 1;
+            """,
+            """
+            SELECT s.transaction_id FROM transaction_shares s JOIN transactions t ON t.id = s.transaction_id
+            WHERE t.kind <> 'Purchase' LIMIT 1;
+            """,
+            // Linked refunds and paybacks are for someone who had a share of that purchase.
+            """
+            SELECT x.id FROM transactions x
+            WHERE x.linked_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM transaction_shares s WHERE s.transaction_id = x.linked_id AND s.person_id = x.person_id)
+            LIMIT 1;
             """,
             // Paybacks never come from yourself.
             """
             SELECT x.id FROM transactions x JOIN people me ON me.id = x.person_id
             WHERE x.kind = 'Payback' AND me.is_self = 1 LIMIT 1;
             """,
-            // Nothing is returned or repaid before it was bought, and never more than it cost.
+            // Nothing is returned or repaid before it was bought, and never more than a person's share.
             """
             SELECT x.id FROM transactions x JOIN transactions p ON p.id = x.linked_id
             WHERE x.date < p.date LIMIT 1;
             """,
             """
-            SELECT p.id FROM transactions p JOIN transactions x ON x.linked_id = p.id
-            GROUP BY p.id HAVING SUM(x.amount_cents) > p.amount_cents LIMIT 1;
+            SELECT x.linked_id FROM transactions x
+            JOIN transaction_shares s ON s.transaction_id = x.linked_id AND s.person_id = x.person_id
+            GROUP BY x.linked_id, x.person_id, s.amount_cents HAVING SUM(x.amount_cents) > s.amount_cents LIMIT 1;
             """
         ];
         foreach (var check in checks)
@@ -947,19 +1038,20 @@ sealed class Store
 
 record PaymentMethod(long Id, string Name, bool Archived, string CreatedAt);
 record Person(long Id, string Name, bool IsSelf, bool Archived, string CreatedAt);
-record Tag(long Id, string Name, string CreatedAt);
+record Tag(long Id, string Name, bool Archived, string CreatedAt);
+record Share(long PersonId, long AmountCents);
 record SpendEvent(long Id, string Name, string StartDate, string EndDate, string Note, string CreatedAt, string? UpdatedAt);
 record SpendTransaction(long Id, string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
-    string Merchant, string Description, string Note, List<long> TagIds, string CreatedAt, string? UpdatedAt);
+    string Merchant, string Description, string Note, List<long> TagIds, List<Share> Shares, string CreatedAt, string? UpdatedAt);
 record HistoryEntry(long Id, string At, string Action, string Entity, long? EntityId, JsonElement? Before, JsonElement? After);
 record HistoryPage(List<HistoryEntry> Entries, bool HasMore);
 record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person> People, List<Tag> Tags, List<SpendEvent> Events, List<SpendTransaction> Transactions);
 
 record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? PaymentMethodId, long? PersonId, long? LinkedId,
-    string? Merchant, string? Description, string? Note, List<long>? TagIds);
+    string? Merchant, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares);
+record ShareRequest(long? PersonId, long? AmountCents);
 record TransactionValues(string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
-    string Merchant, string Description, string Note, List<long> TagIds);
+    string Merchant, string Description, string Note, List<long> TagIds, List<Share> Shares);
 record NameRequest(string? Name);
 record UpdateNameRequest(string? Name, bool? Archived);
-record TagUpdateRequest(string? Name);
 record EventRequest(string? Name, string? StartDate, string? EndDate, string? Note);
