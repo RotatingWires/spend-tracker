@@ -126,6 +126,14 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#monthCards")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
         expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")
 
+        # Search matches the start of words, not letters inside "Purchase" or "Cash".
+        rows = page.locator("#transactionsTable tbody tr:not(.empty-row)")
+        for query, expected in (("h", 0), ("din", 2), ("DINER dinner", 2), ("ven", 1), ("12.17", 1), ("alex", 3), ("refund", 1), ("zzz", 0)):
+            page.fill("#searchInput", query)
+            expect(rows).to_have_count(expected)
+        page.fill("#searchInput", "")
+        expect(rows).to_have_count(4)
+
         # Invalid input shows the server's message and keeps the dialog open.
         page.click("#newTransactionButton")
         page.fill("#txAmount", "5")

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.3.0 Manual
+# SpendTracker v0.3.1 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -159,7 +159,7 @@ Payment methods and people that are used by transactions cannot be deleted; arch
 
 The default tab is a monthly ledger. Use **◀ / ▶** or the month dropdown in the toolbar to change months. The cards above the table show the month's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method; refunds show as −$ and paybacks as +$ in green. The footer row shows net spent per payment method (purchases minus refunds; paybacks are excluded).
 
-**Search** filters the month's rows by merchant, description, note, type, payment method, person, and tags. All words must match.
+**Search** filters the month's rows by merchant, description, note, type, payment method, person, tags, and amount. Each word you type must be the start of a word in the row, so `din` finds *Diner* but `h` does not match the *h* inside *Purchase* or *Cash*; `12.17` finds that amount. All words must match.
 
 Select a row (click, or focus it and press Enter) to edit it. **New Transaction** (toolbar or File menu) opens an empty editor. New entries default to today, or to the first day of the viewed month when you are looking at another month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
@@ -426,6 +426,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.3.1
+
+- Search matches the start of words instead of letters anywhere, so `h` no longer matches every purchase through the *h* in *Purchase* or *Cash*. Amounts are searchable too.
 
 ### v0.3.0
 

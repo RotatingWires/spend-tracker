@@ -233,14 +233,23 @@ function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
 }
 
+function searchWords(text) {
+  return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * Every searched word must be the start of a word in the transaction, so "din" finds "Diner" but "h" does not
+ * match the "h" inside "Purchase" or "Cash". Amounts are searchable as typed, like "12.17".
+ */
 function matchesSearch(tx, query) {
-  if (!query) return true;
-  const haystack = [
-    tx.kind, tx.merchant, tx.description, tx.note, methodName(tx.paymentMethodId),
+  const wanted = searchWords(query);
+  if (wanted.length === 0) return true;
+  const words = searchWords([
+    tx.kind, tx.merchant, tx.description, tx.note, methodName(tx.paymentMethodId), centsToInput(tx.amountCents),
     ...peopleOf(tx).map(personName),
     ...tagIdsOf(tx).map(tagName)
-  ].join(' ').toLowerCase();
-  return query.toLowerCase().split(/\s+/).filter(Boolean).every(word => haystack.includes(word));
+  ].join(' '));
+  return wanted.every(part => words.some(word => word.startsWith(part)));
 }
 
 function eventsOn(key) {
