@@ -1,0 +1,327 @@
+'use strict';
+
+/* Startup, data loading, tab navigation, toolbar, menus, backup/restore, and session handling. */
+
+const TAB_RENDERERS = {
+  transactions: renderTransactions,
+  calendar: renderCalendar,
+  stats: renderStats,
+  people: renderPeople,
+  events: renderEvents,
+  history: () => loadHistory(),
+  manage: renderManage
+};
+const MONTH_TABS = new Set(['transactions', 'calendar']);
+let monthSelect = null;
+
+async function loadSnapshot() {
+  if (state.loading) return state.loading;
+  state.loading = (async () => {
+    try {
+      const snapshot = await api('/snapshot');
+      state.snapshot = snapshot;
+      state.model = buildModel(snapshot);
+      applyReleaseLabel(await frontendReleaseVersion(snapshot.version));
+      showError('');
+      $('#loadingPanel').hidden = true;
+      renderAll();
+    } catch (error) {
+      $('#loadingPanel').hidden = true;
+      showError(`Could not load data: ${error.message}`);
+      setStatus('Data unavailable');
+    }
+  })();
+  try {
+    await state.loading;
+  } finally {
+    state.loading = null;
+  }
+}
+
+function renderAll() {
+  if (!state.model) return;
+  renderMonthSelect();
+  $('#monthControls').hidden = !MONTH_TABS.has(state.activeTab);
+  $('#titleScope').textContent = MONTH_TABS.has(state.activeTab)
+    ? formatMonth(state.month)
+    : $(`.tabs [data-tab="${state.activeTab}"]`).textContent;
+  TAB_RENDERERS[state.activeTab]();
+  if ($('#personDialog').open) renderPersonDialog();
+  if ($('#dayDialog').open) renderDayDialog();
+
+  const count = state.model.transactions.length;
+  $('#statusLeft').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')}`;
+  $('#statusRight').textContent = `Loaded ${new Date().toLocaleTimeString()}`;
+  if ($('#toolbarStatus').textContent === 'Loading...') setStatus('Ready');
+}
+
+function switchTab(name) {
+  state.activeTab = name;
+  $$('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.tab === name ? 'true' : 'false'));
+  $$('.tab-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
+  closeMenus();
+  Charts.hideTooltip();
+  $('#workspace').scrollTop = 0;
+  renderAll();
+}
+
+function renderMonthSelect() {
+  const today = monthOf(todayKey());
+  const transactions = state.model.transactions;
+  const first = transactions.length ? monthOf(transactions[0].date) : today;
+  const last = transactions.length ? monthOf(transactions.at(-1).date) : today;
+  const newest = [last, today, state.month].sort().at(-1);
+  const oldest = [first, today, state.month].sort()[0];
+  const options = [];
+  for (let month = newest; month >= oldest; month = shiftMonth(month, -1))
+    options.push({ value: month, label: formatMonth(month) });
+  monthSelect.setOptions(options, state.month);
+}
+
+function changeMonth(month) {
+  state.month = month;
+  renderAll();
+}
+
+function populateViewMenu() {
+  const menu = $('#viewMenu');
+  menu.replaceChildren();
+  for (const tab of $$('.tabs [role="tab"]')) {
+    menu.append(menuButton(tab.textContent, {
+      role: 'menuitemradio',
+      checked: tab.dataset.tab === state.activeTab,
+      onClick: () => switchTab(tab.dataset.tab)
+    }));
+  }
+  const separator = document.createElement('div');
+  separator.className = 'menu-separator';
+  separator.setAttribute('role', 'separator');
+  const heading = document.createElement('div');
+  heading.className = 'menu-heading';
+  heading.textContent = 'Theme';
+  menu.append(separator, heading);
+  const preference = window.SpendTheme.getPreference();
+  for (const [value, label] of [['light', 'Light'], ['dark', 'Dark']]) {
+    menu.append(menuButton(label, {
+      role: 'menuitemradio',
+      checked: value === preference,
+      onClick: () => {
+        window.SpendTheme.setPreference(value);
+        closeMenus();
+      }
+    }));
+  }
+}
+
+function applyReleaseLabel(version) {
+  if (!version) return;
+  document.title = `SpendTracker v${version}`;
+  $('.title-left').textContent = `SpendTracker v${version}`;
+  $('#aboutVersion').textContent = `SpendTracker v${version}`;
+}
+
+async function frontendReleaseVersion(fallback = '') {
+  try {
+    const response = await fetch('/version.json', { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) return fallback;
+    const body = await response.json();
+    return body.version || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function logout() {
+  closeMenus();
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+  } finally {
+    window.location.replace('/login.html');
+  }
+}
+
+async function downloadBackup() {
+  closeMenus();
+  try {
+    const response = await fetch('/api/backup', { credentials: 'same-origin', cache: 'no-store' });
+    if (response.status === 401) {
+      window.location.replace(loginUrl());
+      return;
+    }
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spend-tracker-${todayKey()}.json`;
+    downloadFile(name, 'application/json', await response.blob());
+    setStatus('Backup downloaded. Keep it private; it contains all your spending data.');
+  } catch (error) {
+    showError(`Could not download a backup: ${error.message}`);
+  }
+}
+
+async function restoreBackup(file) {
+  let backup;
+  try {
+    backup = JSON.parse(await file.text());
+  } catch {
+    showError(`${file.name} is not a valid JSON backup file.`);
+    return;
+  }
+  const count = Array.isArray(backup.transactions) ? backup.transactions.length : 0;
+  const confirmed = await confirmAction('Restore Backup',
+    `Replace ALL current SpendTracker data with ${file.name} (${plural(count, 'transaction')})? The current data is saved on the server in data/backups first. Your password is not changed.`,
+    'Restore');
+  if (!confirmed) return;
+  try {
+    const result = await api('/restore', { method: 'POST', body: backup });
+    await loadSnapshot();
+    setStatus(`Restored ${plural(result.transactions, 'transaction')}. Previous data saved as ${result.recoveryFile}.`);
+  } catch (error) {
+    showError(`Restore failed; nothing was changed. ${error.message}`);
+  }
+}
+
+function initializeRowHover() {
+  const root = document.documentElement;
+  const button = $('#highlightRowsButton');
+  const storageKey = 'spend-tracker-highlight-rows';
+  let enabled = true;
+  let hoveredRow = null;
+  try { enabled = localStorage.getItem(storageKey) !== 'false'; } catch {}
+
+  function highlightRow(row) {
+    if (row === hoveredRow) return;
+    hoveredRow?.classList.remove('row-hover');
+    hoveredRow = row;
+    hoveredRow?.classList.add('row-hover');
+  }
+
+  function applyPreference() {
+    root.classList.toggle('row-hover-enabled', enabled);
+    button.setAttribute('aria-checked', String(enabled));
+    if (!enabled) highlightRow(null);
+  }
+  applyPreference();
+
+  button.addEventListener('click', () => {
+    enabled = !enabled;
+    try { localStorage.setItem(storageKey, String(enabled)); } catch {}
+    applyPreference();
+    closeMenus();
+  });
+
+  // Track rows from mouse pointers only, so a tap on a phone does not leave a row highlighted.
+  document.addEventListener('pointermove', event => {
+    const row = enabled && event.pointerType === 'mouse' ? event.target.closest?.('tbody > tr') ?? null : null;
+    highlightRow(row);
+  }, { passive: true, capture: true });
+  document.addEventListener('pointerout', event => {
+    if (!event.relatedTarget) highlightRow(null);
+  }, { passive: true, capture: true });
+}
+
+function initializeTooltips() {
+  // Touch screens have no hover, so tapping an underlined label shows its definition.
+  const popup = document.createElement('div');
+  popup.className = 'chart-tooltip';
+  popup.hidden = true;
+  document.body.append(popup);
+  document.addEventListener('click', event => {
+    const target = event.target.closest?.('.has-tooltip[title]');
+    if (!target) {
+      popup.hidden = true;
+      return;
+    }
+    popup.textContent = target.getAttribute('title');
+    popup.hidden = false;
+    const rect = target.getBoundingClientRect();
+    popup.style.left = `${Math.max(8, Math.min(window.innerWidth - popup.offsetWidth - 8, rect.left))}px`;
+    popup.style.top = `${rect.bottom + 8 + popup.offsetHeight > window.innerHeight ? rect.top - popup.offsetHeight - 8 : rect.bottom + 8}px`;
+  }, true);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') popup.hidden = true;
+  });
+  $('#workspace').addEventListener('scroll', () => { popup.hidden = true; }, { passive: true });
+}
+
+function startApp() {
+  state.month = monthOf(todayKey());
+  monthSelect = createSingleSelect($('#monthSelect'), { onChange: changeMonth });
+  initializeTransactionEditor();
+  initializeCalendar();
+  initializeStats();
+  initializePeople();
+  initializeEvents();
+  initializeHistory();
+  initializeManage();
+  initializeRowHover();
+  initializeTooltips();
+
+  $('#fileMenuButton').addEventListener('click', event => {
+    event.stopPropagation();
+    toggleMenu($('#fileMenuButton'), $('#fileMenu'));
+  });
+  $('#viewMenuButton').addEventListener('click', event => {
+    event.stopPropagation();
+    populateViewMenu();
+    toggleMenu($('#viewMenuButton'), $('#viewMenu'));
+  });
+  $('#helpButton').addEventListener('click', () => {
+    closeMenus();
+    $('#aboutDialog').showModal();
+  });
+  $('#newTransactionMenuItem').addEventListener('click', () => {
+    closeMenus();
+    openTransactionEditor(null, { date: defaultEntryDate() });
+  });
+  $('#newTransactionButton').addEventListener('click', () => openTransactionEditor(null, { date: defaultEntryDate() }));
+  $('#refreshButton').addEventListener('click', () => {
+    closeMenus();
+    loadSnapshot();
+  });
+  $('#exportCsvButton').addEventListener('click', () => {
+    closeMenus();
+    exportTransactionsCsv();
+  });
+  $('#backupButton').addEventListener('click', downloadBackup);
+  $('#restoreButton').addEventListener('click', () => {
+    closeMenus();
+    $('#restoreFileInput').click();
+  });
+  $('#restoreFileInput').addEventListener('change', event => {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (file) restoreBackup(file);
+  });
+  $('#logoutButton').addEventListener('click', logout);
+  $('#previousMonthButton').addEventListener('click', () => changeMonth(shiftMonth(state.month, -1)));
+  $('#nextMonthButton').addEventListener('click', () => changeMonth(shiftMonth(state.month, 1)));
+  $('#searchInput').addEventListener('input', event => {
+    state.search = event.target.value.trim();
+    renderTransactions();
+  });
+  $$('.tabs [role="tab"]').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+  document.addEventListener('click', closeMenus);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMenus();
+  });
+  window.addEventListener('spend-theme-change', () => {
+    if (state.activeTab === 'stats') renderStats();
+  });
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (state.activeTab === 'stats' && state.model) renderStats();
+    }, 150);
+  });
+
+  loadSnapshot();
+}
+
+/** New entries default to today, unless the viewed month is another month, then its first day. */
+function defaultEntryDate() {
+  const today = todayKey();
+  return MONTH_TABS.has(state.activeTab) && monthOf(today) !== state.month ? monthStart(state.month) : today;
+}
+
+startApp();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

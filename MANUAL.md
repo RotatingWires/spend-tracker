@@ -1,0 +1,396 @@
+> [!WARNING]
+> This project is fully vibecoded, probably inefficient, but it does what I wanted lol
+
+# SpendTracker v0.1.0 Manual
+
+SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
+
+The guiding rule is **real data only**. SpendTracker never assigns categories, guesses merchants, fills in missing amounts, or estimates anything. Tags exist only when you add them; untagged spending is reported as *Untagged*. Every statistic is a defined calculation over recorded entries, and each one's definition is shown when you hover or tap its underlined label.
+
+The interface uses the same Windows 95-style visual language as TaskList and TaskList Stats, with persistent **Light** and **Dark** themes. It works on desktop and phone screens and can be installed as a PWA.
+
+- [Concepts](#concepts)
+- [Using the app](#using-the-app)
+- [Statistics](#statistics)
+- [Data and backups](#data-and-backups)
+- [Authentication](#authentication)
+- [Configuration and running](#configuration-and-running)
+- [HTTP API](#http-api)
+- [Technology stack](#technology-stack)
+- [Project layout](#project-layout)
+- [Version handling](#version-handling)
+- [Security and privacy](#security-and-privacy)
+- [Known limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
+- [Development checks](#development-checks)
+- [Release notes](#release-notes)
+
+## Concepts
+
+### Transactions
+
+Every entry is one of three types. All amounts are positive; the type decides which direction the money moved.
+
+| Type | Meaning | Required links |
+|---|---|---|
+| **Purchase** | Money you spent. **For who** records who it was for. | none |
+| **Refund / return** | Money a store gave back for a purchase. | the purchase it refunds |
+| **Payback to me** | Money another person gave you for something you paid for. | optionally, the purchase it pays for |
+
+Each transaction also has a date, an amount, a payment method, a merchant and/or a description (at least one is required), optional tags (purchases only), and an optional note.
+
+**Refunds** never have their own person or tags. They always belong to the person and tags of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*, and a refund on something bought for a friend reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
+
+**Paybacks** come from someone other than you. Linking a payback to a purchase marks that purchase as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
+
+The server enforces these rules on every save:
+
+- a refund or payback can only link to a purchase, and cannot be dated before it;
+- refunds plus linked paybacks for one purchase can never exceed its amount;
+- a linked payback must come from the person the purchase was for;
+- a purchase with linked refunds/paybacks must stay a purchase, cannot drop below what is linked to it, cannot move to a date after them, and cannot change person while it has paybacks;
+- a purchase with linked entries cannot be deleted until those entries are deleted.
+
+### People
+
+You are the one person marked *(you)*, initially named "Me" (rename it under Manage). Add other people under **Manage → People** and choose them as **For who** on purchases you make for them. You cannot archive or delete yourself.
+
+### Payment methods
+
+Payment methods become the amount columns of the ledger, like the Cash / card / bank columns of a spreadsheet. A new database starts with Cash, Credit Card, and Debit Card. When a refund or payback is recorded, its method is where the money arrived.
+
+### Tags
+
+Tags are optional labels you create and assign yourself. A purchase can have several tags. Nothing is ever tagged automatically.
+
+### Events
+
+Events are named date ranges, such as a trip, a move, or a holiday week. They never change transactions; they only group the purchases and refunds dated inside them. Events appear on the calendar and can be chosen as a Stats period.
+
+### Archiving and deleting
+
+Payment methods and people that are used by transactions cannot be deleted. **Archive** them instead: archived items stay on existing transactions but are not offered for new entries. Unused items can be deleted. Deleting a tag removes it from every transaction that had it; the transactions themselves are kept and History records how many were affected.
+
+## Using the app
+
+### Transactions
+
+The default tab is a monthly ledger. Use **◀ / ▶** or the month dropdown in the toolbar to change months. The cards above the table show the month's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method; refunds show as −$ and paybacks as +$ in green. The footer row shows net spent per payment method (purchases minus refunds; paybacks are excluded).
+
+**Search** filters the month's rows by merchant, description, note, type, payment method, person, and tags. All words must match.
+
+Select a row (click, or focus it and press Enter) to edit it. **New Transaction** (toolbar or File menu) opens an empty editor. New entries default to today, or to the first day of the viewed month when you are looking at another month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+
+In the editor:
+
+- **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
+- **Payback to me** asks who paid you and, optionally, which of their purchases it was for, showing how much of that purchase is still unpaid.
+- **Tags** lists your tags as checkboxes. **Add Tag** creates a new tag immediately.
+- Errors from the server are shown in the dialog exactly as returned; nothing is saved until the server accepts the entry.
+
+### Calendar
+
+A month grid for the toolbar's month. Each day shows net spent and the number of entries; the bar along the bottom of a day is relative to the month's biggest day. Event names appear on the days they cover. Select a day to list its entries, edit one, or add a new entry on that date.
+
+### Stats
+
+Choose a **Period**: all time, a year, a month, or an event. See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
+
+### People
+
+One row per other person: purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases and paybacks, each purchase's unpaid amount, and **Record Payback**.
+
+### Events
+
+List, add, edit, and delete events. Each row shows days, purchases, net spent, and net spent per day. **Stats** opens the Stats tab for that event.
+
+### History
+
+Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. History is stored in the database and included in backups.
+
+### Manage
+
+Add, rename, archive/restore, and delete payment methods, people, and tags. **Used By** counts the transactions using each one.
+
+### Menus
+
+- **File:** New Transaction, Refresh, Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out.
+- **View:** switch tabs and choose the Light or Dark theme. The theme is saved in this browser.
+- **Help:** a short explanation of the concepts above.
+
+## Statistics
+
+All statistics cover the selected period. A transaction is in a period when its date is inside it.
+
+**Counted days** run from the start of the period to today. If the period ended before today, they run to its end; if an entry is dated after today, they run to that entry. For *All time*, the period starts at your earliest entry.
+
+| Statistic | Definition |
+|---|---|
+| Spent | Sum of purchases. |
+| Refunds | Sum of refunds, on the refund date. |
+| Net spent | Spent − refunds. |
+| Paid back to you | Sum of paybacks. |
+| Net after paybacks | Net spent − paid back to you. |
+| Spent for others | Sum of purchases whose For Who is not you, with its share of spent. |
+| Average purchase | Spent ÷ number of purchases. |
+| Largest purchase / refund | The single biggest one. |
+| Days counted | See above. |
+| Average per day | Net spent ÷ counted days, including days without purchases. |
+| Average per spending day | Net spent ÷ days with at least one purchase. |
+| Spending days | Counted days with at least one purchase. |
+| No-spend days | Counted days with no purchase. Refunds and paybacks do not count as spending. |
+| Longest no-spend streak | Most consecutive counted days without a purchase. |
+| Current no-spend streak | Consecutive days up to today without a purchase; shown only when the period includes today. |
+| Highest day | The day with the most net spent (among days with a purchase). |
+| Highest week | The Monday–Sunday week with the most net spent, clipped to the days inside the period. |
+| Highest month | The month with the most net spent. |
+| Lowest full month | The month with the least net spent among months fully inside the period and already over. |
+
+Breakdown tables:
+
+- **By Payment Method:** purchases, spent, refunds, and net per method, and each method's share of spent.
+- **By Person:** purchases for each person, refunds on them, net, and paybacks from them.
+- **By Tag:** purchases, spent, refunds, and net per tag, plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
+- **Day of Week:** purchases and net per weekday, and the average per occurrence of that weekday in the counted days.
+- **Merchants:** visits (purchases), spent, refunds, net, average purchase, and last purchase date. Merchant names are grouped ignoring capitalization and shown with their latest spelling. Refunds count under their purchase's merchant.
+- **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
+
+The chart shows net spent per day for periods of 62 counted days or fewer, otherwise net spent per month.
+
+## Data and backups
+
+All persistent data is in the `data/` folder of the folder SpendTracker runs from (the project folder when started with `dotnet run`):
+
+```text
+data/
+  spend-tracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
+  auth.json             salted password hash, created at first-run setup
+  backups/              recovery copies written automatically before each restore
+logs/
+  console.log           runtime log, capped at about 10 MiB
+```
+
+### Download Backup
+
+**File → Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.json`: a readable JSON file with format `spendtracker-backup` version 1, the app version, and every payment method, person, tag, event, transaction, and history entry. It never contains `auth.json` or the password hash. Treat it like your bank statements.
+
+### Restore Backup
+
+**File → Restore Backup** uploads a backup and replaces **all** current data with it. Before anything changes, SpendTracker writes the current data to `data/backups/before-restore-<time>-<id>.json`, which can itself be restored. The password is not changed.
+
+Restores are strict and atomic. The whole import runs in one database transaction, and is rejected with no changes when the file is not a SpendTracker backup, was made by a newer SpendTracker version, has unknown or missing fields, invalid dates or amounts, duplicate IDs or names, references to missing rows, refunds or paybacks that break the rules in [Transactions](#transactions), or not exactly one self person. Rows keep their original IDs, so links survive. The limit is 64 MiB.
+
+### Export Transactions CSV
+
+**File → Export Transactions CSV** downloads every transaction with date, type, for who, merchant, description, tags, payment method, amount, linked transaction, and note. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a JSON backup to restore.
+
+### Copying the database directly
+
+To back up the files instead, stop SpendTracker first, then copy the whole `data/` folder, including any `-wal` and `-shm` files.
+
+### Schema and migrations
+
+The database records its schema version in `PRAGMA user_version` (currently 1). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Future versions will upgrade older schemas in place at startup.
+
+## Authentication
+
+On first run, SpendTracker prints a setup token in the server console:
+
+```text
+============================================================
+SPENDTRACKER FIRST-RUN SETUP TOKEN
+
+  ABCD-1234-EF56-7890
+
+Enter this token on the Create Password screen.
+It changes each time SpendTracker restarts until setup is complete.
+============================================================
+```
+
+Enter it on the **Create Password** screen with a password of at least 8 characters. The token is printed to the console only and is not written to `logs/console.log`.
+
+- Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes with 600,000 iterations. A hash saved with fewer iterations is upgraded at the next successful login.
+- Sessions use an HttpOnly, SameSite=Strict cookie named `SpendTracker.Auth`, valid up to 30 days and sliding while active. It is marked Secure when the request uses HTTPS.
+- `/api/auth/setup` and `/api/auth/login` allow 5 attempts per source IP per minute.
+- Every other `/api` endpoint and the app page require a session; unauthenticated API calls get HTTP 401.
+
+**Reset the password:** stop SpendTracker, delete `data/auth.json`, and start it again. A new setup token is printed. Your spending data is not affected.
+
+## Configuration and running
+
+```sh
+dotnet run
+```
+
+| Setting | Default | How to change |
+|---|---|---|
+| Listen address | `http://127.0.0.1:8715` (TCP, loopback only) | `dotnet run --urls "http://0.0.0.0:8715"`, the `ASPNETCORE_URLS` environment variable, or a `urls` value in an `appsettings.json` |
+| Data folder | `data/` inside the folder SpendTracker runs from (the project folder for `dotnet run`) | not configurable |
+
+There are no other settings. To keep SpendTracker running in the background, start `dotnet run` (or a published build) from the service manager you already use, with the project folder as the working directory and write access to `data/` and `logs/`.
+
+### Updating
+
+Pull the new version and restart. Download a backup first. The database schema is upgraded automatically at startup when a release needs it.
+
+## HTTP API
+
+All endpoints are under `/api`, use JSON, and require a session except `auth/status`, `auth/setup`, and `auth/login`. Requests are strict: unknown fields, explicit `null` for non-nullable fields, and malformed JSON are rejected with HTTP 400. Refused requests return `{ "error": "message" }`.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/auth/status` | `version`, `configured`, `authenticated` |
+| `POST /api/auth/setup` | `{ setupToken, password, confirmPassword }` |
+| `POST /api/auth/login` | `{ password }` |
+| `POST /api/auth/logout` | end the session |
+| `GET /api/snapshot` | all payment methods, people, tags, events, and transactions |
+| `POST /api/transactions` | create; returns the saved transaction |
+| `PUT /api/transactions/{id}` | replace all fields |
+| `DELETE /api/transactions/{id}` | delete |
+| `POST /api/payment-methods`, `/api/people`, `/api/tags` | `{ name }` |
+| `PATCH /api/payment-methods/{id}`, `/api/people/{id}` | `{ name?, archived? }` |
+| `PATCH /api/tags/{id}` | `{ name }` |
+| `DELETE /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}` | delete when allowed |
+| `POST /api/events`, `PUT /api/events/{id}` | `{ name, startDate, endDate, note }` |
+| `DELETE /api/events/{id}` | delete |
+| `GET /api/history?limit=&beforeId=` | newest-first history page (`limit` 1–500, default 200) and `hasMore` |
+| `GET /api/backup` | download a backup file |
+| `POST /api/restore` | restore a backup file (body is the backup JSON) |
+
+A transaction body is:
+
+```json
+{
+  "kind": "Purchase",
+  "date": "2026-10-01",
+  "amountCents": 1217,
+  "paymentMethodId": 2,
+  "personId": 1,
+  "linkedId": null,
+  "merchant": "BK",
+  "description": "food",
+  "note": "",
+  "tagIds": [3]
+}
+```
+
+Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Refunds send `personId: null` and a `linkedId`. Only purchases may have `tagIds`. Limits: names 60 characters, merchant 120, description 500, note 2000, amount $0.01–$10,000,000.00.
+
+## Technology stack
+
+- C# / ASP.NET Core Minimal API on .NET 10 (Kestrel)
+- SQLite through `Microsoft.Data.Sqlite` (no ORM)
+- Plain HTML, CSS, and JavaScript; no frontend framework or build step
+- Canvas API for the chart; no chart library
+- Service worker and web manifest for PWA install
+
+## Project layout
+
+```text
+SpendTracker.csproj     .NET project, dependency, and release version
+Program.cs              hosting, authentication, error responses, and API routes
+Store.cs                SQLite schema, validation rules, history, backup and restore
+SingleFileLogger.cs     capped logs/console.log writer
+README.md / MANUAL.md   documentation
+
+wwwroot/
+  index.html            app shell, tabs, and dialogs
+  app.js                shared state, money and date helpers, API client, derived model
+  widgets.js            menus, dropdowns, tables, stat cards, confirm/prompt dialogs
+  charts.js             canvas bar chart and tooltips
+  transactions.js       monthly ledger, CSV export, transaction editor
+  calendar.js           month calendar and day detail
+  stats.js              statistics calculations and Stats tab
+  people.js             people balances and person detail
+  events.js             events list and editor
+  history.js            history log rendering
+  manage.js             payment methods, people, and tags
+  ui.js                 startup, tabs, toolbar, menus, backup/restore, session
+  theme.js / theme.css  Light/Dark preference and color tokens
+  style.css             Windows 95-style layout and components
+  login.html / login.js / auth.css   login and first-run setup
+  sw.js                 network-first service worker
+  manifest.webmanifest, icons/spend.svg, version.json
+
+tests/
+  server.py             starts a real server on a temporary data folder
+  test_api.py           API, validation, history, and backup/restore tests
+  test_browser.py       optional Playwright browser tests
+```
+
+## Version handling
+
+`SpendTracker.csproj` holds the single version number in `<Version>`. The build regenerates `wwwroot/version.json` from it for the browser title, rewriting the file only when the version changes. The service worker cache name is stable: it fetches from the network first with `cache: 'no-store'` and uses its cache only when offline, so new releases never need a cache-version bump.
+
+## Security and privacy
+
+- **Network exposure:** loopback by default. Expose it to a LAN only deliberately with `--urls`, behind a firewall. Use HTTPS (for example a private reverse proxy) across untrusted networks; plain HTTP does not protect passwords, cookies, or data in transit.
+- **At rest:** the database and backups are not encrypted. Protect the `data/` folder, downloaded backups, and CSV exports with filesystem permissions.
+- **Least privilege:** the account running SpendTracker needs read access to the project files and write access to `data/` and `logs/` only.
+- **No outbound traffic:** SpendTracker does not contact any external service. The service worker caches only the app's static files, never `/api` responses.
+- **Logs:** `logs/console.log` contains startup, restore, and error messages, never passwords, the setup token, or request bodies.
+
+## Known limitations
+
+- One user per installation.
+- Amounts are shown in US dollars; there is no currency setting.
+- A purchase has one For Who; splitting one purchase between people is not supported yet.
+- Transfers between your own accounts (paying off a card, withdrawing cash) are not tracked; record only real spending.
+- No automatic import yet. Entries are added by hand.
+- Stats are computed in the browser from the full snapshot, which is fine for years of personal data but not designed for very large datasets.
+
+## Troubleshooting
+
+### I only see Create Password
+
+No password exists yet (or `data/auth.json` was removed). Enter the setup token from the server console. If no token is active, restart SpendTracker.
+
+### Login says "Too many attempts"
+
+Setup and login allow 5 attempts per IP per minute. Wait a minute.
+
+### "spend-tracker.db uses schema version N"
+
+The database was created by a newer SpendTracker. Update SpendTracker; it will not modify a newer database.
+
+### A save is refused
+
+The message explains which rule was broken (for example a refund larger than what is left of its purchase). Nothing was saved. See the rules under [Transactions](#transactions).
+
+### Restore failed
+
+Nothing was changed; the message names the problem. Only files downloaded from **File → Download Backup** (or the automatic `data/backups/` copies) can be restored.
+
+### The page shows "Could not load data"
+
+The server is unreachable or the database could not be read. Check that SpendTracker is running and see `logs/console.log`.
+
+## Development checks
+
+```sh
+dotnet build
+python3 -m unittest discover -s tests -p "test_api.py"
+```
+
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, edits that would break links, archiving and deletion rules, tag deletion, events, history, and backup/restore round trips and rejected restores. It uses only the Python standard library.
+
+Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
+
+```sh
+python3 -m unittest discover -s tests -p "test_browser.py"
+```
+
+They run first-run setup, add purchases, refunds, and paybacks through the UI, visit every tab in both themes, check phone-width layout, verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
+
+## Release notes
+
+### v0.1.0
+
+First release.
+
+- Purchases, refunds, and paybacks with server-enforced link rules.
+- Monthly ledger with one column per payment method, search, and totals.
+- People balances, calendar, events, stats, and full change history.
+- Payment methods, people, and tags management with archiving.
+- JSON backup and atomic restore with automatic recovery copies; CSV export.
+- First-run setup token and password login, Light and Dark themes, PWA.

@@ -1,0 +1,68 @@
+/* Light/Dark Win95 theme tokens for SpendTracker. Every color in style.css comes from here. */
+:root {
+  --face: #c0c0c0;
+  --light: #fff;
+  --shadow: #808080;
+  --dark: #404040;
+  --black: #000;
+  --teal: #008080;
+
+  --theme-text: #000;
+  --theme-surface: #fff;
+  --theme-surface-alt: #f4f4f4;
+  --theme-divider: #c8c8c8;
+  --theme-muted: #555;
+  --theme-note: #ffffe1;
+  --theme-row-hover: #e5ecf8;
+  --theme-title: #000080;
+  --theme-title-text: #fff;
+  --theme-error: #800000;
+  --theme-money-in: #006000;
+  --theme-event: #6a2c91;
+
+  --chart-surface: #fff;
+  --chart-text: #222;
+  --chart-axis: #808080;
+  --chart-grid: #e0e0e0;
+  --chart-bar: #000080;
+
+  --heat-0: #d7d7d7;
+  --heat-1: #b7cbd8;
+  --heat-2: #6f9bb5;
+  --heat-3: #2d6587;
+  --heat-4: #003b5c;
+}
+
+:root[data-theme-effective="dark"] {
+  --face: #303030;
+  --light: #666;
+  --shadow: #181818;
+  --dark: #0e0e0e;
+  --black: #000;
+  --teal: #002f2f;
+
+  --theme-text: #f1f1f1;
+  --theme-surface: #191919;
+  --theme-surface-alt: #242424;
+  --theme-divider: #3d3d3d;
+  --theme-muted: #c7c7c7;
+  --theme-note: #3b3825;
+  --theme-row-hover: #2d3850;
+  --theme-title: #111858;
+  --theme-title-text: #fff;
+  --theme-error: #ff8585;
+  --theme-money-in: #69d37d;
+  --theme-event: #d2a8ff;
+
+  --chart-surface: #191919;
+  --chart-text: #eeeeee;
+  --chart-axis: #777;
+  --chart-grid: #333;
+  --chart-bar: #8fa8ff;
+
+  --heat-0: #242424;
+  --heat-1: #30485a;
+  --heat-2: #3f6f8d;
+  --heat-3: #5b91b2;
+  --heat-4: #86bde0;
+}

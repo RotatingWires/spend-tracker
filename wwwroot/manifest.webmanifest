@@ -1,0 +1,11 @@
+{
+  "name": "SpendTracker",
+  "short_name": "SpendTracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#c0c0c0",
+  "theme_color": "#000080",
+  "icons": [
+    { "src": "/icons/spend.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

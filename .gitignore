@@ -1,0 +1,27 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.user
+*.suo
+__pycache__/
+
+# Runtime/private SpendTracker data (database, password hash, restore recovery copies)
+data/
+auth.json
+
+# Runtime logs
+logs/
+
+# SQLite/database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Backup exports contain personal financial data
+spend-tracker-*.json
