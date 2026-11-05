@@ -1,25 +1,13 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.2.1
+# SpendTracker v0.2.2
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
 **[Full manual](MANUAL.md)** — concepts, every statistic's definition, data files, backup/restore, API, and troubleshooting.
 
 SpendTracker only reports what you record. It never guesses categories, auto-tags purchases, or estimates missing data; every statistic is a defined calculation over your own entries, and its definition is one hover or tap away.
-
-## Features
-
-- **Monthly ledger** laid out like a spending spreadsheet: date, for who, what, tags, and one column per payment method, with monthly totals.
-- **Purchases, refunds, and paybacks.** Refunds link to the purchase they return. Paybacks record money other people gave you back, optionally settling a specific purchase.
-- **People ledger** showing what each person owes you, purchase by purchase.
-- **Calendar** with daily net spending, a per-day detail view, and your events.
-- **Events**: named date ranges (a trip, a move) with their own totals and stats.
-- **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, person, tag, merchant, weekday, and month.
-- **History** of every add, edit, delete, and restore with before/after values.
-- **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
-- Light and dark themes, desktop and phone layouts, installable as a PWA.
 
 ## Quickstart
 

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.2.1 Manual
+# SpendTracker v0.2.2 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -9,21 +9,99 @@ The guiding rule is **real data only**. SpendTracker never assigns categories, g
 
 The interface uses the same Windows 95-style visual language as TaskList and TaskList Stats, with persistent **Light** and **Dark** themes. It works on desktop and phone screens and can be installed as a PWA.
 
+- [What it does](#what-it-does)
+- [Technology stack](#technology-stack)
+- [Project layout](#project-layout)
+- [Version handling](#version-handling)
+- [Configuration and running](#configuration-and-running)
 - [Concepts](#concepts)
 - [Using the app](#using-the-app)
 - [Statistics](#statistics)
 - [Data and backups](#data-and-backups)
 - [Authentication](#authentication)
-- [Configuration and running](#configuration-and-running)
 - [HTTP API](#http-api)
-- [Technology stack](#technology-stack)
-- [Project layout](#project-layout)
-- [Version handling](#version-handling)
 - [Security and privacy](#security-and-privacy)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
 - [Development checks](#development-checks)
 - [Release notes](#release-notes)
+
+## What it does
+
+- **Monthly ledger** laid out like a spending spreadsheet: date, for who, what, tags, and one column per payment method, with monthly totals.
+- **Purchases, refunds, and paybacks.** Refunds link to the purchase they return. Paybacks record money other people gave you back, optionally settling a specific purchase.
+- **People ledger** showing what each person owes you, purchase by purchase.
+- **Calendar** with daily net spending, a per-day detail view, and your events.
+- **Events**: named date ranges (a trip, a move) with their own totals and stats.
+- **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, person, tag, merchant, weekday, and month.
+- **History** of every add, edit, delete, and restore with before/after values.
+- **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
+- Light and dark themes, desktop and phone layouts, installable as a PWA.
+
+## Technology stack
+
+- C# / ASP.NET Core Minimal API on .NET 10 (Kestrel)
+- SQLite through `Microsoft.Data.Sqlite` (no ORM)
+- Plain HTML, CSS, and JavaScript; no frontend framework or build step
+- Canvas API for the chart; no chart library
+- Service worker and web manifest for PWA install
+
+## Project layout
+
+```text
+SpendTracker.csproj     .NET project, dependency, and release version
+src/
+  Program.cs            hosting, authentication, error responses, and API routes
+  Store.cs              SQLite schema, validation rules, history, and restoring rows
+  Transfer.cs           backup ZIP creation and restore verification
+  SingleFileLogger.cs   capped logs/console.log writer
+README.md / MANUAL.md   documentation
+
+wwwroot/
+  index.html            app shell, tabs, and dialogs
+  app.js                shared state, money and date helpers, API client, derived model
+  widgets.js            menus, dropdowns, tables, stat cards, confirm/prompt dialogs
+  charts.js             canvas bar chart and tooltips
+  transactions.js       monthly ledger, CSV export, transaction editor
+  calendar.js           month calendar and day detail
+  stats.js              statistics calculations and Stats tab
+  people.js             people balances and person detail
+  events.js             events list and editor
+  history.js            history log rendering
+  manage.js             payment methods, people, and tags
+  ui.js                 startup, tabs, toolbar, menus, backup/restore, session
+  theme.js / theme.css  Light/Dark preference and color tokens
+  style.css             Windows 95-style layout and components
+  login.html / login.js / auth.css   login and first-run setup
+  sw.js                 network-first service worker
+  manifest.webmanifest, icons/spend.svg, version.json
+
+tests/
+  server.py             starts a real server on a temporary data folder
+  test_api.py           API, validation, history, and backup/restore tests
+  test_browser.py       optional Playwright browser tests
+```
+
+## Version handling
+
+`SpendTracker.csproj` holds the single version number in `<Version>`. The build regenerates `wwwroot/version.json` from it for the browser title, rewriting the file only when the version changes. The service worker cache name is stable: it fetches from the network first with `cache: 'no-store'` and uses its cache only when offline, so new releases never need a cache-version bump.
+
+## Configuration and running
+
+```sh
+dotnet run
+```
+
+| Setting | Default | How to change |
+|---|---|---|
+| Listen address | `http://127.0.0.1:8715` (TCP, loopback only) | `dotnet run --urls "http://0.0.0.0:8715"`, the `ASPNETCORE_URLS` environment variable, or a `urls` value in an `appsettings.json` |
+| Data folder | `data/` inside the folder SpendTracker runs from (the project folder for `dotnet run`) | not configurable |
+
+There are no other settings. To keep SpendTracker running in the background, start `dotnet run` (or a published build) from the service manager you already use, with the project folder as the working directory and write access to `data/` and `logs/`.
+
+### Updating
+
+Pull the new version and restart. Download a backup first. The database schema is upgraded automatically at startup when a release needs it.
 
 ## Concepts
 
@@ -118,7 +196,7 @@ Add, rename, archive/restore, and delete payment methods, people, and tags. **Us
 - **View:** switch tabs and choose the Light or Dark theme. The theme is saved in this browser.
 
 Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, …). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
-- **Help:** a short explanation of the concepts above.
+- **Help:** a short explanation of the concepts above, ending with about.lehighradio.com above the version, as in TaskList, TaskList Stats, and NewsReview.
 
 ## Statistics
 
@@ -232,23 +310,6 @@ Enter it on the **Create Password** screen with a password of at least 8 charact
 
 **Reset the password:** stop SpendTracker, delete `data/auth.json`, and start it again. A new setup token is printed. Your spending data is not affected.
 
-## Configuration and running
-
-```sh
-dotnet run
-```
-
-| Setting | Default | How to change |
-|---|---|---|
-| Listen address | `http://127.0.0.1:8715` (TCP, loopback only) | `dotnet run --urls "http://0.0.0.0:8715"`, the `ASPNETCORE_URLS` environment variable, or a `urls` value in an `appsettings.json` |
-| Data folder | `data/` inside the folder SpendTracker runs from (the project folder for `dotnet run`) | not configurable |
-
-There are no other settings. To keep SpendTracker running in the background, start `dotnet run` (or a published build) from the service manager you already use, with the project folder as the working directory and write access to `data/` and `logs/`.
-
-### Updating
-
-Pull the new version and restart. Download a backup first. The database schema is upgraded automatically at startup when a release needs it.
-
 ## HTTP API
 
 All endpoints are under `/api`, use JSON, and require a session except `auth/status`, `auth/setup`, and `auth/login`. Requests are strict: unknown fields, explicit `null` for non-nullable fields, and malformed JSON are rejected with HTTP 400. Refused requests return `{ "error": "message" }`.
@@ -291,53 +352,6 @@ A transaction body is:
 ```
 
 Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Refunds send `personId: null` and a `linkedId`. Only purchases may have `tagIds`. Limits: names 60 characters, merchant 120, description 500, note 2000, amount $0.01–$10,000,000.00.
-
-## Technology stack
-
-- C# / ASP.NET Core Minimal API on .NET 10 (Kestrel)
-- SQLite through `Microsoft.Data.Sqlite` (no ORM)
-- Plain HTML, CSS, and JavaScript; no frontend framework or build step
-- Canvas API for the chart; no chart library
-- Service worker and web manifest for PWA install
-
-## Project layout
-
-```text
-SpendTracker.csproj     .NET project, dependency, and release version
-Program.cs              hosting, authentication, error responses, and API routes
-Store.cs                SQLite schema, validation rules, history, and restoring rows
-Transfer.cs             backup ZIP creation and restore verification
-SingleFileLogger.cs     capped logs/console.log writer
-README.md / MANUAL.md   documentation
-
-wwwroot/
-  index.html            app shell, tabs, and dialogs
-  app.js                shared state, money and date helpers, API client, derived model
-  widgets.js            menus, dropdowns, tables, stat cards, confirm/prompt dialogs
-  charts.js             canvas bar chart and tooltips
-  transactions.js       monthly ledger, CSV export, transaction editor
-  calendar.js           month calendar and day detail
-  stats.js              statistics calculations and Stats tab
-  people.js             people balances and person detail
-  events.js             events list and editor
-  history.js            history log rendering
-  manage.js             payment methods, people, and tags
-  ui.js                 startup, tabs, toolbar, menus, backup/restore, session
-  theme.js / theme.css  Light/Dark preference and color tokens
-  style.css             Windows 95-style layout and components
-  login.html / login.js / auth.css   login and first-run setup
-  sw.js                 network-first service worker
-  manifest.webmanifest, icons/spend.svg, version.json
-
-tests/
-  server.py             starts a real server on a temporary data folder
-  test_api.py           API, validation, history, and backup/restore tests
-  test_browser.py       optional Playwright browser tests
-```
-
-## Version handling
-
-`SpendTracker.csproj` holds the single version number in `<Version>`. The build regenerates `wwwroot/version.json` from it for the browser title, rewriting the file only when the version changes. The service worker cache name is stable: it fetches from the network first with `cache: 'no-store'` and uses its cache only when offline, so new releases never need a cache-version bump.
 
 ## Security and privacy
 
@@ -400,6 +414,12 @@ python3 -m unittest discover -s tests -p "test_browser.py"
 They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 ## Release notes
+
+### v0.2.2
+
+- Move the C# sources into `src/`, matching TaskList, TaskList Stats, and NewsReview. The project file, `wwwroot/`, `tests/`, and every command stay where they were; behavior is unchanged.
+- Follow the shared README/MANUAL layout: the README is the quickstart and security notes, and the feature list now opens the manual as **What it does**, followed by the technology, layout, version, and running sections in the same order as the other apps.
+- End Help with about.lehighradio.com above the version, like the other apps.
 
 ### v0.2.1
 
