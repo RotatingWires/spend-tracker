@@ -1,7 +1,13 @@
 """API and data-integrity tests against a real SpendTracker server. Run: python3 -m unittest discover tests"""
 
+import hashlib
+import io
 import json
+import sqlite3
+import tempfile
 import unittest
+import zipfile
+from pathlib import Path
 
 from server import ApiError, Server, build
 
@@ -197,44 +203,106 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.refund(bought["id"], 500)
         self.payback(1000, linked=bought["id"])
         self.api.post("/api/events", {"name": "Trip", "startDate": "2026-10-01", "endDate": "2026-10-03", "note": ""})
-        backup = self.api.get("/api/backup")
-        self.assertEqual(backup["format"], "spendtracker-backup")
-        self.assertNotIn("auth", json.dumps(backup).lower().replace("author", ""))
+        before = self.api.get("/api/snapshot")
+        archive = self.api.download("/api/backup")
+
+        with zipfile.ZipFile(io.BytesIO(archive)) as backup:
+            self.assertEqual(sorted(backup.namelist()), ["manifest.json", "spend-tracker.db"])
+            manifest = json.loads(backup.read("manifest.json"))
+            database = backup.read("spend-tracker.db")
+        self.assertEqual(manifest["format"], "spendtracker-backup")
+        self.assertEqual(manifest["sha256"], hashlib.sha256(database).hexdigest())
+        self.assertEqual(manifest["totals"]["transactions"], 3)
+        self.assertNotIn(b"PBKDF2", database)  # the password file is never included
 
         self.purchase(amount=999, merchant="Added after backup")
-        result = self.api.post("/api/restore", backup)
+        result = self.api.upload_zip("/api/restore", archive)
         self.assertEqual(result["transactions"], 3)
         self.assertTrue((self.server.data_dir / "backups" / result["recoveryFile"]).exists())
 
         restored = self.api.get("/api/snapshot")
-        for key in ("paymentMethods", "people", "tags", "events", "transactions"):
-            self.assertEqual(restored[key], backup[key], key)
+        self.assertEqual(restored, before)
         self.assertEqual(self.history()[0]["action"], "Restored")
-        # IDs keep counting from the restored data rather than reusing a removed row's ID.
-        self.assertGreater(self.purchase()["id"], max(t["id"] for t in backup["transactions"]))
+        # IDs keep counting past every row that ever existed rather than reusing one.
+        self.assertGreater(self.purchase()["id"], 4)
+
+        # The recovery copy is itself a valid backup of the data from just before the restore.
+        recovery = (self.server.data_dir / "backups" / result["recoveryFile"]).read_bytes()
+        self.api.upload_zip("/api/restore", recovery)
+        self.assertIn("Added after backup", json.dumps(self.api.get("/api/snapshot")))
 
     def test_invalid_restore_changes_nothing(self):
         bought = self.purchase(amount=1000, person=self.alex)
-        backup = self.api.get("/api/backup")
+        self.refund(bought["id"], 100)
+        archive = self.api.download("/api/backup")
         before = self.api.get("/api/snapshot")
 
-        cases = {
-            "over-refunded": lambda b: b["transactions"].append({**b["transactions"][0], "id": 99, "kind": "Refund", "personId": None, "linkedId": bought["id"], "amountCents": 1001}),
-            "missing method": lambda b: b["transactions"][0].update(paymentMethodId=42),
-            "duplicate ids": lambda b: b["tags"].extend([{"id": 7, "name": "a", "createdAt": "x"}, {"id": 7, "name": "b", "createdAt": "x"}]),
-            "no self": lambda b: [p.update(isSelf=False) for p in b["people"]],
-            "bad date": lambda b: b["transactions"][0].update(date="2026-13-01"),
-            "wrong format": lambda b: b.update(format="something-else"),
-            "newer app": lambda b: b.update(appVersion="99.0.0"),
+        # Data problems, re-signed so they pass the archive checks and must be caught by the data rules.
+        data_cases = {
+            "over-refunded": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, linked_id, merchant, created_at) VALUES ('Refund', '2026-10-05', 950, 1, NULL, {bought['id']}, 'x', 'x')",
+            "missing payment method": "UPDATE transactions SET payment_method_id = 42",
+            "impossible date": "UPDATE transactions SET date = '2026-02-30'",
+            "text amount": "UPDATE transactions SET amount_cents = 'lots'",
+            "no self person": "UPDATE people SET is_self = 0",
+            "tag on a refund": f"INSERT INTO tags (id, name, created_at) VALUES (9, 'x', 'x'); INSERT INTO transaction_tags VALUES ({bought['id'] + 1}, 9)",
+            "blank name": "UPDATE tags SET name = ' '; INSERT INTO tags (name, created_at) VALUES ('  ', 'x')",
+            "damaged history": "UPDATE history SET after_json = '{not json'",
+            "payback from me": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, merchant, created_at) VALUES ('Payback', '2026-10-05', 5, 1, {self.me}, 'x', 'x')",
+            "trigger": "CREATE TRIGGER evil AFTER INSERT ON tags BEGIN DELETE FROM people; END",
+            "view": "CREATE VIEW extra AS SELECT 1",
+            "extra table": "CREATE TABLE extra (id INTEGER)",
+            "extra column": "ALTER TABLE tags ADD COLUMN color TEXT",
         }
-        for name, corrupt in cases.items():
+        for name, sql in data_cases.items():
             with self.subTest(name):
-                broken = json.loads(json.dumps(backup))
-                corrupt(broken)
-                self.assertRejected(lambda: self.api.post("/api/restore", broken), 400)
+                self.assertRejected(lambda: self.api.upload_zip("/api/restore", rebuild(archive, sql=sql)), 400)
                 self.assertEqual(self.api.get("/api/snapshot"), before)
-        self.assertRejected(lambda: self.api.post("/api/restore", {**backup, "extra": 1}), 400)
-        self.assertRejected(lambda: self.api.post("/api/restore", {k: v for k, v in backup.items() if k != "transactions"}), 400)
+
+        archive_cases = {
+            "checksum mismatch": rebuild(archive, sql="UPDATE transactions SET amount_cents = 1", resign=False),
+            "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
+            "wrong format": rebuild(archive, manifest={"format": "something-else"}),
+            "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 2}),
+            "extra member": rebuild(archive, extra={"notes.txt": b"hi"}),
+            "missing database": rebuild(archive, drop="spend-tracker.db"),
+            "old JSON backup": json.dumps({"format": "spendtracker-backup", "formatVersion": 1}).encode(),
+            "random bytes": b"PK\x03\x04 definitely not a zip",
+        }
+        for name, data in archive_cases.items():
+            with self.subTest(name):
+                self.assertRejected(lambda: self.api.upload_zip("/api/restore", data), 400)
+                self.assertEqual(self.api.get("/api/snapshot"), before)
+        self.assertRejected(lambda: self.api.upload_zip("/api/restore", b""), 400, contains="Choose a backup")
+        self.assertFalse((self.server.data_dir / "backups").exists() and any((self.server.data_dir / "backups").iterdir()),
+                         "a rejected restore must not write a recovery copy")
+
+
+def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True):
+    """Repackages a real backup ZIP after changing its database or manifest."""
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "spend-tracker.db"
+        with zipfile.ZipFile(io.BytesIO(archive)) as source:
+            path.write_bytes(source.read("spend-tracker.db"))
+            fields = json.loads(source.read("manifest.json"))
+        if sql:
+            with sqlite3.connect(path) as connection:
+                connection.executescript(sql)
+            connection.close()
+        database = path.read_bytes()
+        if resign:
+            fields["sha256"] = hashlib.sha256(database).hexdigest()
+            with sqlite3.connect(path) as connection:
+                fields["totals"] = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in fields["totals"]}
+            connection.close()
+        fields.update(manifest or {})
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w") as target:
+            members = {"manifest.json": json.dumps(fields).encode(), "spend-tracker.db": database, **(extra or {})}
+            for member, content in members.items():
+                if member != drop:
+                    target.writestr(member, content)
+        return output.getvalue()
 
 
 if __name__ == "__main__":

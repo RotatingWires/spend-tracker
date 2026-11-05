@@ -78,7 +78,6 @@ var dataDir = Path.Combine(app.Environment.ContentRootPath, "data");
 Directory.CreateDirectory(dataDir);
 var authPath = Path.Combine(dataDir, "auth.json");
 const int PasswordIterations = 600_000;
-const long MaxRestoreBytes = 64L * 1024 * 1024;
 
 var store = new Store(Path.Combine(dataDir, "spend-tracker.db"));
 var journalMode = store.Initialize();
@@ -253,21 +252,38 @@ api.MapDelete("/events/{id:long}", (long id) =>
     return Results.NoContent();
 });
 
-api.MapGet("/backup", (HttpContext context) =>
+api.MapGet("/backup", async (HttpContext context) =>
 {
-    context.Response.Headers.CacheControl = "no-store";
-    var backup = store.ReadBackup(appVersion);
-    var json = JsonSerializer.SerializeToUtf8Bytes(backup, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
-    return Results.File(json, "application/json", $"spend-tracker-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json");
+    var workDirectory = Directory.CreateTempSubdirectory("spend-tracker-download-");
+    try
+    {
+        var path = Path.Combine(workDirectory.FullName, "backup.zip");
+        Transfer.CreateArchive(store, path, appVersion);
+        context.Response.Headers.CacheControl = "no-store";
+        await Results.File(path, "application/zip", $"spend-tracker-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.zip").ExecuteAsync(context);
+    }
+    finally
+    {
+        workDirectory.Delete(recursive: true);
+    }
 });
 
-api.MapPost("/restore", (Backup backup) =>
+api.MapPost("/restore", async (HttpRequest request) =>
 {
-    var recoveryPath = Path.Combine(dataDir, "backups", $"before-restore-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json");
-    var result = store.Restore(backup, recoveryPath, appVersion);
-    app.Logger.LogInformation("Restored a backup with {Transactions} transactions. Previous data saved to data/backups/{RecoveryFile}.", result.Transactions, result.RecoveryFile);
-    return Results.Ok(result);
-}).WithMetadata(new RequestSizeLimitAttribute(MaxRestoreBytes));
+    var workDirectory = Directory.CreateTempSubdirectory("spend-tracker-upload-");
+    try
+    {
+        var uploadPath = Path.Combine(workDirectory.FullName, "upload.zip");
+        await Transfer.SaveUpload(request.Body, uploadPath, request.HttpContext.RequestAborted);
+        var result = Transfer.RestoreArchive(store, uploadPath, Path.Combine(dataDir, "backups"), appVersion);
+        app.Logger.LogInformation("Restored a backup with {Transactions} transactions. Previous data saved to data/backups/{RecoveryFile}.", result.Transactions, result.RecoveryFile);
+        return Results.Ok(result);
+    }
+    finally
+    {
+        workDirectory.Delete(recursive: true);
+    }
+}).WithMetadata(new RequestSizeLimitAttribute(Transfer.MaxUploadBytes));
 
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();

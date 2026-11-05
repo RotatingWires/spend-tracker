@@ -38,7 +38,7 @@
         <div id="viewMenu" class="menu-dropdown" role="menu" hidden></div>
       </div>
       <button id="helpButton" type="button" aria-haspopup="dialog" aria-controls="aboutDialog">Help</button>
-      <input id="restoreFileInput" type="file" accept="application/json,.json" hidden>
+      <input id="restoreFileInput" type="file" accept=".zip,application/zip" hidden>
     </nav>
 
     <section class="toolbar" aria-label="Month and quick actions">
@@ -254,7 +254,7 @@
         <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase, uses that purchase's person and tags, and reduces net spent on the date it was refunded.</p>
         <p><strong>Payback to me:</strong> money someone else gave you for something you paid for. Link it to a purchase to settle that purchase, or leave it unlinked to reduce their overall balance. Paybacks do not change net spent; Stats shows them separately.</p>
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
-        <p><strong>Backups</strong> (File → Download Backup) contain every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
+        <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
         <p>Amounts are shown in US dollars.</p>
         <div><span id="aboutVersion">SpendTracker</span></div>
       </div>

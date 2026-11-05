@@ -24,4 +24,4 @@ logs/
 *.sqlite3
 
 # Backup exports contain personal financial data
-spend-tracker-*.json
+spend-tracker-*.zip

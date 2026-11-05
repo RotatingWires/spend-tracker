@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.1.0
+# SpendTracker v0.2.0
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -18,7 +18,7 @@ SpendTracker only reports what you record. It never guesses categories, auto-tag
 - **Events**: named date ranges (a trip, a move) with their own totals and stats.
 - **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, person, tag, merchant, weekday, and month.
 - **History** of every add, edit, delete, and restore with before/after values.
-- **Backup and restore** as a readable JSON file, plus CSV export.
+- **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
 
 ## Quickstart
@@ -51,6 +51,6 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 - **Passwords:** salted PBKDF2-HMAC-SHA256 with 600,000 iterations in `data/auth.json`; the plaintext password is never stored. The setup token is printed to the console only and is not written to the log file.
 - **Sessions:** HttpOnly, SameSite=Strict cookies lasting up to 30 days, marked Secure when the request uses HTTPS. Setup/login allow 5 attempts per source IP per minute.
 - **No third parties:** SpendTracker makes no outbound network requests. The service worker never caches API responses.
-- **Backups** contain every entry and the full history but never the password hash.
+- **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).

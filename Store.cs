@@ -14,9 +14,11 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed class Store
 {
-    public const string BackupFormat = "spendtracker-backup";
-    public const int BackupFormatVersion = 1;
-    const int SchemaVersion = 1;
+    public const int SchemaVersion = 1;
+
+    /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
+    public static readonly string[] Tables = ["payment_methods", "people", "tags", "events", "transactions", "transaction_tags", "history"];
+
     const long MaxAmountCents = 1_000_000_000; // $10,000,000.00 — far above any real purchase, small enough to stay exact in JavaScript.
     const int MaxNameLength = 60;
     const int MaxMerchantLength = 120;
@@ -34,6 +36,8 @@ sealed class Store
         this.databasePath = databasePath;
         connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
     }
+
+    public string DatabasePath => databasePath;
 
     // ---------------------------------------------------------------- schema
 
@@ -174,17 +178,6 @@ sealed class Store
         var hasMore = entries.Count > limit;
         if (hasMore) entries.RemoveAt(entries.Count - 1);
         return new HistoryPage(entries, hasMore);
-    }
-
-    public Backup ReadBackup(string version)
-    {
-        using var connection = Open();
-        using var transaction = connection.BeginTransaction(deferred: true);
-        var snapshot = ReadSnapshot(connection, transaction, version);
-        var history = ReadHistoryEntries(connection, transaction, null, null);
-        history.Reverse();
-        return new Backup(BackupFormat, BackupFormatVersion, version, Now(),
-            snapshot.PaymentMethods, snapshot.People, snapshot.Tags, snapshot.Events, snapshot.Transactions, history);
     }
 
     static List<PaymentMethod> ReadPaymentMethods(SqliteConnection connection, SqliteTransaction? transaction)
@@ -694,111 +687,139 @@ sealed class Store
         transaction.Commit();
     }
 
-    // ---------------------------------------------------------------- backup restore
+    // ---------------------------------------------------------------- backup and restore
+
+    /// <summary>Writes a consistent online copy of the database, safe to take while SpendTracker is in use.</summary>
+    public void CopyTo(string destinationPath)
+    {
+        using var source = Open();
+        using var destination = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = destinationPath, Pooling = false }.ToString());
+        destination.Open();
+        source.BackupDatabase(destination);
+        Execute(destination, null, "PRAGMA journal_mode=DELETE;"); // One self-contained file with no -wal sidecar.
+    }
+
+    public static Dictionary<string, long> CountRows(SqliteConnection connection) =>
+        Tables.ToDictionary(table => table, table => Convert.ToInt64(Scalar(connection, null, $"SELECT COUNT(*) FROM {table};"), CultureInfo.InvariantCulture));
+
+    /// <summary>Column definitions of a table, used to require that a backup has exactly the live layout.</summary>
+    public static List<string> TableLayout(SqliteConnection connection, string table)
+    {
+        var columns = new List<string>();
+        using var command = Sql(connection, null, $"PRAGMA table_info({table});");
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var values = Enumerable.Range(0, reader.FieldCount).Select(i => reader.IsDBNull(i) ? "NULL" : Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture));
+            columns.Add(string.Join('|', values));
+        }
+        return columns;
+    }
 
     /// <summary>
-    /// Replaces all data with a backup. Rows keep their original IDs so links survive. Everything happens in one
-    /// transaction and is checked before commit, so an invalid backup leaves the current data untouched.
+    /// Replaces all data with the rows of an already verified backup database. Rows keep their IDs so links survive.
+    /// Everything runs in one transaction and is checked before commit, so a backup that breaks any rule leaves the
+    /// current data untouched. Only rows are copied; the backup's own schema, triggers, and views are never used.
     /// </summary>
-    public RestoreResult Restore(Backup backup, string recoveryPath, string version)
+    public void ReplaceAllData(string importedPath, object restoreDetails)
     {
-        if (backup.Format != BackupFormat || backup.FormatVersion != BackupFormatVersion)
-            throw RequestException.Invalid("This is not a SpendTracker backup file.");
-        if (!System.Version.TryParse(backup.AppVersion, out var backupVersion) || backupVersion > System.Version.Parse(version))
-            throw RequestException.Invalid("This backup was made by a newer SpendTracker version. Update SpendTracker first.");
-        if (backup.PaymentMethods is null || backup.People is null || backup.Tags is null || backup.Events is null || backup.Transactions is null || backup.History is null)
-            throw RequestException.Invalid("The backup is missing one or more data sections.");
-        ValidateBackupRows(backup);
-
-        // Keep a recovery copy before changing any live rows. It is private server data.
-        Directory.CreateDirectory(Path.GetDirectoryName(recoveryPath)!);
-        File.WriteAllText(recoveryPath, JsonSerializer.Serialize(ReadBackup(version), HistoryJson));
+        using var imported = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = importedPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        imported.Open();
+        Execute(imported, null, "PRAGMA trusted_schema=OFF;");
 
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         Execute(connection, transaction, "PRAGMA defer_foreign_keys = ON;");
-        Execute(connection, transaction, """
-            DELETE FROM transaction_tags;
-            DELETE FROM transactions;
-            DELETE FROM events;
-            DELETE FROM tags;
-            DELETE FROM people;
-            DELETE FROM payment_methods;
-            DELETE FROM history;
-            DELETE FROM sqlite_sequence;
-            """);
+        foreach (var table in Tables.Reverse())
+            Execute(connection, transaction, $"DELETE FROM {table};");
 
         try
         {
-            foreach (var m in backup.PaymentMethods)
-                Execute(connection, transaction, "INSERT INTO payment_methods (id, name, archived, created_at) VALUES ($id, $name, $archived, $created);",
-                    ("$id", m.Id), ("$name", m.Name.Trim()), ("$archived", m.Archived ? 1 : 0), ("$created", m.CreatedAt));
-            foreach (var p in backup.People)
-                Execute(connection, transaction, "INSERT INTO people (id, name, is_self, archived, created_at) VALUES ($id, $name, $self, $archived, $created);",
-                    ("$id", p.Id), ("$name", p.Name.Trim()), ("$self", p.IsSelf ? 1 : 0), ("$archived", p.Archived ? 1 : 0), ("$created", p.CreatedAt));
-            foreach (var t in backup.Tags)
-                Execute(connection, transaction, "INSERT INTO tags (id, name, created_at) VALUES ($id, $name, $created);",
-                    ("$id", t.Id), ("$name", t.Name.Trim()), ("$created", t.CreatedAt));
-            foreach (var e in backup.Events)
-                Execute(connection, transaction, """
-                    INSERT INTO events (id, name, start_date, end_date, note, created_at, updated_at)
-                    VALUES ($id, $name, $start, $end, $note, $created, $updated);
-                    """, ("$id", e.Id), ("$name", e.Name.Trim()), ("$start", e.StartDate), ("$end", e.EndDate), ("$note", e.Note ?? ""), ("$created", e.CreatedAt), ("$updated", e.UpdatedAt));
-            foreach (var x in backup.Transactions)
-            {
-                Execute(connection, transaction, """
-                    INSERT INTO transactions
-                        (id, kind, date, amount_cents, payment_method_id, person_id, linked_id, merchant, description, note, created_at, updated_at)
-                    VALUES ($id, $kind, $date, $amount, $method, $person, $linked, $merchant, $description, $note, $created, $updated);
-                    """, ("$id", x.Id), ("$kind", x.Kind), ("$date", x.Date), ("$amount", x.AmountCents), ("$method", x.PaymentMethodId),
-                    ("$person", x.PersonId), ("$linked", x.LinkedId), ("$merchant", x.Merchant ?? ""), ("$description", x.Description ?? ""),
-                    ("$note", x.Note ?? ""), ("$created", x.CreatedAt), ("$updated", x.UpdatedAt));
-                foreach (var tagId in (x.TagIds ?? []).Distinct())
-                    Execute(connection, transaction, "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($id, $tag);", ("$id", x.Id), ("$tag", tagId));
-            }
-            foreach (var h in backup.History)
-                Execute(connection, transaction, """
-                    INSERT INTO history (id, at, action, entity, entity_id, before_json, after_json)
-                    VALUES ($id, $at, $action, $entity, $entityId, $before, $after);
-                    """, ("$id", h.Id), ("$at", h.At), ("$action", h.Action), ("$entity", h.Entity), ("$entityId", h.EntityId),
-                    ("$before", h.Before?.GetRawText()), ("$after", h.After?.GetRawText()));
+            foreach (var table in Tables)
+                CopyRows(imported, connection, transaction, table);
         }
-        catch (SqliteException error) when (error.SqliteErrorCode is 19) // SQLITE_CONSTRAINT: duplicate IDs/names or a failed CHECK.
+        catch (SqliteException error) when (error.SqliteErrorCode is 19 or 20) // SQLITE_CONSTRAINT or SQLITE_MISMATCH
         {
             throw RequestException.Invalid($"The backup contains invalid or duplicate rows: {error.Message}");
         }
 
+        ValidateRestoredRows(connection, transaction);
         CheckIntegrity(connection, transaction);
-        RecordHistory(connection, transaction, "Restored", "Backup", null, null, new
-        {
-            backup.AppVersion,
-            backup.ExportedAt,
-            Transactions = backup.Transactions.Count,
-            RecoveryFile = Path.GetFileName(recoveryPath)
-        });
+        RecordHistory(connection, transaction, "Restored", "Backup", null, null, restoreDetails);
         transaction.Commit();
-        return new RestoreResult(backup.Transactions.Count, Path.GetFileName(recoveryPath));
     }
 
-    static void ValidateBackupRows(Backup backup)
+    static void CopyRows(SqliteConnection source, SqliteConnection destination, SqliteTransaction transaction, string table)
     {
-        foreach (var m in backup.PaymentMethods) RequireName(m.Name, $"Payment method #{m.Id} name");
-        foreach (var p in backup.People) RequireName(p.Name, $"Person #{p.Id} name");
-        foreach (var t in backup.Tags) RequireName(t.Name, $"Tag #{t.Id} name");
-        foreach (var e in backup.Events) RequireName(e.Name, $"Event #{e.Id} name");
-        foreach (var x in backup.Transactions)
+        var columns = new List<string>();
+        using (var info = Sql(destination, transaction, $"PRAGMA table_info({table});"))
+        using (var reader = info.ExecuteReader())
         {
-            if (!Kinds.Contains(x.Kind)) throw RequestException.Invalid($"Transaction #{x.Id} has an unknown type.");
-            RequireDate(x.Date, $"Transaction #{x.Id} date");
-            if (x.AmountCents < 1 || x.AmountCents > MaxAmountCents) throw RequestException.Invalid($"Transaction #{x.Id} has an invalid amount.");
+            while (reader.Read()) columns.Add(reader.GetString(1));
         }
-        foreach (var e in backup.Events)
+        var columnList = string.Join(", ", columns);
+
+        using var insert = Sql(destination, transaction,
+            $"INSERT INTO {table} ({columnList}) VALUES ({string.Join(", ", columns.Select((_, i) => $"$p{i}"))});");
+        var parameters = columns.Select((_, i) => insert.Parameters.Add(new SqliteParameter { ParameterName = $"$p{i}" })).ToArray();
+        using var select = Sql(source, null, $"SELECT {columnList} FROM {table};");
+        using var rows = select.ExecuteReader();
+        while (rows.Read())
         {
-            RequireDate(e.StartDate, $"Event #{e.Id} start date");
-            RequireDate(e.EndDate, $"Event #{e.Id} end date");
+            for (var i = 0; i < parameters.Length; i++)
+                parameters[i].Value = rows.IsDBNull(i) ? DBNull.Value : rows.GetValue(i);
+            insert.ExecuteNonQuery();
         }
-        if (backup.People.Count(p => p.IsSelf) != 1) throw RequestException.Invalid("The backup must contain exactly one self person.");
-        if (!backup.PaymentMethods.Any(m => !m.Archived)) throw RequestException.Invalid("The backup must contain at least one active payment method.");
+    }
+
+    /// <summary>Rules the API enforces on every save that SQLite constraints alone do not, applied to restored rows.</summary>
+    static void ValidateRestoredRows(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        foreach (var (table, label) in new[] { ("payment_methods", "payment method"), ("people", "person"), ("tags", "tag"), ("events", "event") })
+        {
+            var bad = Scalar(connection, transaction,
+                $"SELECT id FROM {table} WHERE typeof(name) <> 'text' OR length(trim(name)) = 0 OR length(name) > {MaxNameLength} OR name <> trim(name) LIMIT 1;");
+            if (bad is not null) throw RequestException.Invalid($"The backup has an invalid {label} name (#{bad}).");
+        }
+
+        var badTransaction = Scalar(connection, transaction, $"""
+            SELECT id FROM transactions
+            WHERE typeof(amount_cents) <> 'integer' OR amount_cents > {MaxAmountCents}
+               OR typeof(payment_method_id) <> 'integer'
+               OR typeof(person_id) NOT IN ('integer', 'null') OR typeof(linked_id) NOT IN ('integer', 'null')
+               OR typeof(merchant) <> 'text' OR typeof(description) <> 'text' OR typeof(note) <> 'text'
+               OR length(merchant) > {MaxMerchantLength} OR length(description) > {MaxDescriptionLength} OR length(note) > {MaxNoteLength}
+               OR (trim(merchant) = '' AND trim(description) = '')
+            LIMIT 1;
+            """);
+        if (badTransaction is not null) throw RequestException.Invalid($"Transaction #{badTransaction} in the backup has an invalid value.");
+
+        var taggedNonPurchase = Scalar(connection, transaction,
+            "SELECT t.transaction_id FROM transaction_tags t JOIN transactions x ON x.id = t.transaction_id WHERE x.kind <> 'Purchase' LIMIT 1;");
+        if (taggedNonPurchase is not null) throw RequestException.Invalid($"Transaction #{taggedNonPurchase} in the backup has tags, but only purchases can.");
+
+        if (Scalar(connection, transaction, $"SELECT id FROM events WHERE typeof(note) <> 'text' OR length(note) > {MaxNoteLength} LIMIT 1;") is { } badEvent)
+            throw RequestException.Invalid($"Event #{badEvent} in the backup has an invalid note.");
+
+        var badHistory = Scalar(connection, transaction, """
+            SELECT id FROM history
+            WHERE typeof(entity_id) NOT IN ('integer', 'null')
+               OR (before_json IS NOT NULL AND NOT json_valid(before_json))
+               OR (after_json IS NOT NULL AND NOT json_valid(after_json))
+            LIMIT 1;
+            """);
+        if (badHistory is not null) throw RequestException.Invalid($"History entry #{badHistory} in the backup is damaged.");
+
+        if (Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM people WHERE is_self = 1;"), CultureInfo.InvariantCulture) != 1)
+            throw RequestException.Invalid("The backup must contain exactly one self person.");
+        if (Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM payment_methods WHERE archived = 0;"), CultureInfo.InvariantCulture) == 0)
+            throw RequestException.Invalid("The backup must contain at least one active payment method.");
+
+        // The schema only checks the YYYY-MM-DD shape; this rejects dates that do not exist, like 2026-02-30.
+        using var dates = Sql(connection, transaction, "SELECT date FROM transactions UNION SELECT start_date FROM events UNION SELECT end_date FROM events;");
+        using var reader = dates.ExecuteReader();
+        while (reader.Read())
+            RequireDate(reader.GetString(0), "Every date in the backup");
     }
 
     /// <summary>Checks relationships that SQLite constraints cannot express. Throws instead of letting inconsistent data commit.</summary>
@@ -933,9 +954,6 @@ record SpendTransaction(long Id, string Kind, string Date, long AmountCents, lon
 record HistoryEntry(long Id, string At, string Action, string Entity, long? EntityId, JsonElement? Before, JsonElement? After);
 record HistoryPage(List<HistoryEntry> Entries, bool HasMore);
 record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person> People, List<Tag> Tags, List<SpendEvent> Events, List<SpendTransaction> Transactions);
-record Backup(string Format, int FormatVersion, string AppVersion, string ExportedAt, List<PaymentMethod> PaymentMethods, List<Person> People,
-    List<Tag> Tags, List<SpendEvent> Events, List<SpendTransaction> Transactions, List<HistoryEntry> History);
-record RestoreResult(int Transactions, string RecoveryFile);
 
 record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? PaymentMethodId, long? PersonId, long? LinkedId,
     string? Merchant, string? Description, string? Note, List<long>? TagIds);

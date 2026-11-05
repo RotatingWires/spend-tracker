@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.1.0 Manual
+# SpendTracker v0.2.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -172,17 +172,31 @@ logs/
 
 ### Download Backup
 
-**File → Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.json`: a readable JSON file with format `spendtracker-backup` version 1, the app version, and every payment method, person, tag, event, transaction, and history entry. It never contains `auth.json` or the password hash. Treat it like your bank statements.
+**File → Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
+
+- `spend-tracker.db`: a consistent copy of the whole database (every payment method, person, tag, event, transaction, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
+- `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
+
+It never contains `auth.json` or the password hash. Treat it like your bank statements.
 
 ### Restore Backup
 
-**File → Restore Backup** uploads a backup and replaces **all** current data with it. Before anything changes, SpendTracker writes the current data to `data/backups/before-restore-<time>-<id>.json`, which can itself be restored. The password is not changed.
+**File → Restore Backup** uploads a backup ZIP and replaces **all** current data with it. The password is not changed.
 
-Restores are strict and atomic. The whole import runs in one database transaction, and is rejected with no changes when the file is not a SpendTracker backup, was made by a newer SpendTracker version, has unknown or missing fields, invalid dates or amounts, duplicate IDs or names, references to missing rows, refunds or paybacks that break the rules in [Transactions](#transactions), or not exactly one self person. Rows keep their original IDs, so links survive. The limit is 64 MiB.
+The upload is verified before any live data changes. It is rejected when:
+
+- it is not a ZIP with exactly `manifest.json` and `spend-tracker.db`, or a member is encrypted or too large;
+- the manifest is not a SpendTracker backup, or came from a newer SpendTracker version or schema;
+- the database does not match the manifest's checksum or row counts, or fails SQLite's integrity check;
+- the database has different tables or columns than this version, or contains triggers, views, or virtual tables.
+
+SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, tags only on purchases, exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
+
+Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
 
 ### Export Transactions CSV
 
-**File → Export Transactions CSV** downloads every transaction with date, type, for who, merchant, description, tags, payment method, amount, linked transaction, and note. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a JSON backup to restore.
+**File → Export Transactions CSV** downloads every transaction with date, type, for who, merchant, description, tags, payment method, amount, linked transaction, and note. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
 
 ### Copying the database directly
 
@@ -254,8 +268,8 @@ All endpoints are under `/api`, use JSON, and require a session except `auth/sta
 | `POST /api/events`, `PUT /api/events/{id}` | `{ name, startDate, endDate, note }` |
 | `DELETE /api/events/{id}` | delete |
 | `GET /api/history?limit=&beforeId=` | newest-first history page (`limit` 1–500, default 200) and `hasMore` |
-| `GET /api/backup` | download a backup file |
-| `POST /api/restore` | restore a backup file (body is the backup JSON) |
+| `GET /api/backup` | download a backup ZIP |
+| `POST /api/restore` | restore a backup ZIP (raw `application/zip` body, up to 256 MiB) |
 
 A transaction body is:
 
@@ -289,7 +303,8 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 ```text
 SpendTracker.csproj     .NET project, dependency, and release version
 Program.cs              hosting, authentication, error responses, and API routes
-Store.cs                SQLite schema, validation rules, history, backup and restore
+Store.cs                SQLite schema, validation rules, history, and restoring rows
+Transfer.cs             backup ZIP creation and restore verification
 SingleFileLogger.cs     capped logs/console.log writer
 README.md / MANUAL.md   documentation
 
@@ -372,7 +387,7 @@ dotnet build
 python3 -m unittest discover -s tests -p "test_api.py"
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, edits that would break links, archiving and deletion rules, tag deletion, events, history, and backup/restore round trips and rejected restores. It uses only the Python standard library.
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, edits that would break links, archiving and deletion rules, tag deletion, events, history, and backup ZIP round trips plus 23 kinds of rejected restore (damaged ZIPs, wrong manifests, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -380,9 +395,17 @@ Optional browser tests use Playwright with Firefox (`pip install playwright` and
 python3 -m unittest discover -s tests -p "test_browser.py"
 ```
 
-They run first-run setup, add purchases, refunds, and paybacks through the UI, visit every tab in both themes, check phone-width layout, verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
+They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 ## Release notes
+
+### v0.2.0
+
+- Backups are now ZIP files holding an online copy of the SQLite database and a manifest with a SHA-256 checksum and row counts, the same layout as TaskList and NewsReview. They scale with the database instead of being held in memory as one JSON document.
+- Restores verify the ZIP, manifest, checksum, SQLite integrity, and exact table layout, reject triggers and views, and check every app rule before committing in one transaction. Recovery copies are ZIPs and are only kept when a restore succeeds.
+- Upload limit raised from 64 MiB to 256 MiB (1 GiB uncompressed).
+- Removed the JSON backup format; v0.1.0 JSON backups cannot be restored.
+- The service worker now returns a normal network error when a file is neither reachable nor cached, instead of an empty response.
 
 ### v0.1.0
 

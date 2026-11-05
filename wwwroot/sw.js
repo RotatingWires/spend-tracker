@@ -37,6 +37,9 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
       }
       return response;
-    }).catch(() => caches.match(event.request).then(hit => hit || caches.match(url.pathname)))
+    }).catch(async () => {
+      // Offline: use the cached copy. With no copy, answer with a normal network error instead of nothing.
+      return (await caches.match(event.request)) ?? (await caches.match(url.pathname)) ?? Response.error();
+    })
   );
 });

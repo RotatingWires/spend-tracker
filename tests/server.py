@@ -104,14 +104,16 @@ class Client:
         self.base_url = base_url
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
-    def request(self, method, path, body=None, raw=None):
+    def request(self, method, path, body=None, raw=None, content_type="application/json", binary_response=False):
         data = raw if raw is not None else (None if body is None else json.dumps(body).encode())
         request = urllib.request.Request(self.base_url + path, data=data, method=method)
         if data is not None:
-            request.add_header("Content-Type", "application/json")
+            request.add_header("Content-Type", content_type)
         try:
-            with self.opener.open(request, timeout=30) as response:
+            with self.opener.open(request, timeout=60) as response:
                 payload = response.read()
+                if binary_response:
+                    return payload
                 return json.loads(payload) if payload else None
         except urllib.error.HTTPError as error:
             with error:
@@ -127,6 +129,12 @@ class Client:
 
     def post(self, path, body=None, raw=None):
         return self.request("POST", path, body, raw)
+
+    def download(self, path):
+        return self.request("GET", path, binary_response=True)
+
+    def upload_zip(self, path, data):
+        return self.request("POST", path, raw=data, content_type="application/zip")
 
     def put(self, path, body):
         return self.request("PUT", path, body)

@@ -149,8 +149,8 @@ async function downloadBackup() {
       return;
     }
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spend-tracker-${todayKey()}.json`;
-    downloadFile(name, 'application/json', await response.blob());
+    const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spend-tracker-${todayKey()}.zip`;
+    downloadFile(name, 'application/zip', await response.blob());
     setStatus('Backup downloaded. Keep it private; it contains all your spending data.');
   } catch (error) {
     showError(`Could not download a backup: ${error.message}`);
@@ -158,20 +158,25 @@ async function downloadBackup() {
 }
 
 async function restoreBackup(file) {
-  let backup;
-  try {
-    backup = JSON.parse(await file.text());
-  } catch {
-    showError(`${file.name} is not a valid JSON backup file.`);
-    return;
-  }
-  const count = Array.isArray(backup.transactions) ? backup.transactions.length : 0;
   const confirmed = await confirmAction('Restore Backup',
-    `Replace ALL current SpendTracker data with ${file.name} (${plural(count, 'transaction')})? The current data is saved on the server in data/backups first. Your password is not changed.`,
+    `Replace ALL current SpendTracker data with ${file.name}? The current data is saved on the server in data/backups first. Your password is not changed.`,
     'Restore');
   if (!confirmed) return;
   try {
-    const result = await api('/restore', { method: 'POST', body: backup });
+    setStatus(`Restoring ${file.name}...`);
+    const response = await fetch('/api/restore', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/zip' },
+      body: file
+    });
+    if (response.status === 401) {
+      window.location.replace(loginUrl());
+      return;
+    }
+    const result = await response.json().catch(() => ({ error: `${response.status} ${response.statusText}` }));
+    if (!response.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
     await loadSnapshot();
     setStatus(`Restored ${plural(result.transactions, 'transaction')}. Previous data saved as ${result.recoveryFile}.`);
   } catch (error) {

@@ -158,6 +158,24 @@ class BrowserTests(unittest.TestCase):
         self.shot(page, "editor-phone-dark")
         page.click("#txCancelButton")
 
+        # Download a backup, change the data, then restore it through the UI.
+        page.set_viewport_size({"width": 1280, "height": 900})
+        page.click('.tabs [data-tab="transactions"]')
+        page.click("#fileMenuButton")
+        with page.expect_download() as download_info:
+            page.click("#backupButton")
+        download = download_info.value
+        self.assertRegex(download.suggested_filename, r"^spend-tracker-\d{8}-\d{6}\.zip$")
+        backup_path = Path(download.path())
+        self.add_transaction(page, amount="99", merchant="After backup")
+        expect(page.locator("#transactionsTable")).to_contain_text("After backup")
+        page.click("#fileMenuButton")
+        page.set_input_files("#restoreFileInput", str(backup_path))
+        page.click("#confirmOkButton")
+        expect(page.locator("#toolbarStatus")).to_contain_text("Restored 4 transactions")
+        expect(page.locator("#transactionsTable")).not_to_contain_text("After backup")
+        expect(page.locator("#transactionsTable")).to_contain_text("BK — food")
+
         # Logging out returns to the login page and protects the app.
         page.click("#fileMenuButton")
         page.click("#logoutButton")
