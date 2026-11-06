@@ -34,7 +34,26 @@ function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
  * A Win95 dropdown built from a button and a menu, used instead of native <select> to match the theme.
  * Options are [{ value, label }]. Values are compared as strings.
  */
-function createSingleSelect(host, { onChange = () => {} } = {}) {
+/**
+ * Appends "Add New..." to a dropdown menu when onAdd is given. onAdd asks for and creates the item; the caller then
+ * refreshes the options with it chosen.
+ */
+function addNewItem(menu, onAdd) {
+  if (!onAdd) return;
+  const item = menuButton('Add New...', {
+    onClick: event => {
+      event.stopPropagation();
+      closeMenus();
+      onAdd();
+    }
+  });
+  item.classList.add('menu-add-new');
+  // The separator only divides it from existing items; an empty list shows just "Add New...".
+  if (menu.children.length) menu.append(menuSeparator());
+  menu.append(item);
+}
+
+function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -61,7 +80,7 @@ function createSingleSelect(host, { onChange = () => {} } = {}) {
   function render() {
     const selected = options.find(option => option.value === current);
     label.textContent = selected?.label ?? '—';
-    button.disabled = options.length === 0;
+    button.disabled = options.length === 0 && !onAdd;
     menu.replaceChildren(...options.map(option => menuButton(option.label, {
       role: 'menuitemradio',
       checked: option.value === current,
@@ -75,6 +94,7 @@ function createSingleSelect(host, { onChange = () => {} } = {}) {
         onChange(current);
       }
     })));
+    addNewItem(menu, onAdd);
   }
 
   button.addEventListener('click', event => {
@@ -98,7 +118,7 @@ function createSingleSelect(host, { onChange = () => {} } = {}) {
  * A Win95 dropdown of check items, like the TaskList Stats list filter. The menu stays open while items are
  * toggled. Options are [{ value, label }]; the button summarizes the selection, by default as a list of labels.
  */
-function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', ') } = {}) {
+function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -126,7 +146,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
     const names = options.filter(option => selected.has(option.value)).map(option => option.label);
     label.textContent = names.length ? summary(names) : empty;
     button.title = label.textContent;
-    button.disabled = options.length === 0;
+    button.disabled = options.length === 0 && !onAdd;
     menu.replaceChildren(...options.map(option => {
       const item = menuButton(option.label, {
         role: 'menuitemcheckbox',
@@ -142,6 +162,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
       });
       return item;
     }));
+    addNewItem(menu, onAdd);
   }
 
   const values = () => options.filter(option => selected.has(option.value)).map(option => option.value);

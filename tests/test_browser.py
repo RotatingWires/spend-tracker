@@ -331,6 +331,56 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("$10.00")
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
+        page.locator("#personDialog button", has_text="Close").click()
+
+    def test_gifts_and_adding_from_the_editor(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        # New Transaction... stays in the top left on every tab.
+        positions = set()
+        for tab in TABS:
+            page.click(f'.tabs button:text-is("{tab}")')
+            box = page.locator("#newTransactionButton").bounding_box()
+            positions.add((box["x"], box["y"]))
+        self.assertEqual(len(positions), 1, "New Transaction... moved between tabs")
+        page.click('.tabs [data-tab="transactions"]')
+
+        # Every editor dropdown can add a new item, which is then chosen.
+        page.click("#newTransactionButton")
+        page.fill("#txAmount", "25")
+        page.click("#txMerchant .retro-select")
+        page.locator("#txMerchant .menu-dropdown button", has_text="Add New...").click()
+        expect(page.locator("#promptTitle")).to_have_text("New merchant")
+        page.fill("#promptInput", "Florist")
+        page.keyboard.press("Enter")
+        expect(page.locator("#txMerchant .retro-select")).to_have_text("Florist▼")
+        page.click("#txPeople .retro-select")
+        page.locator("#txPeople .menu-dropdown button", has_text="Add New...").click()
+        page.fill("#promptInput", "Sam")
+        page.keyboard.press("Enter")
+        self.set_checks(page, "#txPeople", ["Sam"])
+        page.click("#txTags .retro-select")
+        page.locator("#txTags .menu-dropdown button", has_text="Add New...").click()
+        page.fill("#promptInput", "gifts")
+        page.keyboard.press("Enter")
+        expect(page.locator("#txTags .retro-select")).to_have_text("gifts▼")
+
+        # A gift share is bought for them but stays off their balance unless Include gifts is checked.
+        page.locator("#txShares input[type=checkbox]").check()  # Sam alone: one Gift box, no amount boxes
+        page.click("#txSaveButton")
+        expect(page.locator("#transactionDialog")).not_to_be_visible()
+        expect(page.locator("#transactionsTable tbody tr", has_text="Florist")).to_contain_text("Sam (gift)")
+        page.click('.tabs [data-tab="people"]')
+        row = page.locator("#peopleTable tbody tr", has_text="Sam")
+        expect(row).to_contain_text("$25.00$25.00")  # bought for them, all of it a gift
+        expect(row).to_contain_text("Settled")
+        page.check("#includeGifts")
+        expect(row).to_contain_text("$25.00 owed to you")
+        page.uncheck("#includeGifts")
+        expect(row).to_contain_text("Settled")
+        row.click()
+        expect(page.locator("#personTable tbody tr", has_text="Florist")).to_contain_text("Gift")
+        page.locator("#personDialog button", has_text="Close").click()
 
     def test_time_frames_and_collections(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
@@ -461,7 +511,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#confirmOkButton")
         expect(page.locator("#statusLeft")).to_have_text("People: 3 entries changed.")
         shares = {tx["id"]: tx["shares"] for tx in api.get("/api/snapshot")["transactions"]}
-        self.assertEqual(shares[third["id"]], [{"personId": me, "amountCents": 15001}, {"personId": riley, "amountCents": 15000}])
+        self.assertEqual(shares[third["id"]], [{"personId": me, "amountCents": 15001, "gift": False}, {"personId": riley, "amountCents": 15000, "gift": False}])
 
         # A rule the server enforces skips that entry, says why, and leaves it selected.
         api.post("/api/transactions", {

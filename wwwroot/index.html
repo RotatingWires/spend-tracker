@@ -49,15 +49,16 @@
       </div>
     </nav>
 
-    <section class="toolbar" aria-label="Time frame and search">
+    <section class="toolbar" aria-label="New transaction and time frame">
+      <!-- First in the toolbar so it stays in the top left on every tab; the time frame controls follow on month tabs. -->
+      <button type="button" id="newTransactionButton" class="default-button">New Transaction...</button>
       <div class="toolbar-group" id="monthControls">
+        <span class="toolbar-separator" aria-hidden="true"></span>
         <span class="toolbar-label" id="timeFrameLabel">Time frame:</span>
         <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month" title="Move the chosen months back one month">◀</button>
         <div id="timeFrameSelect" aria-labelledby="timeFrameLabel"></div>
         <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month">▶</button>
-        <span class="toolbar-separator" aria-hidden="true"></span>
       </div>
-      <button type="button" id="newTransactionButton" class="default-button">New Transaction...</button>
     </section>
 
     <section class="tabs" role="tablist" aria-label="Sections">
@@ -107,7 +108,8 @@
 
       <section class="tab-panel" data-panel="people" role="tabpanel" hidden>
         <form class="panel-actions" data-add="people"><input class="retro-input" name="name" maxlength="60" placeholder="New person" aria-label="New person name" required><button type="submit">Add</button></form>
-        <div class="note">What other people owe you, from purchases you marked as for them, minus refunds on those purchases and paybacks they made. Select a person for their purchases and paybacks. Archiving a person only stops them being offered for new entries.</div>
+        <div class="note">What other people owe you, from purchases you marked as for them (gifts left out unless Include gifts is checked), minus refunds on those purchases and paybacks they made. Select a person for their purchases and paybacks. Archiving a person only stops them being offered for new entries.</div>
+        <label class="control-row"><input type="checkbox" id="includeGifts"> Include gifts in Balance</label>
         <div class="table-wrap"><table id="peopleTable"></table></div>
       </section>
 
@@ -277,7 +279,7 @@
       <div class="dialog-title" id="aboutTitle">About SpendTracker</div>
       <div class="dialog-body">
         <p>A self-hosted spending tracker. Every statistic comes from entries you recorded; SpendTracker never guesses categories or fills in data for you.</p>
-        <p><strong>Purchase:</strong> money you spent. <strong>For who</strong> says who it was for. Pick several people to split it; each friend's share counts toward what they owe you.</p>
+        <p><strong>Purchase:</strong> money you spent. <strong>For who</strong> says who it was for. Pick several people to split it; each friend's share counts toward what they owe you, unless you check <strong>Gift</strong> for them. Gifts stay off their balance unless People → Include gifts is checked.</p>
         <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase and one person's share of it, uses that purchase's tags and collections, and reduces net spent on the date it was refunded.</p>
         <p><strong>Collections</strong> work like tags: add them on the Collections tab (a trip, a move) and choose them on purchases. The Collections tab and Stats total each collection's purchases and their refunds.</p>
         <p><strong>Time frame</strong> (toolbar) chooses what the ledger and calendar show: All time, one month, or several months checked together. ◀ / ▶ move the chosen months by one.</p>

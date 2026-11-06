@@ -622,7 +622,10 @@ button.calendar-day:active {
 .form-grid .inline-select-menu { min-width: 0; }
 .form-grid .retro-select { min-width: 0; }
 .form-grid .full { grid-column: 1 / -1; }
-.share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 4px 8px; align-items: center; margin-top: 6px; }
+.share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 4px 8px; align-items: center; margin-top: 6px; }
+.share-gift { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.share-gift input { margin: 0; accent-color: var(--title); }
+#includeGifts { margin: 0; accent-color: var(--title); }
 .share-rows .retro-input { width: 100%; text-align: right; }
 .share-rows .share-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }

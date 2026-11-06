@@ -14,7 +14,7 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed class Store
 {
-    public const int SchemaVersion = 5;
+    public const int SchemaVersion = 6;
 
     /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
     public static readonly string[] Tables = ["payment_methods", "people", "tags", "merchants", "collections", "transactions", "transaction_shares", "transaction_tags", "transaction_collections", "scope_counters", "scope_numbers", "history"];
@@ -126,6 +126,8 @@ sealed class Store
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 person_id INTEGER NOT NULL REFERENCES people(id),
                 amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+                -- A gift share is bought for that person but not owed back, so it stays off their balance.
+                gift INTEGER NOT NULL DEFAULT 0 CHECK(gift IN (0, 1)),
                 PRIMARY KEY (transaction_id, person_id)
             );
             CREATE TABLE transaction_tags (
@@ -332,7 +334,7 @@ sealed class Store
 
         var sharesByTransaction = new Dictionary<long, List<Share>>();
         using (var shareCommand = Sql(connection, transaction,
-            "SELECT transaction_id, person_id, amount_cents FROM transaction_shares WHERE $id IS NULL OR transaction_id = $id ORDER BY transaction_id, person_id;",
+            "SELECT transaction_id, person_id, amount_cents, gift FROM transaction_shares WHERE $id IS NULL OR transaction_id = $id ORDER BY transaction_id, person_id;",
             ("$id", onlyId)))
         using (var reader = shareCommand.ExecuteReader())
         {
@@ -341,7 +343,7 @@ sealed class Store
                 var transactionId = reader.GetInt64(0);
                 if (!sharesByTransaction.TryGetValue(transactionId, out var shares))
                     sharesByTransaction[transactionId] = shares = [];
-                shares.Add(new Share(reader.GetInt64(1), reader.GetInt64(2)));
+                shares.Add(new Share(reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0));
             }
         }
 
@@ -488,8 +490,8 @@ sealed class Store
                 Execute(connection, transaction, $"INSERT INTO {kind.LinkTable} (transaction_id, {kind.LinkColumn}) VALUES ($id, $label);", ("$id", savedId), ("$label", labelId));
         }
         foreach (var share in values.Shares)
-            Execute(connection, transaction, "INSERT INTO transaction_shares (transaction_id, person_id, amount_cents) VALUES ($id, $person, $amount);",
-                ("$id", savedId), ("$person", share.PersonId), ("$amount", share.AmountCents));
+            Execute(connection, transaction, "INSERT INTO transaction_shares (transaction_id, person_id, amount_cents, gift) VALUES ($id, $person, $amount, $gift);",
+                ("$id", savedId), ("$person", share.PersonId), ("$amount", share.AmountCents), ("$gift", share.Gift ? 1 : 0));
         Renumber(connection, transaction, savedId);
 
         var after = ReadTransactions(connection, transaction, savedId).Single();
@@ -579,6 +581,8 @@ sealed class Store
                         throw RequestException.Invalid("A payback cannot be dated before its purchase.");
                     var paybackShare = RequireShare(connection, transaction, repaid.Id, personId,
                         "A payback can only be linked to a purchase that person had a share of.");
+                    if (IsGiftShare(connection, transaction, repaid.Id, personId!.Value))
+                        throw RequestException.Invalid($"{PersonName(connection, transaction, personId.Value)}'s share of that purchase was a gift, so there is nothing to pay back.");
                     if (LinkedShareTotal(connection, transaction, repaid.Id, personId!.Value, id) + amount > paybackShare)
                         throw RequestException.Invalid($"Refunds and paybacks for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(paybackShare)}.");
                 }
@@ -620,8 +624,10 @@ sealed class Store
             if (cents < 1) throw RequestException.Invalid("Each person's share must be at least $0.01.");
             if (shares.Any(s => s.PersonId == personId)) throw RequestException.Invalid("Each person can only be on a purchase once.");
             var wasOnPurchase = before?.Shares.Any(s => s.PersonId == personId) == true;
-            RequireUsablePerson(connection, transaction, personId, wasOnPurchase ? personId : null, "Choose who this purchase was for.");
-            shares.Add(new Share(personId, cents));
+            var person = RequireUsablePerson(connection, transaction, personId, wasOnPurchase ? personId : null, "Choose who this purchase was for.");
+            var gift = share.Gift ?? false;
+            if (gift && person.IsSelf) throw RequestException.Invalid("Your own share cannot be a gift.");
+            shares.Add(new Share(personId, cents, gift));
         }
         var total = shares.Sum(s => s.AmountCents);
         if (total != amount)
@@ -643,6 +649,8 @@ sealed class Store
             var name = PersonName(connection, transaction, group.Key);
             var share = shares.FirstOrDefault(s => s.PersonId == group.Key)
                 ?? throw RequestException.Invalid($"{name} has linked refunds or paybacks on this purchase, so they must stay on it.");
+            if (share.Gift && group.Any(d => d.Kind == "Payback"))
+                throw RequestException.Invalid($"{name} has paid back part of this purchase, so their share cannot be a gift.");
             var linked = group.Sum(d => d.AmountCents);
             if (linked > share.AmountCents)
                 throw RequestException.Invalid($"Refunds and paybacks for {name}'s share already total {FormatCents(linked)}; their share cannot be less than that.");
@@ -691,6 +699,10 @@ sealed class Store
             ("$purchase", purchaseId), ("$person", personId));
         return share is null ? throw RequestException.Invalid(missingMessage) : Convert.ToInt64(share, CultureInfo.InvariantCulture);
     }
+
+    static bool IsGiftShare(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long personId) =>
+        Convert.ToInt64(Scalar(connection, transaction, "SELECT gift FROM transaction_shares WHERE transaction_id = $purchase AND person_id = $person;",
+            ("$purchase", purchaseId), ("$person", personId)) ?? 0L, CultureInfo.InvariantCulture) != 0;
 
     static long LinkedShareTotal(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long personId, long? excludingId) =>
         Convert.ToInt64(Scalar(connection, transaction,
@@ -1119,6 +1131,16 @@ sealed class Store
               AND NOT EXISTS (SELECT 1 FROM transaction_shares s WHERE s.transaction_id = x.linked_id AND s.person_id = x.person_id)
             LIMIT 1;
             """,
+            // Your own share is never a gift, and nobody pays back a gift.
+            """
+            SELECT s.transaction_id FROM transaction_shares s JOIN people me ON me.id = s.person_id
+            WHERE s.gift = 1 AND me.is_self = 1 LIMIT 1;
+            """,
+            """
+            SELECT x.id FROM transactions x
+            JOIN transaction_shares s ON s.transaction_id = x.linked_id AND s.person_id = x.person_id
+            WHERE x.kind = 'Payback' AND s.gift = 1 LIMIT 1;
+            """,
             // Paybacks never come from yourself.
             """
             SELECT x.id FROM transactions x JOIN people me ON me.id = x.person_id
@@ -1231,7 +1253,8 @@ record LabelKind(string Table, string LinkTable, string LinkColumn, string Entit
 record Merchant(long Id, string Name, bool Archived, string CreatedAt);
 /// <summary>A transaction's number inside one scope, such as ("person", 3, 12): the 12th entry for person #3.</summary>
 record ScopeNumber(string Scope, long ScopeId, long Number);
-record Share(long PersonId, long AmountCents);
+/// <summary>One person's part of a purchase. A gift share is not owed back and stays off their balance.</summary>
+record Share(long PersonId, long AmountCents, bool Gift = false);
 record SpendTransaction(long Id, string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
     long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<long> CollectionIds, List<Share> Shares,
     List<ScopeNumber> Numbers, string CreatedAt, string? UpdatedAt);
@@ -1242,7 +1265,7 @@ record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person>
 
 record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? PaymentMethodId, long? PersonId, long? LinkedId,
     long? MerchantId, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares, bool? Archived = null, List<long>? CollectionIds = null);
-record ShareRequest(long? PersonId, long? AmountCents);
+record ShareRequest(long? PersonId, long? AmountCents, bool? Gift = null);
 record TransactionValues(string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
     long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<long> CollectionIds, List<Share> Shares);
 record NameRequest(string? Name);

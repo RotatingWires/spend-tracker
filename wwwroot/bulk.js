@@ -99,7 +99,10 @@ const BULK_ACTIONS = {
       const people = changedIds(tx.shares.map(share => share.personId), choice);
       if (!people) return { skip: choice.mode === 'add' ? `${names} ${choice.ids.length === 1 ? 'is' : 'are'} already on it` : `${names} ${choice.ids.length === 1 ? 'is' : 'are'} not on it` };
       if (people.length === 0) return { skip: 'it would leave nobody on it' };
-      return { body: transactionRequest(tx, { shares: evenShares(tx.amountCents, people) }) };
+      // People who stay keep whether their share is a gift.
+      const gifts = new Set(tx.shares.filter(share => share.gift).map(share => share.personId));
+      const shares = evenShares(tx.amountCents, people).map(share => ({ ...share, gift: gifts.has(share.personId) }));
+      return { body: transactionRequest(tx, { shares }) };
     }
   },
   merchant: {

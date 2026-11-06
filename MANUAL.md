@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.9.0 Manual
+# SpendTracker v0.10.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -126,6 +126,8 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
+**Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts as bought for them (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
+
 **Refunds** never have their own tags; they count under the tags and merchant of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*. Each refund is for one person's share of the purchase: picked automatically when the purchase was for one person, and chosen by you when it was split, so a refund on a friend's share reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
 
 **Paybacks** come from someone other than you. Linking a payback to a purchase marks that person's share as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
@@ -172,7 +174,7 @@ The default tab is the ledger for the **Time frame** chosen in the toolbar: **Al
 
 **File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
-Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button in the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
 
@@ -180,6 +182,8 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 - **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person, with **Split Evenly** and a running total; Save refuses shares that do not add up to the amount.
 - **Refund / return** on a split purchase also asks **Whose share** it refunds.
 - **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid.
+- Every dropdown that lists your own items (**For who**, **Paid back by**, **Paid with**, **Merchant**, **Tags**, and **Collections**) ends with **Add New...**: it asks for a name, adds the item exactly as the Add form on its tab would, and chooses it in the editor.
+- **For who** shows a **Gift** box for everyone but you (see *Gifts* above); with several people it sits next to each amount box.
 - **Tags** is a dropdown of check items, so a purchase can have several. Tags are created, renamed, archived, and deleted only on the **Tags** tab.
 - **Collections** works the same way as Tags, for collections created on the **Collections** tab.
 - **Merchant** is a dropdown of your active merchants, like payment methods, plus **No merchant**. Merchants are added on the **Merchants** tab. An archived merchant can stay on entries that already have it but is not offered for others.
@@ -211,7 +215,7 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 ### People
 
-An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
+An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
 
 ### Payment Methods, Tags, Collections, and Merchants
 
@@ -323,9 +327,9 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 
 ### Schema and migrations
 
-The database records its schema version in `PRAGMA user_version` (currently 5). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), and 0.5–0.8 (schema 4) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
+The database records its schema version in `PRAGMA user_version` (currently 6). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
 
-Schema 5 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares`, `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
+Schema 6 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares` (with `gift`), `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
 
 ## Authentication
 
@@ -387,14 +391,14 @@ A transaction body is:
   "note": "",
   "tagIds": [3],
   "collectionIds": [1],
-  "shares": [{ "personId": 1, "amountCents": 617 }, { "personId": 2, "amountCents": 600 }],
+  "shares": [{ "personId": 1, "amountCents": 617 }, { "personId": 2, "amountCents": 600, "gift": false }],
   "archived": false
 }
 ```
 
 `merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, …]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
 
-Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares`; refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `collectionIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
+Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares` (each share may set `"gift": true` for anyone but you; leaving it out means false); refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `collectionIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
 
 ## Security and privacy
 
@@ -462,6 +466,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.10.0
+
+- **Gifts:** mark a person's share of a purchase as a gift in **For who**. Gifts stay off their balance unless **People → Include gifts in Balance** is checked; the People tab and person dialog show them, and the ledger marks them *(gift)*. The API's shares take `gift`; database schema 6, with no upgrade from schema 5.
+- **Add New...** at the end of every editor dropdown of your own items adds one without leaving the editor.
+- **New Transaction...** is the first item in the toolbar, so it stays in the top left on every tab.
 
 ### v0.9.0
 

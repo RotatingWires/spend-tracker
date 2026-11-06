@@ -11,6 +11,7 @@ const state = {
   statsPeriod: ['all'],
   statsChart: savedChartMeasures(),
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
+  includeGifts: readSetting('spend-tracker-include-gifts') === 'true',
   loading: null
 };
 
@@ -203,6 +204,11 @@ function shareOf(purchase, personId) {
   return purchase.shares.find(share => share.personId === personId)?.amountCents ?? 0;
 }
 
+/** A gift share is bought for that person but not owed back. */
+function isGiftShare(purchase, personId) {
+  return purchase?.shares.some(share => share.personId === personId && share.gift) ?? false;
+}
+
 function tagIdsOf(tx) {
   return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.tagIds ?? [] : tx.tagIds;
 }
@@ -240,7 +246,7 @@ function whoLabel(tx) {
     const purchase = state.model.byId.get(tx.linkedId);
     return purchase && purchase.shares.length > 1 ? `${personName(tx.personId)}'s share` : personName(tx.personId);
   }
-  return tx.shares.map(share => personName(share.personId)).join(', ');
+  return tx.shares.map(share => (share.gift ? `${personName(share.personId)} (gift)` : personName(share.personId))).join(', ');
 }
 
 /** Short human label: "Merchant — description", whichever parts exist. */
@@ -329,7 +335,7 @@ function transactionRequest(tx, changes = {}) {
   return {
     kind: tx.kind, date: tx.date, amountCents: tx.amountCents, paymentMethodId: tx.paymentMethodId, personId: tx.personId,
     linkedId: tx.linkedId, merchantId: tx.merchantId, description: tx.description, note: tx.note, tagIds: tx.tagIds, collectionIds: tx.collectionIds,
-    shares: tx.shares.map(share => ({ personId: share.personId, amountCents: share.amountCents })), archived: tx.archived,
+    shares: tx.shares.map(share => ({ personId: share.personId, amountCents: share.amountCents, gift: share.gift })), archived: tx.archived,
     ...changes
   };
 }

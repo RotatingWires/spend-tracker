@@ -36,11 +36,11 @@ class SpendTrackerApiTests(unittest.TestCase):
         return found or self.api.post("/api/merchants", {"name": name})["id"]
 
     def purchase(self, amount=1000, date="2026-10-01", person=None, method=None, shares=None, merchant="Store", **extra):
-        """A purchase for one person (the whole amount), or split by shares=[(person, cents), ...]."""
+        """A purchase for one person (the whole amount), or split by shares=[(person, cents) or (person, cents, gift), ...]."""
         shares = [(person or self.me, amount)] if shares is None else shares
         body = {"kind": "Purchase", "date": date, "amountCents": amount, "paymentMethodId": method or self.card,
                 "personId": None, "linkedId": None, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [],
-                "shares": [{"personId": who, "amountCents": cents} for who, cents in shares]}
+                "shares": [{"personId": share[0], "amountCents": share[1], **({"gift": True} if share[2:] == (True,) else {})} for share in shares]}
         body.update(extra)
         return self.api.post("/api/transactions", body)
 
@@ -135,7 +135,7 @@ class SpendTrackerApiTests(unittest.TestCase):
     def test_split_purchases(self):
         jordan = self.api.post("/api/people", {"name": "Jordan"})["id"]
         dinner = self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 1200), (jordan, 800)])
-        self.assertEqual(dinner["shares"], [{"personId": self.me, "amountCents": 1000}, {"personId": self.alex, "amountCents": 1200}, {"personId": jordan, "amountCents": 800}])
+        self.assertEqual(dinner["shares"], [{"personId": self.me, "amountCents": 1000, "gift": False}, {"personId": self.alex, "amountCents": 1200, "gift": False}, {"personId": jordan, "amountCents": 800, "gift": False}])
         self.assertIsNone(dinner["personId"])
         self.assertRejected(lambda: self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 1000)]), contains="add up to $20.00")
         self.assertRejected(lambda: self.purchase(amount=2000, shares=[(self.me, 1000), (self.me, 1000)]), contains="only be on a purchase once")
@@ -156,7 +156,7 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertRejected(lambda: self.api.put(f"/api/transactions/{dinner['id']}", {**base, "shares": [{"personId": self.me, "amountCents": 1100}, {"personId": self.alex, "amountCents": 1100}, {"personId": jordan, "amountCents": 800}]}),
                             contains="cannot be less")
         edited = self.api.put(f"/api/transactions/{dinner['id']}", {**base, "amountCents": 3500, "shares": [{"personId": self.me, "amountCents": 1500}, {"personId": self.alex, "amountCents": 1200}, {"personId": jordan, "amountCents": 800}]})
-        self.assertEqual(edited["shares"][0], {"personId": self.me, "amountCents": 1500})
+        self.assertEqual(edited["shares"][0], {"personId": self.me, "amountCents": 1500, "gift": False})
         self.assertRejected(lambda: self.api.delete(f"/api/people/{jordan}"), contains="Archive them instead")
 
     def test_purchase_edits_keep_linked_entries_valid(self):
@@ -229,6 +229,21 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual(self.api.get("/api/snapshot")["transactions"][0]["tagIds"], [gas])
         deleted = next(e for e in self.history() if e["entity"] == "Tag" and e["action"] == "Deleted")
         self.assertEqual(deleted["before"]["removedFromTransactions"], 1)
+
+    def test_gift_shares(self):
+        riley = self.api.post("/api/people", {"name": "Riley"})["id"]
+        gift = self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 1000, True), (riley, 1000)])
+        self.assertEqual([share["gift"] for share in gift["shares"]], [False, True, False])
+        self.assertRejected(lambda: self.purchase(shares=[(self.me, 1000, True)]),
+                            contains="Your own share cannot be a gift")
+        # A gift is not owed, so it cannot be paid back; the person who still owes can pay back their share.
+        self.assertRejected(lambda: self.payback(500, person=self.alex, linked=gift["id"]), contains="was a gift")
+        self.payback(500, person=riley, linked=gift["id"])
+        # And a share someone already paid back toward cannot become a gift.
+        shares = [{"personId": self.me, "amountCents": 1000}, {"personId": self.alex, "amountCents": 1000, "gift": True}, {"personId": riley, "amountCents": 1000, "gift": True}]
+        self.assertRejected(lambda: self.api.put(f"/api/transactions/{gift['id']}", {**self.editable(gift), "shares": shares}), contains="cannot be a gift")
+        # Refunds on a gift share are still allowed: the store gave the money back.
+        self.refund(gift["id"], 1000, person=self.alex)
 
     def test_archived_tags_stay_on_purchases_but_are_not_offered(self):
         food = self.api.post("/api/tags", {"name": "food"})["id"]
@@ -396,7 +411,8 @@ class SpendTrackerApiTests(unittest.TestCase):
         data_cases = {
             "over-refunded": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, linked_id, description, created_at) VALUES ('Refund', '2026-10-05', 950, 1, {self.alex}, {bought['id']}, 'x', 'x')",
             "shares off by a cent": "UPDATE transaction_shares SET amount_cents = amount_cents + 1",
-            "share on a refund": f"INSERT INTO transaction_shares VALUES ({bought['id'] + 1}, {self.alex}, 100)",
+            "payback for a gift": f"UPDATE transaction_shares SET gift = 1; INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, linked_id, description, created_at) VALUES ('Payback', '2026-10-06', 5, 1, {self.alex}, {bought['id']}, 'x', 'x')",
+            "share on a refund": f"INSERT INTO transaction_shares VALUES ({bought['id'] + 1}, {self.alex}, 100, 0)",
             "refund for someone without a share": f"UPDATE transactions SET person_id = {self.me} WHERE kind = 'Refund'",
             "missing payment method": "UPDATE transactions SET payment_method_id = 42",
             "impossible date": "UPDATE transactions SET date = '2026-02-30'",
@@ -427,7 +443,8 @@ class SpendTrackerApiTests(unittest.TestCase):
             "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
             "wrong format": rebuild(archive, manifest={"format": "something-else"}),
             "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
-            "newer schema": rebuild(archive, manifest={"schemaVersion": 6}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 7}),
+            "schema 5 from v0.9": rebuild(archive, manifest={"schemaVersion": 5}),
             "schema 4 from v0.8": rebuild(archive, manifest={"schemaVersion": 4}),
             "schema 3 from v0.4": rebuild(archive, manifest={"schemaVersion": 3}),
             "schema 2 from v0.3": rebuild(archive, manifest={"schemaVersion": 2}),

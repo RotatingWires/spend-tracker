@@ -181,19 +181,51 @@ const editor = {
   linked: null,
   tags: null,
   collections: null,
-  shareInputs: new Map()
+  shareInputs: new Map(),
+  // People whose share of the purchase is a gift (person IDs as strings, like the dropdown values).
+  gifts: new Set()
 };
 
 function initializeTransactionEditor() {
   editor.kind = createSingleSelect($('#txKind'), { onChange: () => applyEditorKind() });
   editor.kind.setOptions(KIND_OPTIONS, 'Purchase');
-  editor.method = createSingleSelect($('#txMethod'));
-  editor.merchant = createSingleSelect($('#txMerchant'));
-  editor.people = createMultiSelect($('#txPeople'), { empty: 'Choose people', onChange: () => renderShareRows() });
-  editor.person = createSingleSelect($('#txPerson'), { onChange: () => onEditorPersonChange() });
+  // Each list's "Add New..." adds an item as its tab's Add form would, then chooses it here.
+  editor.method = createSingleSelect($('#txMethod'), {
+    onAdd: () => addFromEditor('payment-methods', id => editor.method.setOptions(methodOptions(id), id))
+  });
+  editor.merchant = createSingleSelect($('#txMerchant'), {
+    onAdd: () => addFromEditor('merchants', id => editor.merchant.setOptions(merchantOptions(id), id))
+  });
+  editor.people = createMultiSelect($('#txPeople'), {
+    empty: 'Choose people',
+    onChange: () => renderShareRows(),
+    onAdd: () => addFromEditor('people', id => {
+      editor.people.setOptions(peopleOptions(editor.transaction), [...editor.people.values, id]);
+      renderShareRows();
+    })
+  });
+  editor.person = createSingleSelect($('#txPerson'), {
+    onChange: () => onEditorPersonChange(),
+    onAdd: () => addFromEditor('people', id => {
+      editor.person.setOptions(payerOptions(id), id);
+      onEditorPersonChange();
+    })
+  });
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
-  editor.tags = createMultiSelect($('#txTags'), { empty: 'No tags' });
-  editor.collections = createMultiSelect($('#txCollections'), { empty: 'No collections' });
+  editor.tags = createMultiSelect($('#txTags'), {
+    empty: 'No tags',
+    onAdd: () => addFromEditor('tags', id => {
+      const chosen = [...editor.tags.values.map(Number), id];
+      editor.tags.setOptions(labelOptions(state.snapshot.tags, chosen), chosen);
+    })
+  });
+  editor.collections = createMultiSelect($('#txCollections'), {
+    empty: 'No collections',
+    onAdd: () => addFromEditor('collections', id => {
+      const chosen = [...editor.collections.values.map(Number), id];
+      editor.collections.setOptions(labelOptions(state.snapshot.collections, chosen), chosen);
+    })
+  });
 
   $('#transactionForm').addEventListener('submit', event => {
     event.preventDefault();
@@ -203,6 +235,22 @@ function initializeTransactionEditor() {
   $('#txDeleteButton').addEventListener('click', () => deleteTransaction());
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());
+}
+
+/** "Add New..." in an editor dropdown: asks for a name, adds the item, reloads the data, and lets choose() pick it. */
+async function addFromEditor(path, choose) {
+  const config = MANAGED[path];
+  const name = await promptText(`New ${config.singular}`, 'Name', '', { maxLength: config.maxLength ?? 60 });
+  if (!name) return;
+  try {
+    const created = await api(`/${path}`, { method: 'POST', body: { name } });
+    await loadSnapshot();
+    choose(created.id);
+    $('#txError').textContent = '';
+    setStatus(`Added ${config.singular} ${created.name}.`);
+  } catch (error) {
+    $('#txError').textContent = error.message;
+  }
 }
 
 function editorKind() {
@@ -233,6 +281,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   editor.tags.setOptions(labelOptions(state.snapshot.tags, tx?.tagIds ?? []), tx?.tagIds ?? []);
   editor.collections.setOptions(labelOptions(state.snapshot.collections, tx?.collectionIds ?? []), tx?.collectionIds ?? []);
   editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), centsToInput(share.amountCents)]));
+  editor.gifts = new Set((tx?.shares ?? []).filter(share => share.gift).map(share => String(share.personId)));
   editor.people.setOptions(peopleOptions(tx), tx?.shares?.length ? tx.shares.map(share => share.personId) : [state.model.self.id]);
   editor.person.setOptions([], null);
   editor.linked.setOptions([], null);
@@ -333,43 +382,65 @@ function selectedPeople() {
   return editor.people.values.map(Number);
 }
 
-/** One person takes the whole amount; several people each get an amount box that must add up to the total. */
+/**
+ * One person takes the whole amount; several people each get an amount box that must add up to the total. Everyone
+ * but you also gets a Gift box: a gift share is bought for them but not owed back.
+ */
 function renderShareRows() {
   const container = $('#txShares');
   for (const input of container.querySelectorAll('input[data-person]')) editor.shareInputs.set(input.dataset.person, input.value);
+  for (const box of container.querySelectorAll('input[data-gift]')) {
+    if (box.checked) editor.gifts.add(box.dataset.gift);
+    else editor.gifts.delete(box.dataset.gift);
+  }
   const people = selectedPeople();
+  const split = people.length > 1;
   container.replaceChildren();
-  container.hidden = people.length < 2;
-  if (people.length < 2) return;
+  container.hidden = !split && people.every(id => id === state.model.self.id);
+  if (container.hidden) return;
 
   for (const personId of people) {
     const name = document.createElement('label');
     name.className = 'share-name';
-    name.htmlFor = `txShare${personId}`;
+    name.htmlFor = split ? `txShare${personId}` : `txGift${personId}`;
     name.textContent = personName(personId);
-    const input = document.createElement('input');
-    input.id = `txShare${personId}`;
-    input.className = 'retro-input';
-    input.type = 'text';
-    input.inputMode = 'decimal';
-    input.autocomplete = 'off';
-    input.placeholder = '0.00';
-    input.dataset.person = String(personId);
-    input.value = editor.shareInputs.get(String(personId)) ?? '';
-    input.addEventListener('input', () => updateShareTotal());
-    container.append(name, input);
+    const amount = document.createElement(split ? 'input' : 'span');
+    if (split) {
+      amount.id = `txShare${personId}`;
+      amount.className = 'retro-input';
+      amount.type = 'text';
+      amount.inputMode = 'decimal';
+      amount.autocomplete = 'off';
+      amount.placeholder = '0.00';
+      amount.dataset.person = String(personId);
+      amount.value = editor.shareInputs.get(String(personId)) ?? '';
+      amount.addEventListener('input', () => updateShareTotal());
+    }
+    const gift = document.createElement('label');
+    gift.className = 'share-gift';
+    if (personId !== state.model.self.id) {
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.id = `txGift${personId}`;
+      box.dataset.gift = String(personId);
+      box.checked = editor.gifts.has(String(personId));
+      gift.title = `A gift: ${personName(personId)} does not owe this back, so it stays off their balance.`;
+      gift.append(box, 'Gift');
+    }
+    container.append(name, amount, gift);
   }
+  if (!split) return;
 
   const footer = document.createElement('div');
   footer.className = 'share-footer';
-  const split = document.createElement('button');
-  split.type = 'button';
-  split.textContent = 'Split Evenly';
-  split.addEventListener('click', () => splitEvenly());
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = 'Split Evenly';
+  button.addEventListener('click', () => splitEvenly());
   const total = document.createElement('span');
   total.id = 'txShareTotal';
   total.className = 'form-hint';
-  footer.append(split, total);
+  footer.append(button, total);
   container.append(footer);
   updateShareTotal();
 }
@@ -405,11 +476,13 @@ function splitEvenly() {
 function collectShares(amountCents) {
   const people = selectedPeople();
   if (people.length === 0) throw new Error('Choose who this purchase was for.');
-  if (people.length === 1) return [{ personId: people[0], amountCents }];
+  const gift = personId => $(`#txGift${personId}`)?.checked ?? false;
+  if (people.length === 1) return [{ personId: people[0], amountCents, gift: gift(people[0]) }];
   return shareInputs().map(input => {
+    const personId = Number(input.dataset.person);
     const cents = parseMoney(input.value);
-    if (cents == null) throw new Error(`Enter ${personName(Number(input.dataset.person))}'s share, or use Split Evenly.`);
-    return { personId: Number(input.dataset.person), amountCents: cents };
+    if (cents == null) throw new Error(`Enter ${personName(personId)}'s share, or use Split Evenly.`);
+    return { personId, amountCents: cents, gift: gift(personId) };
   });
 }
 
