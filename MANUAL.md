@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.11.4 Manual
+# SpendTracker v0.12.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -52,7 +52,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 SpendTracker.csproj     .NET project, dependency, and release version
 src/
   Program.cs            hosting, authentication, error responses, and API routes
-  Store.cs              SQLite schema, validation rules, history, and restoring rows
+  Store.cs              SQLite schema, validation rules, history, restoring rows, and Fresh start
   Transfer.cs           backup ZIP creation and restore verification
   SingleFileLogger.cs   capped logs/console.log writer
 README.md / MANUAL.md   documentation
@@ -68,6 +68,7 @@ wwwroot/
   people.js             people balances and person detail
   summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
   search.js             File → Search... dialog
+  fresh-start.js        File → Fresh Start... dialog
   history.js            history log rendering
   manage.js             add, rename, archive, and delete payment methods, people, tags, collections, and merchants
   bulk.js               selection mode and bulk actions in the ledger
@@ -81,7 +82,7 @@ wwwroot/
 
 tests/
   server.py             starts a real server on a temporary data folder
-  test_api.py           API, validation, history, and backup/restore tests
+  test_api.py           API, validation, history, backup/restore, and Fresh start tests
   test_browser.py       optional Playwright browser tests
 ```
 
@@ -223,11 +224,11 @@ Four tabs with the same layout: an **Add** form, then one row per payment method
 
 ### History
 
-Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. History is stored in the database and included in backups.
+Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. History is stored in the database and included in backups. **File → Fresh Start...** can clear it; see [Fresh Start](#fresh-start).
 
 ### Menus
 
-- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out.
+- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Fresh Start..., Highlight rows on hover, Log Out.
 - **View:** switch tabs, **Show Archived**, and choose the Light or Dark theme. Show Archived and the theme are saved in this browser.
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
@@ -288,7 +289,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 data/
   spend-tracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
-  backups/              recovery copies written automatically before each restore
+  backups/              recovery copies written automatically before each restore (File → Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
 ```
@@ -316,6 +317,22 @@ The upload is verified before any live data changes. It is rejected when:
 SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
 
 Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
+
+### Fresh Start
+
+**File → Fresh Start...**, after Restore Backup, clears only what you choose and then compacts the database so the space goes back to the disk, like Fresh start in NewsReview and TaskList. Tick the items to clear, type `RESET SELECTED`, and choose **Clear Selected**. Each choice shows how much it holds, and the dialog shows the current database size. Change history and pre-restore recovery backups are ticked to start with; nothing that removes an entry is.
+
+| Choice | What is cleared |
+| --- | --- |
+| Archived entries | Archived purchases, refunds, and paybacks. Archived entries still count in totals and balances, so those change. An archived purchase stays while an active (unarchived) refund or payback still links to it; the dialog says how many stay for that reason. |
+| Every entry | All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay. |
+| Unused labels | Merchants, tags, collections, people, and payment methods that no remaining entry uses. Me always stays, and so does one active payment method (the oldest one) when no active method is in use. |
+| Change history | Every entry on the History tab. |
+| Pre-restore recovery backups | The `before-restore-*.zip` files in `data/backups/`. |
+
+Removed entries and labels get Deleted history entries with their old values, exactly like a normal delete, unless the same Fresh start also clears history. Per-person, tag, merchant, payment-method, and collection counters stay, so entry numbers are never reused; numbers of a removed label go with it, as when it is deleted normally.
+
+The database part runs in one SQLite transaction, so a failure changes nothing. Compaction (SQLite `VACUUM`, then a WAL checkpoint) runs afterwards; if it fails, the data is still cleared and the freed space is reused for new data. The status bar reports what was removed and how much space was freed. Your password and browser preferences are kept. Fresh start cannot be undone in SpendTracker, so download a backup first if you might want the data back. It is not a secure disk wipe.
 
 ### Export Transactions CSV
 
@@ -375,6 +392,8 @@ All endpoints are under `/api`, use JSON, and require a session except `auth/sta
 | `GET /api/history?limit=&beforeId=` | newest-first history page (`limit` 1–500, default 200) and `hasMore` |
 | `GET /api/backup` | download a backup ZIP |
 | `POST /api/restore` | restore a backup ZIP (raw body with `Content-Type: application/zip`, up to 256 MiB) |
+| `GET /api/fresh-start` | what Fresh start could clear: `archivedEntries` (removable), `allArchivedEntries`, `entries`, `unusedLabels`, `historyEntries`, `recoveryBackups`, `recoveryBackupBytes`, `databaseBytes` |
+| `POST /api/fresh-start` | `{ confirmation: "RESET SELECTED", selections }`, where `selections` maps any of `archivedEntries`, `allEntries`, `unusedLabels`, `history`, `recoveryBackups` to true or false, at least one true; clears them, compacts the database, and returns `removedEntries`, `keptArchivedEntries`, `removedLabels`, `removedHistory`, `removedBackups`, `freedBytes`, `compacted`, and `warning` (null unless compaction or a backup deletion failed) |
 
 A transaction body is:
 
@@ -453,7 +472,7 @@ dotnet build
 python3 -m unittest discover -s tests -p "test_api.py"
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, Fresh start (confirmation, archived entries kept while an active entry links to them, every entry and unused labels keeping Me and one payment method, history and recovery-backup removal, and compaction), and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -461,11 +480,15 @@ Optional browser tests use Playwright with Firefox (`pip install playwright` and
 python3 -m unittest discover -s tests -p "test_browser.py"
 ```
 
-They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
+They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, check the Fresh Start dialog's choices, confirmation, and phone-width fit while clearing only history, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.12.0
+
+- Add **File → Fresh Start...**, like NewsReview's and TaskList's: choose what to clear (archived entries, every entry, unused labels, change history, or pre-restore recovery backups), type `RESET SELECTED`, and the database is compacted afterwards to free disk space. Removals are recorded as Deleted unless history is cleared too, and entry numbers are never reused.
 
 ### v0.11.4
 

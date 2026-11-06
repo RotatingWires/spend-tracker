@@ -30,6 +30,7 @@
             <button type="button" id="exportCsvButton" role="menuitem"><span></span><span class="menu-label">Export Transactions CSV...</span></button>
             <button type="button" id="backupButton" role="menuitem"><span></span><span class="menu-label">Download Backup...</span></button>
             <button type="button" id="restoreButton" role="menuitem"><span></span><span class="menu-label">Restore Backup...</span></button>
+            <button type="button" id="freshStartMenuItem" role="menuitem"><span></span><span class="menu-label">Fresh Start...</span></button>
             <div class="menu-separator" role="separator"></div>
             <button type="button" id="highlightRowsButton" role="menuitemcheckbox" aria-checked="true"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Highlight rows on hover</span></button>
             <div class="menu-separator" role="separator"></div>
@@ -274,6 +275,27 @@
     </form>
   </dialog>
 
+  <dialog id="freshStartDialog" class="retro-dialog" aria-labelledby="freshStartTitle">
+    <form method="dialog" class="dialog-window">
+      <div class="dialog-title" id="freshStartTitle">Fresh Start</div>
+      <div class="dialog-body fresh-start-body">
+        <p>Only the selected items are cleared, then the database is compacted to free disk space. This cannot be undone in SpendTracker; use File → Download Backup first if you might want them back.</p>
+        <fieldset class="fresh-start-options"><legend>Choose what to clear</legend>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="archivedEntries"> <span><strong>Archived entries</strong> <span data-fresh-count="archivedEntries"></span><br>Archived entries still count in totals and balances, so those change. An archived purchase stays while an active refund or payback links to it.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="allEntries"> <span><strong>Every entry</strong> <span data-fresh-count="allEntries"></span><br>All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay unless you also clear unused labels.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="unusedLabels"> <span><strong>Unused labels</strong> <span data-fresh-count="unusedLabels"></span><br>Merchants, tags, collections, people, and payment methods no remaining entry uses. Me and one active payment method always stay.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="history" checked> <span><strong>Change history</strong> <span data-fresh-count="history"></span><br>Every saved add, edit, delete, and restore on the History tab, with its before and after values.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="recoveryBackups" checked> <span><strong>Pre-restore recovery backups</strong> <span data-fresh-count="recoveryBackups"></span><br>ZIPs the server saved in data/backups before each restore.</span></label>
+        </fieldset>
+        <p class="note">Removed entries and labels are recorded as Deleted on the History tab, like a normal delete, unless history is cleared too. Entry numbers are never reused. Your password and browser preferences are kept. <span id="freshStartSize"></span></p>
+        <label for="freshStartConfirmation" class="form-label">Type RESET SELECTED to confirm</label>
+        <input id="freshStartConfirmation" class="retro-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40">
+        <div id="freshStartError" class="form-error" role="alert" aria-live="polite"></div>
+      </div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" id="freshStartButton">Clear Selected</button><button type="submit" value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
   <dialog id="aboutDialog" class="retro-dialog wide" aria-labelledby="aboutTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="aboutTitle">About SpendTracker</div>
@@ -309,6 +331,7 @@
   <script src="/bulk.js"></script>
   <script src="/scopes.js"></script>
   <script src="/search.js"></script>
+  <script src="/fresh-start.js"></script>
   <script src="/ui.js"></script>
 </body>
 </html>

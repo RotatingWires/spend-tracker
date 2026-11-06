@@ -136,6 +136,41 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#txError")).to_have_text("")
         expect(page.locator("#transactionDialog")).not_to_be_visible()
 
+    def test_fresh_start_dialog(self):
+        # Clears only change history and recovery backups, so the entries other tests check stay; the API tests cover the rest.
+        # Adding and deleting a tag leaves history to clear without changing any totals.
+        api = self.api_client()
+        tag = api.post("/api/tags", {"name": "fresh-start-check"})["id"]
+        api.request("DELETE", f"/api/tags/{tag}")
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        page.click("#fileMenuButton")
+        page.click("#freshStartMenuItem")
+        dialog = page.locator("#freshStartDialog")
+        expect(dialog.locator('[data-fresh-count="history"]')).to_have_text(re.compile(r"^\(\d+ changes?\)$"))
+        expect(dialog.locator('[data-fresh-start="history"]')).to_be_checked()
+        expect(dialog.locator('[data-fresh-start="recoveryBackups"]')).to_be_checked()
+        for option in ("archivedEntries", "allEntries", "unusedLabels"):
+            expect(dialog.locator(f'[data-fresh-start="{option}"]')).not_to_be_checked()
+        self.shot(page, "fresh-start-dialog")
+        page.click("#freshStartButton")
+        expect(page.locator("#freshStartError")).to_have_text("Type RESET SELECTED to confirm.")
+        expect(dialog).to_be_visible()
+        page.fill("#freshStartConfirmation", "RESET SELECTED")
+        page.click("#freshStartButton")
+        expect(dialog).not_to_be_visible()
+        expect(page.locator("#statusLeft")).to_have_text(re.compile(r"^Fresh start: removed \d+ history changes?; freed "))
+        self.assertEqual(api.get("/api/history")["entries"], [])
+
+        page.set_viewport_size({"width": 390, "height": 760})
+        page.click("#fileMenuButton")
+        page.click("#freshStartMenuItem")
+        box = dialog.bounding_box()
+        self.assertLessEqual(box["x"] + box["width"], 390)
+        self.assertLessEqual(box["y"] + box["height"], 760)
+        self.shot(page, "fresh-start-dialog-phone")
+        page.keyboard.press("Escape")
+
     def test_full_workflow_in_both_themes_and_phone_width(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)

@@ -462,6 +462,81 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertFalse((self.server.data_dir / "backups").exists() and any((self.server.data_dir / "backups").iterdir()),
                          "a rejected restore must not write a recovery copy")
 
+    # ------------------------------------------------------------ fresh start
+
+    def fresh_start(self, **selections):
+        return self.api.post("/api/fresh-start", {"confirmation": "RESET SELECTED", "selections": selections})
+
+    def archive(self, tx):
+        return self.api.put(f"/api/transactions/{tx['id']}", {**self.editable(tx), "archived": True})
+
+    def test_fresh_start_requires_confirmation_and_valid_options(self):
+        self.purchase()
+        for body in [{"confirmation": "reset selected", "selections": {"history": True}},
+                     {"confirmation": "RESET SELECTED", "selections": {"bogus": True}},
+                     {"confirmation": "RESET SELECTED", "selections": {"history": False}},
+                     {"confirmation": "RESET SELECTED"}]:
+            self.assertRejected(lambda: self.api.post("/api/fresh-start", body))
+        self.assertEqual(len(self.api.get("/api/snapshot")["transactions"]), 1)
+        self.assertEqual(len(self.history()), 3)  # Alex, the merchant, and the purchase
+
+    def test_fresh_start_removes_archived_entries_unless_an_active_entry_links_to_them(self):
+        kept = self.archive(self.purchase(amount=2000, person=self.alex, merchant="Kept"))
+        self.refund(kept["id"], 500, person=self.alex)
+        gone = self.archive(self.purchase(amount=700, person=self.alex, merchant="Gone"))
+        active = self.purchase(amount=900, person=self.alex, merchant="Active")
+        refund = self.archive(self.refund(active["id"], 100, person=self.alex))
+        summary = self.api.get("/api/fresh-start")
+        self.assertEqual((summary["archivedEntries"], summary["allArchivedEntries"]), (2, 3))
+
+        result = self.fresh_start(archivedEntries=True)
+        self.assertEqual((result["removedEntries"], result["keptArchivedEntries"]), (2, 1))
+        remaining = {tx["id"] for tx in self.api.get("/api/snapshot")["transactions"]}
+        self.assertTrue({kept["id"], active["id"]} <= remaining)
+        self.assertFalse({gone["id"], refund["id"]} & remaining)
+        deleted = {entry["entityId"] for entry in self.history() if entry["action"] == "Deleted"}
+        self.assertEqual(deleted, {gone["id"], refund["id"]})
+        # Per-person numbers keep counting past the removed entries rather than reusing them.
+        alex_numbers = [n["number"] for n in self.purchase(person=self.alex)["numbers"] if n["scope"] == "person"]
+        self.assertEqual(alex_numbers, [6])
+
+    def test_fresh_start_every_entry_and_unused_labels_keep_me_and_one_payment_method(self):
+        tag = self.api.post("/api/tags", {"name": "food"})["id"]
+        trip = self.api.post("/api/collections", {"name": "Trip"})["id"]
+        bought = self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 2000)], method=self.debit, tagIds=[tag], collectionIds=[trip])
+        self.refund(bought["id"], 500, person=self.alex)
+        self.payback(1500, linked=bought["id"])
+        self.api.post("/api/people", {"name": "Unused"})
+        self.assertEqual(self.api.get("/api/fresh-start")["unusedLabels"], 1)  # only "Unused": every payment method is on an entry
+
+        result = self.fresh_start(allEntries=True, unusedLabels=True)
+        self.assertEqual(result["removedEntries"], 3)
+        snapshot = self.api.get("/api/snapshot")
+        self.assertEqual(snapshot["transactions"], [])
+        self.assertEqual([p["name"] for p in snapshot["people"]], ["Me"])
+        self.assertEqual([m["name"] for m in snapshot["paymentMethods"]], ["Cash"])
+        self.assertEqual((snapshot["merchants"], snapshot["tags"], snapshot["collections"]), ([], [], []))
+        self.assertEqual(result["removedLabels"], 7)  # Store, food, Trip, Alex, Unused, Credit Card, Debit Card
+        self.assertGreaterEqual(sum(entry["action"] == "Deleted" for entry in self.history()), 10)
+        self.purchase(method=snapshot["paymentMethods"][0]["id"], merchant="New start")
+
+    def test_fresh_start_clears_history_and_recovery_backups_and_frees_space(self):
+        for index in range(60):
+            self.purchase(amount=100 + index, merchant=f"Shop {index % 5}", note="n" * 1500)
+        self.api.upload_zip("/api/restore", self.api.download("/api/backup"))
+        summary = self.api.get("/api/fresh-start")
+        self.assertEqual(summary["recoveryBackups"], 1)
+        self.assertGreater(summary["historyEntries"], 60)
+
+        result = self.fresh_start(allEntries=True, history=True, recoveryBackups=True)
+        self.assertEqual((result["removedEntries"], result["removedBackups"]), (60, 1))
+        self.assertTrue(result["compacted"])
+        self.assertEqual(self.history(), [])  # cleared history records no Deleted entries for the removed rows
+        self.assertEqual(list((self.server.data_dir / "backups").iterdir()), [])
+        after = self.api.get("/api/fresh-start")
+        self.assertLess(after["databaseBytes"], summary["databaseBytes"] / 2)
+        self.assertGreater(result["freedBytes"], after["databaseBytes"])
+
 
 def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True):
     """Repackages a real backup ZIP after changing its database or manifest."""

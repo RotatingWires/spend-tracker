@@ -306,8 +306,67 @@ api.MapPost("/restore", async (HttpRequest request) =>
     }
 }).WithMetadata(new RequestSizeLimitAttribute(Transfer.MaxUploadBytes));
 
+// Fresh start: clear only what the user selects, then compact so the space goes back to the disk.
+api.MapGet("/fresh-start", () =>
+{
+    var summary = store.ReadFreshStartSummary();
+    var backups = RecoveryBackups(dataDir);
+    return Results.Ok(new
+    {
+        summary.ArchivedEntries, summary.AllArchivedEntries, summary.Entries, summary.UnusedLabels, summary.HistoryEntries,
+        RecoveryBackups = backups.Length, RecoveryBackupBytes = backups.Sum(file => file.Length), DatabaseBytes = store.DatabaseBytes()
+    });
+});
+
+api.MapPost("/fresh-start", (FreshStartRequest request) =>
+{
+    if (request.Confirmation != "RESET SELECTED") throw RequestException.Invalid("Type RESET SELECTED to confirm.");
+    var selections = request.Selections;
+    string[] options = [.. Store.FreshStartOptions, "recoveryBackups"];
+    if (selections is null || selections.Keys.Any(key => !options.Contains(key)) || !selections.Values.Any(selected => selected))
+        throw RequestException.Invalid("Choose at least one valid Fresh start option.");
+
+    var bytesBefore = store.DatabaseBytes() + RecoveryBackups(dataDir).Sum(file => file.Length);
+    var result = store.FreshStart(selections);
+    var removedBackups = 0;
+    string? warning = null;
+    if (selections.TryGetValue("recoveryBackups", out var clearBackups) && clearBackups)
+    {
+        foreach (var file in RecoveryBackups(dataDir))
+        {
+            try { file.Delete(); removedBackups++; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                warning = "Some recovery backups could not be deleted. Check data/backups on the server.";
+            }
+        }
+    }
+    var compacted = true;
+    try { store.Compact(); }
+    catch (SqliteException error)
+    {
+        app.Logger.LogWarning(error, "Fresh start finished, but database compaction failed.");
+        compacted = false;
+        warning ??= "Selected data was cleared, but the database could not be compacted. Freed space can still be reused; check available disk space.";
+    }
+    var freedBytes = Math.Max(0, bytesBefore - store.DatabaseBytes() - RecoveryBackups(dataDir).Sum(file => file.Length));
+    app.Logger.LogInformation("Fresh start removed {Entries} entries, {Labels} labels, {History} history entries, and {Backups} recovery backups; freed {Bytes} bytes.",
+        result.RemovedEntries, result.RemovedLabels, result.RemovedHistory, removedBackups, freedBytes);
+    return Results.Ok(new
+    {
+        result.RemovedEntries, result.KeptArchivedEntries, result.RemovedLabels, result.RemovedHistory,
+        RemovedBackups = removedBackups, FreedBytes = freedBytes, Compacted = compacted, Warning = warning
+    });
+});
+
 app.MapFallbackToFile("index.html").RequireAuthorization();
 app.Run();
+
+static FileInfo[] RecoveryBackups(string dataDir)
+{
+    var directory = new DirectoryInfo(Path.Combine(dataDir, "backups"));
+    return directory.Exists ? directory.GetFiles("before-restore-*.zip") : [];
+}
 
 static string GenerateSetupToken()
 {
@@ -383,5 +442,6 @@ static async Task SignInOwner(HttpContext context)
 }
 
 record LoginRequest(string? Password);
+record FreshStartRequest(string? Confirmation, Dictionary<string, bool>? Selections);
 record SetupRequest(string? SetupToken, string? Password, string? ConfirmPassword);
 record PasswordFile(int Version, int Iterations, string Salt, string Hash);
