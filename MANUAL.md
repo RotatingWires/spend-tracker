@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.3.3 Manual
+# SpendTracker v0.3.4 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -426,6 +426,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.3.4
+
+- Opening a menu no longer moves focus to its first item, which made **New Transaction…** look stuck highlighted in the File menu. Menus now behave like TaskList and TaskList Stats.
 
 ### v0.3.3
 

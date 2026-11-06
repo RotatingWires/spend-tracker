@@ -12,7 +12,6 @@ function toggleMenu(button, menu) {
   closeMenus();
   menu.hidden = !open;
   button.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (open) menu.querySelector('[aria-checked="true"], button')?.focus();
 }
 
 function menuButton(label, { role = 'menuitem', checked = false, onClick }) {

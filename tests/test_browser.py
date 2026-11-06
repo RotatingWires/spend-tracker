@@ -207,6 +207,11 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable")).not_to_contain_text("After backup")
         expect(page.locator("#transactionsTable")).to_contain_text("BK — food")
 
+        # Opening a menu does not leave its first item highlighted (focus stays on the menu button).
+        page.click("#fileMenuButton")
+        self.assertFalse(page.evaluate("Boolean(document.activeElement.closest('.menu-dropdown'))"))
+        page.click("#fileMenuButton")
+
         # Logging out returns to the login page and protects the app.
         page.click("#fileMenuButton")
         page.click("#logoutButton")
