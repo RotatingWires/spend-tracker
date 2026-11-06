@@ -22,17 +22,19 @@ function monthTotals(transactions) {
 
 function renderTransactions() {
   // The cards count every entry, archived or not; only the table hides archived entries.
-  const monthRows = transactionsInRange(monthStart(state.month), monthEnd(state.month));
+  const monthRows = timeFrameTransactions();
   const totals = monthTotals(monthRows);
   $('#monthCards').replaceChildren(
-    statCard('Spent', formatMoney(totals.spent), { sub: plural(totals.purchases, 'purchase'), title: 'Total of every purchase dated in this month.' }),
-    statCard('Refunds', formatMoney(totals.refunded), { title: 'Total of every refund dated in this month.' }),
+    statCard('Spent', formatMoney(totals.spent), { sub: plural(totals.purchases, 'purchase'), title: 'Total of every purchase dated in the time frame.' }),
+    statCard('Refunds', formatMoney(totals.refunded), { title: 'Total of every refund dated in the time frame.' }),
     statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }),
-    statCard('Paid back to you', formatMoney(totals.paidBack), { title: 'Paybacks from other people dated in this month. These do not change net spent.' }),
+    statCard('Paid back to you', formatMoney(totals.paidBack), { title: 'Paybacks from other people dated in the time frame. These do not change net spent.' }),
     statCard('Entries', numberFormat.format(monthRows.length))
   );
 
-  const listed = listedTransactions(monthStart(state.month), monthEnd(state.month));
+  const listed = timeFrameTransactions({ listed: true });
+  // The Events column appears once you have created an event.
+  const showEvents = state.snapshot.events.length > 0;
   const rows = listed.filter(tx => matchesSearch(tx, state.search));
   visibleLedgerIds = rows.map(tx => tx.id);
   pruneSelection();
@@ -45,6 +47,7 @@ function renderTransactions() {
     { label: 'For Who' },
     { label: 'What' },
     { label: 'Tags' },
+    ...(showEvents ? [{ label: 'Events' }] : []),
     ...methods.map(method => ({ label: method.name, num: true }))
   ];
 
@@ -82,6 +85,7 @@ function renderTransactions() {
         whoLabel(tx),
         what,
         tagIdsOf(tx).map(tagName).join(', '),
+        ...(showEvents ? [eventIdsOf(tx).map(eventName).join(', ')] : []),
         ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true })
       ]
     };
@@ -94,6 +98,7 @@ function renderTransactions() {
       '',
       { text: 'Net spent (purchases − refunds)', title: 'Paybacks are listed in the table but not included in these totals.' },
       '',
+      ...(showEvents ? [''] : []),
       ...methods.map(method => {
         const net = rows
           .filter(tx => tx.paymentMethodId === method.id && tx.kind !== 'Payback')
@@ -105,16 +110,16 @@ function renderTransactions() {
 
   const hidden = monthRows.length - listed.length;
   const empty = monthRows.length === 0
-    ? `No entries in ${formatMonth(state.month)}. Use New Transaction to add one.`
-    : listed.length === 0 ? `Every entry in ${formatMonth(state.month)} is archived. Turn on View → Show Archived to list them.` : 'No entries match the search.';
+    ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
+    : listed.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : 'No entries match the search.';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
   $('#archivedNote').hidden = hidden === 0 || listed.length === 0;
-  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden this month; they still count in the totals above and in Stats. View → Show Archived lists them.`;
+  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in the totals above and in Stats. View → Show Archived lists them.`;
   updateBulkControls();
 }
 
 function exportTransactionsCsv() {
-  const header = ['ID', 'Date', 'Type', 'For Who', 'Merchant', 'Description', 'Tags', 'Payment Method', 'Amount', 'Linked To', 'Note', 'Archived'];
+  const header = ['ID', 'Date', 'Type', 'For Who', 'Merchant', 'Description', 'Tags', 'Events', 'Payment Method', 'Amount', 'Linked To', 'Note', 'Archived'];
   const lines = [header];
   for (const tx of state.model.transactions) {
     const forWho = tx.kind === 'Purchase' && tx.shares.length > 1
@@ -128,6 +133,7 @@ function exportTransactionsCsv() {
       tx.merchant,
       tx.description,
       tagIdsOf(tx).map(tagName).join('; '),
+      eventIdsOf(tx).map(eventName).join('; '),
       methodName(tx.paymentMethodId),
       centsToInput(tx.amountCents),
       tx.linkedId == null ? '' : `#${tx.linkedId}`,
@@ -171,6 +177,7 @@ const editor = {
   person: null,
   linked: null,
   tags: null,
+  events: null,
   shareInputs: new Map()
 };
 
@@ -182,6 +189,7 @@ function initializeTransactionEditor() {
   editor.person = createSingleSelect($('#txPerson'), { onChange: () => onEditorPersonChange() });
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), { empty: 'No tags' });
+  editor.events = createMultiSelect($('#txEvents'), { empty: 'No events' });
 
   $('#transactionForm').addEventListener('submit', event => {
     event.preventDefault();
@@ -218,7 +226,8 @@ function openTransactionEditor(tx = null, defaults = {}) {
   // New entries start on the method of the latest purchase; the user sees and can change it before saving.
   const lastPurchase = state.model.transactions.findLast(entry => entry.kind === 'Purchase');
   editor.method.setOptions(methodOptions(tx?.paymentMethodId), tx?.paymentMethodId ?? lastPurchase?.paymentMethodId);
-  editor.tags.setOptions(tagOptions(tx?.tagIds ?? []), tx?.tagIds ?? []);
+  editor.tags.setOptions(labelOptions(state.snapshot.tags, tx?.tagIds ?? []), tx?.tagIds ?? []);
+  editor.events.setOptions(labelOptions(state.snapshot.events, tx?.eventIds ?? []), tx?.eventIds ?? []);
   editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), centsToInput(share.amountCents)]));
   editor.people.setOptions(peopleOptions(tx), tx?.shares?.length ? tx.shares.map(share => share.personId) : [state.model.self.id]);
   editor.person.setOptions([], null);
@@ -268,6 +277,7 @@ function applyEditorKind(preferred = {}) {
   $('#txLinkedRow').hidden = isPurchase;
   $('#txMethodLabel').textContent = isPurchase ? 'Paid with' : isRefund ? 'Refunded to' : 'Received as';
   showEditorRow('txTags', isPurchase);
+  showEditorRow('txEvents', isPurchase);
 
   if (isPurchase) {
     showEditorRow('txPerson', false);
@@ -294,10 +304,11 @@ function archivedLabel(item) {
   return item.archived ? `${item.name} (archived)` : item.name;
 }
 
-function tagOptions(currentIds) {
-  return state.snapshot.tags
-    .filter(tag => !tag.archived || currentIds.includes(tag.id))
-    .map(tag => ({ value: tag.id, label: archivedLabel(tag) }));
+/** Tags or events offered on a purchase: the active ones, plus archived ones it already has. */
+function labelOptions(labels, currentIds) {
+  return labels
+    .filter(label => !label.archived || currentIds.includes(label.id))
+    .map(label => ({ value: label.id, label: archivedLabel(label) }));
 }
 
 function peopleOptions(tx) {
@@ -462,7 +473,7 @@ function updateLinkedHint() {
   const remaining = shareRemaining(purchase, personId, editor.transaction?.id ?? null);
   const whose = purchase.shares.length > 1 ? `${personName(personId)}'s share` : 'this purchase';
   hint.textContent = kind === 'Refund'
-    ? `Up to ${formatMoney(remaining)} of ${whose} can still be refunded. Refunds use the purchase's tags.`
+    ? `Up to ${formatMoney(remaining)} of ${whose} can still be refunded. Refunds use the purchase's tags and events.`
     : `${formatMoney(remaining)} of ${whose} is still unpaid.`;
 }
 
@@ -538,6 +549,7 @@ async function saveTransaction(changes = {}) {
     description: $('#txDescription').value,
     note: $('#txNote').value,
     tagIds: kind === 'Purchase' ? editor.tags.values.map(Number) : [],
+    eventIds: kind === 'Purchase' ? editor.events.values.map(Number) : [],
     shares,
     archived: editor.transaction?.archived ?? false,
     ...changes

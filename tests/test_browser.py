@@ -40,9 +40,15 @@ class BrowserTests(unittest.TestCase):
         page = context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+        page.on("console", lambda message: errors.append(message.text) if message.type == "error" and not self.aborted_by_navigation(message.text) else None)
         self.addCleanup(lambda: self.assertEqual(errors, [], "browser errors"))
         return page
+
+    @staticmethod
+    def aborted_by_navigation(text):
+        """Firefox logs this when the page navigates (restore, log out) while the service worker is still fetching a file
+        for it, such as the icon, before that file is cached. The request is simply abandoned; nothing fails for the user."""
+        return "A ServiceWorker intercepted the request and encountered an unexpected error" in text
 
     def api_client(self):
         """One API session for the whole class, so the tests stay under the login rate limit (5 a minute)."""
@@ -56,16 +62,17 @@ class BrowserTests(unittest.TestCase):
             page.screenshot(path=str(self.screenshots / f"{name}.png"), full_page=False)
 
     def log_in(self, page):
-        page.goto(self.server.url + "/")
+        """The first test runs first-run setup in the page; later ones reuse the API session's cookie (login allows 5 a minute)."""
         if not (self.server.data_dir / "auth.json").exists():
+            page.goto(self.server.url + "/")
             expect(page.locator("#setupTokenGroup")).to_be_visible()
             page.fill("#setupToken", self.server.token)
             page.fill("#password", PASSWORD)
             page.fill("#confirmPassword", PASSWORD)
             page.click("#loginButton")
         else:
-            page.fill("#password", PASSWORD)
-            page.click("#loginButton")
+            page.context.add_cookies([{"name": cookie.name, "value": cookie.value, "url": self.server.url} for cookie in self.api_client().cookies])
+            page.goto(self.server.url + "/")
         expect(page.locator("#statusLeft")).to_have_text("Ready")
 
     def pick(self, page, host, label):
@@ -80,6 +87,20 @@ class BrowserTests(unittest.TestCase):
         for item in page.locator(f"{host} .menu-dropdown button").all():
             wanted = item.inner_text().strip() in names
             if (item.get_attribute("aria-checked") == "true") != wanted:
+                item.click()
+        page.keyboard.press("Escape")
+
+    def choose_time_frame(self, page, labels):
+        """Checks exactly these Time frame entries. The menu re-renders after each click, so items are found again each time."""
+        page.click("#timeFrameSelect .retro-select")
+        items = page.locator("#timeFrameSelect .menu-dropdown button")
+        for label in labels:
+            item = items.filter(has_text=re.compile(f"^{re.escape(label)}$"))
+            if item.get_attribute("aria-checked") != "true":
+                item.click()
+        for label in [text.strip() for text in items.all_inner_texts()]:
+            item = items.filter(has_text=re.compile(f"^{re.escape(label)}$"))
+            if label not in labels and item.get_attribute("aria-checked") == "true":
                 item.click()
         page.keyboard.press("Escape")
 
@@ -179,7 +200,7 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Escape")
 
         page.click('.tabs [data-tab="calendar"]')
-        page.locator("#monthCalendar button.calendar-day", has_text="$").first.click()
+        page.locator("#calendarMonths button.calendar-day", has_text="$").first.click()
         expect(page.locator("#dayDialog")).to_be_visible()
         page.keyboard.press("Escape")
 
@@ -252,6 +273,69 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
 
+    def test_time_frames_and_events(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        api = self.api_client()
+        snapshot = api.get("/api/snapshot")
+        me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
+        card = snapshot["paymentMethods"][1]["id"]
+        trip = api.post("/api/events", {"name": "Beach trip"})["id"]
+
+        def add(kind, date, cents, merchant, linked=None, events=()):
+            return api.post("/api/transactions", {
+                "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": card, "personId": None if kind == "Purchase" else me,
+                "linkedId": linked, "merchant": merchant, "description": "", "note": "", "tagIds": [], "eventIds": list(events),
+                "shares": [{"personId": me, "amountCents": cents}] if kind == "Purchase" else []})
+
+        # January and February 2024 belong to this test alone; amounts stay large for the Stats test's lowest month.
+        hotel = add("Purchase", "2024-01-20", 60000, "Hotel", events=[trip])
+        add("Purchase", "2024-02-03", 70000, "Groceries")
+        add("Refund", "2024-02-05", 10000, "Hotel", linked=hotel["id"])
+        page.click("#fileMenuButton")
+        page.click("#refreshButton")
+
+        # Several months show together, and All time shows everything.
+        self.choose_time_frame(page, ["January 2024", "February 2024"])
+        expect(page.locator("#titleScope")).to_have_text("Jan 2024, Feb 2024")
+        expect(page.locator("#timeFrameSelect .retro-select")).to_have_text("February 2024, January 2024▼")
+        expect(page.locator("#transactionsTable tbody tr")).to_have_count(3)
+        expect(page.locator("#monthCards")).to_contain_text("Spent$1,300.00")
+        expect(page.locator("#transactionsTable tbody tr", has_text="Hotel").first).to_contain_text("Beach trip")
+        page.click("#nextMonthButton")
+        expect(page.locator("#titleScope")).to_have_text("Feb 2024, Mar 2024")
+        page.click("#previousMonthButton")
+        page.click('.tabs [data-tab="calendar"]')
+        expect(page.locator("#calendarMonths legend")).to_have_text(["February 2024", "January 2024"])
+        expect(page.locator('#calendarMonths [data-month="2024-01"] .calendar-day', has_text="Beach trip")).to_have_count(1)
+        self.choose_time_frame(page, ["All time"])
+        expect(page.locator("#titleScope")).to_have_text("All time")
+        expect(page.locator("#previousMonthButton")).to_be_disabled()
+        self.shot(page, "calendar-all-time")
+        self.choose_time_frame(page, ["January 2024"])
+        expect(page.locator("#calendarMonths legend")).to_have_text(["January 2024"])
+
+        # Events total their own purchases and the refunds on them, wherever they are dated.
+        page.click('.tabs [data-tab="events"]')
+        row = page.locator("#eventsTable tbody tr", has_text="Beach trip")
+        expect(row).to_contain_text("1$600.00$100.00$500.00")
+        row.locator("button", has_text="Stats").click()
+        expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
+        expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
+
+        # New Transaction... stands out, and purchases choose events like tags.
+        page.click('.tabs [data-tab="transactions"]')
+        expect(page.locator("#newTransactionButton")).to_have_text("New Transaction...")
+        page.click("#newTransactionButton")
+        self.set_checks(page, "#txEvents", ["Beach trip"])
+        expect(page.locator("#txEvents .retro-select")).to_have_text("Beach trip▼")
+        page.click("#txCancelButton")
+        page.click('.tabs [data-tab="manage"]')
+        page.locator("#eventsManageTable tbody tr", has_text="Beach trip").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Event: Beach trip")
+        expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
+        page.locator("#scopeDialog button", has_text="Close").click()
+
     def test_select_and_bulk_actions(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
@@ -270,7 +354,7 @@ class BrowserTests(unittest.TestCase):
         first, second, third = buy("2024-06-01", 10000, "Hardware"), buy("2024-06-02", 20000, "Bakery"), buy("2024-06-03", 30001, "Garage")
         page.click("#fileMenuButton")
         page.click("#refreshButton")
-        self.pick(page, "#monthSelect", "June 2024")
+        self.choose_time_frame(page, ["June 2024"])
         expect(page.locator("#transactionsTable tbody tr").first).to_contain_text(f"#{first['id']}")
 
         page.click("#fileMenuButton")

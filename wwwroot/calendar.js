@@ -1,6 +1,6 @@
 'use strict';
 
-/* Calendar tab: a month grid of daily net spending, events, and a per-day detail dialog. */
+/* Calendar tab: a month grid of daily net spending for each month in the time frame, and a per-day detail dialog. */
 
 let calendarDialogDay = null;
 
@@ -25,15 +25,30 @@ function heatLevel(net, max) {
   return Math.min(4, Math.max(1, Math.ceil((net / max) * 4)));
 }
 
+/** One month grid per month in the time frame, newest first. */
 function renderCalendar() {
-  const month = state.month;
-  const days = dailyNet(listedTransactions(monthStart(month), monthEnd(month)));
+  const months = timeFrameMonths().reverse();
+  $('#calendarMonths').replaceChildren(...months.map(renderMonthGrid));
+}
+
+function renderMonthGrid(month) {
+  const listed = listedTransactions(monthStart(month), monthEnd(month));
+  const days = dailyNet(listed);
   const max = Math.max(0, ...[...days.values()].map(day => day.net));
   const today = todayKey();
-  $('#calendarLegend').textContent = formatMonth(month);
 
-  const grid = $('#monthCalendar');
-  grid.replaceChildren();
+  const box = document.createElement('fieldset');
+  box.className = 'groupbox';
+  const legend = document.createElement('legend');
+  legend.textContent = formatMonth(month);
+  const wrap = document.createElement('div');
+  wrap.className = 'calendar-wrap';
+  const grid = document.createElement('div');
+  grid.className = 'month-calendar';
+  grid.dataset.month = month;
+  wrap.append(grid);
+  box.append(legend, wrap);
+
   for (const name of WEEKDAYS) {
     const head = document.createElement('div');
     head.className = 'calendar-head';
@@ -50,7 +65,8 @@ function renderCalendar() {
   for (let dayOfMonth = 1; dayOfMonth <= daysInMonth(month); dayOfMonth++) {
     const key = `${month}-${pad2(dayOfMonth)}`;
     const day = days.get(key);
-    const events = eventsOn(key);
+    // Events are not dated; a day shows the events of the entries recorded on it.
+    const events = eventsOf(listed.filter(tx => tx.date === key));
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = `calendar-day heat-${heatLevel(day?.net ?? 0, max)}`;
@@ -74,17 +90,18 @@ function renderCalendar() {
     } else {
       summary.push('no entries');
     }
-    for (const event of events) {
+    for (const name of events) {
       const label = document.createElement('span');
       label.className = 'calendar-event';
-      label.textContent = event.name;
+      label.textContent = name;
       cell.append(label);
-      summary.push(`event ${event.name}`);
+      summary.push(`event ${name}`);
     }
     cell.setAttribute('aria-label', summary.join(', '));
     cell.addEventListener('click', () => openDayDialog(key));
     grid.append(cell);
   }
+  return box;
 }
 
 function openDayDialog(key) {
@@ -99,8 +116,8 @@ function renderDayDialog() {
   const rows = listedTransactions(key, key);
   const totals = monthTotals(rows);
   $('#dayDialogTitle').textContent = `${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`;
-  const events = eventsOn(key);
-  $('#dayDialogEvents').textContent = events.length ? `Events: ${events.map(event => event.name).join(', ')}` : '';
+  const events = eventsOf(rows);
+  $('#dayDialogEvents').textContent = events.length ? `Events: ${events.join(', ')}` : '';
   $('#dayDialogEvents').hidden = events.length === 0;
 
   renderTable($('#dayTable'), [{ label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],

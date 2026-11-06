@@ -247,11 +247,11 @@ api.MapDelete("/people/{id:long}", (long id) =>
     return Results.NoContent();
 });
 
-api.MapPost("/tags", (NameRequest request) => Results.Ok(store.CreateTag(request)));
-api.MapPatch("/tags/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateTag(id, request)));
+api.MapPost("/tags", (NameRequest request) => Results.Ok(store.CreateLabel(Store.Tags, request)));
+api.MapPatch("/tags/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateLabel(Store.Tags, id, request)));
 api.MapDelete("/tags/{id:long}", (long id) =>
 {
-    store.DeleteTag(id);
+    store.DeleteLabel(Store.Tags, id);
     return Results.NoContent();
 });
 
@@ -263,11 +263,11 @@ api.MapDelete("/merchants/{id:long}", (long id) =>
     return Results.NoContent();
 });
 
-api.MapPost("/events", (EventRequest request) => Results.Ok(store.SaveEvent(null, request)));
-api.MapPut("/events/{id:long}", (long id, EventRequest request) => Results.Ok(store.SaveEvent(id, request)));
+api.MapPost("/events", (NameRequest request) => Results.Ok(store.CreateLabel(Store.Events, request)));
+api.MapPatch("/events/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateLabel(Store.Events, id, request)));
 api.MapDelete("/events/{id:long}", (long id) =>
 {
-    store.DeleteEvent(id);
+    store.DeleteLabel(Store.Events, id);
     return Results.NoContent();
 });
 

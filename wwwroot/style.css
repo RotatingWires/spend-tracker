@@ -203,6 +203,8 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
   min-height: 38px;
 }
 .toolbar-label { font-weight: 700; }
+/* The main action: bold, with the extra black frame Windows 95 gives a dialog's default button. */
+button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1px var(--black); margin: 1px; }
 /* The search bar fills the toolbar, like TaskList's new-task bar. */
 #searchForm { display: flex; flex: 1 1 420px; gap: 6px; min-width: 0; }
 #searchInput { flex: 1; min-width: 0; }

@@ -6,7 +6,8 @@ const state = {
   snapshot: null,
   model: null,
   activeTab: 'transactions',
-  month: null,
+  // What the ledger and calendar show: every month (all), or the chosen months ("YYYY-MM").
+  timeFrame: { all: false, months: [] },
   search: '',
   statsPeriod: 'all',
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
@@ -171,6 +172,7 @@ function buildModel(snapshot) {
   const people = new Map(snapshot.people.map(person => [person.id, person]));
   const tags = new Map(snapshot.tags.map(tag => [tag.id, tag]));
   const merchants = new Map(snapshot.merchants.map(merchant => [merchant.id, merchant]));
+  const events = new Map(snapshot.events.map(event => [event.id, event]));
   const byId = new Map(snapshot.transactions.map(tx => [tx.id, tx]));
   const self = snapshot.people.find(person => person.isSelf);
   const linked = new Map();
@@ -179,7 +181,7 @@ function buildModel(snapshot) {
     if (!linked.has(tx.linkedId)) linked.set(tx.linkedId, []);
     linked.get(tx.linkedId).push(tx);
   }
-  return { methods, people, tags, merchants, byId, self, linked, transactions: snapshot.transactions, events: snapshot.events };
+  return { methods, people, tags, merchants, events, byId, self, linked, transactions: snapshot.transactions };
 }
 
 /** Everyone a purchase was for (its shares), or the one person a refund or payback is about. */
@@ -195,6 +197,11 @@ function tagIdsOf(tx) {
   return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.tagIds ?? [] : tx.tagIds;
 }
 
+/** Events work like tags: a refund counts under its purchase's events. */
+function eventIdsOf(tx) {
+  return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.eventIds ?? [] : tx.eventIds;
+}
+
 function personName(id) {
   return state.model.people.get(id)?.name ?? `Person #${id}`;
 }
@@ -205,6 +212,10 @@ function methodName(id) {
 
 function tagName(id) {
   return state.model.tags.get(id)?.name ?? `Tag #${id}`;
+}
+
+function eventName(id) {
+  return state.model.events.get(id)?.name ?? `Event #${id}`;
 }
 
 /** The part of a purchase bought for people other than you. */
@@ -249,12 +260,52 @@ function listedTransactions(start, end) {
   return transactionsInRange(start, end).filter(tx => state.showArchived || !tx.archived);
 }
 
-/** A transaction's number inside a scope ("person", "tag", "merchant", "method"), such as 3 for Alex's third entry. */
+// ---------------------------------------------------------------- time frame
+
+/** Every month from the first entry to the last one, including the current month, oldest first. */
+function allMonths() {
+  const transactions = state.model.transactions;
+  const today = monthOf(todayKey());
+  const first = transactions.length && monthOf(transactions[0].date) < today ? monthOf(transactions[0].date) : today;
+  const last = transactions.length && monthOf(transactions.at(-1).date) > today ? monthOf(transactions.at(-1).date) : today;
+  const months = [];
+  for (let month = first; month <= last; month = shiftMonth(month, 1)) months.push(month);
+  return months;
+}
+
+function timeFrameMonths() {
+  return state.timeFrame.all ? allMonths() : [...state.timeFrame.months].sort();
+}
+
+function inTimeFrame(date) {
+  return state.timeFrame.all || state.timeFrame.months.includes(monthOf(date));
+}
+
+/** Entries in the time frame; listed: true leaves out archived ones unless View → Show Archived is on. */
+function timeFrameTransactions({ listed = false } = {}) {
+  return state.model.transactions.filter(tx => inTimeFrame(tx.date) && (!listed || state.showArchived || !tx.archived));
+}
+
+/** The one month chosen, or null for All time or several months. */
+function singleTimeFrameMonth() {
+  return !state.timeFrame.all && state.timeFrame.months.length === 1 ? state.timeFrame.months[0] : null;
+}
+
+/** "All time", "November 2026", "Oct 2026, Nov 2026", or "5 months". */
+function timeFrameLabel() {
+  if (state.timeFrame.all) return 'All time';
+  const months = timeFrameMonths();
+  if (months.length === 1) return formatMonth(months[0]);
+  if (months.length <= 3) return months.map(month => `${MONTH_NAMES[Number(month.slice(5)) - 1].slice(0, 3)} ${month.slice(0, 4)}`).join(', ');
+  return `${months.length} months`;
+}
+
+/** A transaction's number inside a scope ("person", "tag", "event", "merchant", "method"), such as 3 for Alex's third entry. */
 function numberIn(tx, scope, scopeId) {
   return tx.numbers.find(entry => entry.scope === scope && entry.scopeId === scopeId)?.number ?? null;
 }
 
-const SCOPE_NAMES = { person: personName, tag: tagName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}`, method: methodName };
+const SCOPE_NAMES = { person: personName, tag: tagName, event: eventName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}`, method: methodName };
 
 /** Every per-scope number of a transaction, people first, each labelled like "Alex #3". */
 function scopeNumbers(tx) {
@@ -267,7 +318,7 @@ function scopeNumbers(tx) {
 function transactionRequest(tx, changes = {}) {
   return {
     kind: tx.kind, date: tx.date, amountCents: tx.amountCents, paymentMethodId: tx.paymentMethodId, personId: tx.personId,
-    linkedId: tx.linkedId, merchant: tx.merchant, description: tx.description, note: tx.note, tagIds: tx.tagIds,
+    linkedId: tx.linkedId, merchant: tx.merchant, description: tx.description, note: tx.note, tagIds: tx.tagIds, eventIds: tx.eventIds,
     shares: tx.shares.map(share => ({ personId: share.personId, amountCents: share.amountCents })), archived: tx.archived,
     ...changes
   };
@@ -281,7 +332,7 @@ function evenShares(amountCents, personIds) {
 }
 
 /**
- * Searches only what the user typed or tagged: merchant, description, note, tags, and the amount (as 12.17 or
+ * Searches only what the user typed or tagged: merchant, description, note, tags, events, and the amount (as 12.17 or
  * $12.17). Each searched word can appear anywhere, as in TaskList and NewsReview. The type, payment method, and
  * people are left out so a search like "h" does not match every "Purchase" or "Cash" row. A word like "#12" finds
  * transaction #12 exactly.
@@ -291,11 +342,13 @@ function matchesSearch(tx, query) {
   if (wanted.length === 0) return true;
   const text = [
     tx.merchant, tx.description, tx.note, centsToInput(tx.amountCents), formatMoney(tx.amountCents),
-    ...tagIdsOf(tx).map(tagName)
+    ...tagIdsOf(tx).map(tagName), ...eventIdsOf(tx).map(eventName)
   ].join(' ').toLowerCase();
   return wanted.every(part => /^#\d+$/.test(part) ? tx.id === Number(part.slice(1)) : text.includes(part));
 }
 
-function eventsOn(key) {
-  return state.model.events.filter(event => event.startDate <= key && event.endDate >= key);
+/** The events of the given entries, each once, by name. */
+function eventsOf(transactions) {
+  const ids = new Set(transactions.flatMap(eventIdsOf));
+  return [...ids].map(eventName).sort((a, b) => a.localeCompare(b));
 }

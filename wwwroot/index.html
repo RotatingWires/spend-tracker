@@ -48,12 +48,12 @@
       </div>
     </nav>
 
-    <section class="toolbar" aria-label="Month and search">
+    <section class="toolbar" aria-label="Time frame and search">
       <div class="toolbar-group" id="monthControls">
-        <span class="toolbar-label" id="monthLabel">Month:</span>
-        <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month">◀</button>
-        <div id="monthSelect" aria-labelledby="monthLabel"></div>
-        <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month">▶</button>
+        <span class="toolbar-label" id="timeFrameLabel">Time frame:</span>
+        <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month" title="Move the chosen months back one month">◀</button>
+        <div id="timeFrameSelect" aria-labelledby="timeFrameLabel"></div>
+        <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month">▶</button>
         <span class="toolbar-separator" aria-hidden="true"></span>
       </div>
       <form id="searchForm" role="search">
@@ -72,18 +72,15 @@
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
         <div id="monthCards" class="stat-grid"></div>
-        <div class="panel-actions"><button type="button" id="newTransactionButton">New Transaction</button></div>
+        <div class="panel-actions"><button type="button" id="newTransactionButton" class="default-button">New Transaction...</button></div>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="archivedNote" class="note" hidden></div>
       </section>
 
       <section class="tab-panel" data-panel="calendar" role="tabpanel" hidden>
-        <fieldset class="groupbox">
-          <legend id="calendarLegend">Calendar</legend>
-          <div class="calendar-wrap"><div id="monthCalendar" class="month-calendar"></div></div>
-          <div class="heat-legend" aria-hidden="true">Less <span class="heat-swatch heat-0"></span><span class="heat-swatch heat-1"></span><span class="heat-swatch heat-2"></span><span class="heat-swatch heat-3"></span><span class="heat-swatch heat-4"></span> More</div>
-        </fieldset>
-        <div class="note">Each day shows net spent (purchases minus refunds) and how many entries were recorded. The bar under each day is relative to this month's biggest day. Event names appear on the days they cover. Archived entries are left out unless View → Show Archived is on.</div>
+        <div class="heat-legend" aria-hidden="true">Less <span class="heat-swatch heat-0"></span><span class="heat-swatch heat-1"></span><span class="heat-swatch heat-2"></span><span class="heat-swatch heat-3"></span><span class="heat-swatch heat-4"></span> More</div>
+        <div id="calendarMonths"></div>
+        <div class="note">One calendar per month in the time frame, newest first. Each day shows net spent (purchases minus refunds) and how many entries were recorded. The bar under each day is relative to that month's biggest day. A day shows the events of the entries recorded on it. Archived entries are left out unless View → Show Archived is on.</div>
       </section>
 
       <section class="tab-panel" data-panel="stats" role="tabpanel" hidden>
@@ -117,8 +114,7 @@
       </section>
 
       <section class="tab-panel" data-panel="events" role="tabpanel" hidden>
-        <div class="panel-actions"><button type="button" id="newEventButton">New Event</button></div>
-        <div class="note">Events are date ranges you name yourself, such as a trip or a move. Totals include every purchase and refund dated inside the range. Events can also be chosen as a Stats period.</div>
+        <div class="note">Events work like tags: add them under Manage → Events (a trip, a move, a wedding) and choose them on purchases in the editor. Totals include those purchases and any refunds on them. Select an event to list its entries; Stats shows the event as a period.</div>
         <div class="table-wrap"><table id="eventsTable"></table></div>
       </section>
 
@@ -143,6 +139,11 @@
           <legend>Tags</legend>
           <form class="panel-actions" data-add="tags"><input class="retro-input" name="name" maxlength="60" placeholder="New tag" aria-label="New tag name" required><button type="submit">Add</button></form>
           <div class="table-wrap"><table id="tagsTable"></table></div>
+        </fieldset>
+        <fieldset class="groupbox">
+          <legend>Events</legend>
+          <form class="panel-actions" data-add="events"><input class="retro-input" name="name" maxlength="60" placeholder="New event" aria-label="New event name" required><button type="submit">Add</button></form>
+          <div class="table-wrap"><table id="eventsManageTable"></table></div>
         </fieldset>
         <fieldset class="groupbox">
           <legend>Merchants</legend>
@@ -195,6 +196,9 @@
           <span class="form-label" id="txTagsLabel">Tags</span>
           <div id="txTags" aria-labelledby="txTagsLabel"></div>
 
+          <span class="form-label" id="txEventsLabel">Events</span>
+          <div id="txEvents" aria-labelledby="txEventsLabel"></div>
+
           <label for="txNote">Note</label>
           <textarea id="txNote" class="retro-input" rows="2" maxlength="2000"></textarea>
         </div>
@@ -235,22 +239,6 @@
     </form>
   </dialog>
 
-  <dialog id="eventDialog" class="retro-dialog" aria-labelledby="eventDialogTitle">
-    <form class="dialog-window" id="eventForm" novalidate>
-      <div class="dialog-title" id="eventDialogTitle">New Event</div>
-      <div class="dialog-body">
-        <div class="form-grid">
-          <label for="eventName">Name</label><input id="eventName" class="retro-input" type="text" maxlength="60" required>
-          <label for="eventStart">Start</label><input id="eventStart" class="retro-input" type="date" required>
-          <label for="eventEnd">End</label><input id="eventEnd" class="retro-input" type="date" required>
-          <label for="eventNote">Note</label><textarea id="eventNote" class="retro-input" rows="2" maxlength="2000"></textarea>
-        </div>
-        <div id="eventError" class="form-error" role="alert" aria-live="polite"></div>
-      </div>
-      <div class="dialog-buttons"><button type="button" id="eventDeleteButton">Delete</button><span class="spacer"></span><button type="button" id="eventCancelButton">Cancel</button><button type="submit">Save</button></div>
-    </form>
-  </dialog>
-
   <dialog id="confirmDialog" class="retro-dialog" aria-labelledby="confirmTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="confirmTitle">Confirm</div>
@@ -281,13 +269,15 @@
       <div class="dialog-body">
         <p>A self-hosted spending tracker. Every statistic comes from entries you recorded; SpendTracker never guesses categories or fills in data for you.</p>
         <p><strong>Purchase:</strong> money you spent. <strong>For who</strong> says who it was for. Pick several people to split it; each friend's share counts toward what they owe you.</p>
-        <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase and one person's share of it, uses that purchase's tags, and reduces net spent on the date it was refunded.</p>
+        <p><strong>Refund / return:</strong> money a store gave back. It is linked to the original purchase and one person's share of it, uses that purchase's tags and events, and reduces net spent on the date it was refunded.</p>
+        <p><strong>Events</strong> work like tags: add them under Manage (a trip, a move) and choose them on purchases. The Events tab and Stats total each event's purchases and their refunds.</p>
+        <p><strong>Time frame</strong> (toolbar) chooses what the ledger and calendar show: All time, one month, or several months checked together. ◀ / ▶ move the chosen months by one.</p>
         <p><strong>Payback to me:</strong> money someone else gave you for something you paid for. Link it to a purchase to settle their share of it, or leave it unlinked to reduce their overall balance. Paybacks do not change net spent; Stats shows them separately.</p>
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
         <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
-        <p><strong>Archiving</strong> a payment method, person, tag, or merchant under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats. Archiving a <strong>transaction</strong> hides it from the ledger and calendar (View → Show Archived lists it again); it still counts in Stats, People balances, and refund limits.</p>
-        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, merchant, and payment method it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or a payment method, person, tag, or merchant under Manage, to see its whole numbered list.</p>
-        <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape or Select... again stops) to archive, tag, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
+        <p><strong>Archiving</strong> a payment method, person, tag, event, or merchant under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats. Archiving a <strong>transaction</strong> hides it from the ledger and calendar (View → Show Archived lists it again); it still counts in Stats, People balances, and refund limits.</p>
+        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, event, merchant, and payment method it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or any row under Manage, to see its whole numbered list.</p>
+        <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape or Select... again stops) to archive, tag, add to an event, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
         <p>Amounts are shown in US dollars.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>

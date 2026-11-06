@@ -19,15 +19,13 @@ const TRANSACTION_FIELDS = [
   ['description', 'What', value => value || '—'],
   ['note', 'Note', value => value || '—'],
   ['tagIds', 'Tags', value => (value.length ? value.map(tagName).join(', ') : '—')],
+  ['eventIds', 'Events', value => (value?.length ? value.map(eventName).join(', ') : '—')],
   ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
 ];
 
 const SIMPLE_FIELDS = [
   ['name', 'Name', value => value],
-  ['archived', 'Archived', value => (value ? 'Yes' : 'No')],
-  ['startDate', 'Start', value => formatDate(value)],
-  ['endDate', 'End', value => formatDate(value)],
-  ['note', 'Note', value => value || '—']
+  ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
 ];
 
 async function loadHistory({ older = false } = {}) {
@@ -52,8 +50,6 @@ function historySubject(entry) {
   switch (entry.entity) {
     case 'Transaction':
       return `#${entry.entityId} ${value.kind} ${formatMoney(value.amountCents)} · ${formatDate(value.date)} · ${describeTransaction(value) || '(no description)'}`;
-    case 'Event':
-      return `${value.name} (${formatDateRange(value.startDate, value.endDate)})`;
     case 'Backup':
       return `Backup from ${formatDateTime(value.exportedAt)} (${plural(value.transactions, 'transaction')})`;
     default:

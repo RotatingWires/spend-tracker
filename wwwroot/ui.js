@@ -12,7 +12,7 @@ const TAB_RENDERERS = {
   manage: renderManage
 };
 const MONTH_TABS = new Set(['transactions', 'calendar']);
-let monthSelect = null;
+let timeFrameSelect = null;
 
 async function loadSnapshot() {
   if (state.loading) return state.loading;
@@ -40,10 +40,10 @@ async function loadSnapshot() {
 
 function renderAll() {
   if (!state.model) return;
-  renderMonthSelect();
+  renderTimeFrameSelect();
   $('#monthControls').hidden = !MONTH_TABS.has(state.activeTab);
   $('#titleScope').textContent = MONTH_TABS.has(state.activeTab)
-    ? formatMonth(state.month)
+    ? timeFrameLabel()
     : $(`.tabs [data-tab="${state.activeTab}"]`).textContent;
   TAB_RENDERERS[state.activeTab]();
   updateBulkControls();
@@ -53,7 +53,7 @@ function renderAll() {
 
   const count = state.model.transactions.length;
   // Messages go on the left and totals on the right, as in TaskList.
-  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')}`;
+  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')} • ${plural(state.snapshot.events.length, 'event')}`;
   if ($('#statusLeft').textContent === 'Loading...') setStatus('Ready');
 }
 
@@ -67,21 +67,30 @@ function switchTab(name) {
   renderAll();
 }
 
-function renderMonthSelect() {
-  const today = monthOf(todayKey());
-  const transactions = state.model.transactions;
-  const first = transactions.length ? monthOf(transactions[0].date) : today;
-  const last = transactions.length ? monthOf(transactions.at(-1).date) : today;
-  const newest = [last, today, state.month].sort().at(-1);
-  const oldest = [first, today, state.month].sort()[0];
-  const options = [];
-  for (let month = newest; month >= oldest; month = shiftMonth(month, -1))
-    options.push({ value: month, label: formatMonth(month) });
-  monthSelect.setOptions(options, state.month);
+/** All time, then every month newest first, including chosen months outside the data (reached with ◀ / ▶). */
+function renderTimeFrameSelect() {
+  const months = [...new Set([...allMonths(), ...state.timeFrame.months])].sort().reverse();
+  timeFrameSelect.setOptions([{ value: 'all', label: 'All time' }, ...months.map(month => ({ value: month, label: formatMonth(month) }))],
+    state.timeFrame.all ? ['all'] : state.timeFrame.months);
+  // ◀ / ▶ move the whole selection by a month, so they are off for All time.
+  $('#previousMonthButton').disabled = state.timeFrame.all;
+  $('#nextMonthButton').disabled = state.timeFrame.all;
 }
 
-function changeMonth(month) {
-  state.month = month;
+/**
+ * Applies a new dropdown selection. All time and months exclude each other: checking All time clears the months,
+ * and checking a month leaves All time. Unchecking the last choice is ignored, so something is always shown.
+ */
+function changeTimeFrame(values) {
+  const months = values.filter(value => value !== 'all');
+  if (values.includes('all') && !state.timeFrame.all) state.timeFrame = { all: true, months: [] };
+  else if (months.length) state.timeFrame = { all: false, months };
+  renderAll();
+}
+
+function shiftTimeFrame(delta) {
+  if (state.timeFrame.all) return;
+  state.timeFrame = { all: false, months: state.timeFrame.months.map(month => shiftMonth(month, delta)) };
   renderAll();
 }
 
@@ -265,13 +274,16 @@ function initializeTooltips() {
 }
 
 function startApp() {
-  state.month = monthOf(todayKey());
-  monthSelect = createSingleSelect($('#monthSelect'), { onChange: changeMonth });
+  state.timeFrame = { all: false, months: [monthOf(todayKey())] };
+  timeFrameSelect = createMultiSelect($('#timeFrameSelect'), {
+    empty: 'Choose months',
+    onChange: changeTimeFrame,
+    summary: names => (names.length > 3 ? `${names.length} months` : names.join(', '))
+  });
   initializeTransactionEditor();
   initializeCalendar();
   initializeStats();
   initializePeople();
-  initializeEvents();
   initializeHistory();
   initializeManage();
   initializeBulk();
@@ -315,8 +327,8 @@ function startApp() {
     if (file) restoreBackup(file);
   });
   $('#logoutButton').addEventListener('click', logout);
-  $('#previousMonthButton').addEventListener('click', () => changeMonth(shiftMonth(state.month, -1)));
-  $('#nextMonthButton').addEventListener('click', () => changeMonth(shiftMonth(state.month, 1)));
+  $('#previousMonthButton').addEventListener('click', () => shiftTimeFrame(-1));
+  $('#nextMonthButton').addEventListener('click', () => shiftTimeFrame(1));
   // Search runs on the Search button or Enter, as in TaskList and NewsReview, not on every keystroke.
   // Emptying the box is already a complete search, so it shows every row again right away.
   // The bar sits in the toolbar on every tab; searching shows the results in the Transactions ledger.
@@ -353,10 +365,11 @@ function startApp() {
   loadSnapshot();
 }
 
-/** New entries default to today, unless the viewed month is another month, then its first day. */
+/** New entries default to today, unless one other month is being viewed, then its first day. */
 function defaultEntryDate() {
   const today = todayKey();
-  return MONTH_TABS.has(state.activeTab) && monthOf(today) !== state.month ? monthStart(state.month) : today;
+  const month = singleTimeFrameMonth();
+  return MONTH_TABS.has(state.activeTab) && month && monthOf(today) !== month ? monthStart(month) : today;
 }
 
 startApp();

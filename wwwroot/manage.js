@@ -1,6 +1,6 @@
 'use strict';
 
-/* Manage tab: payment methods, people, tags, and merchants. */
+/* Manage tab: payment methods, people, tags, events, and merchants. */
 
 const MANAGED = {
   'payment-methods': {
@@ -25,6 +25,14 @@ const MANAGED = {
     scope: 'tag',
     items: () => state.snapshot.tags,
     uses: id => state.model.transactions.filter(tx => tx.tagIds.includes(id)).length,
+    archivable: () => true
+  },
+  events: {
+    table: '#eventsManageTable',
+    singular: 'event',
+    scope: 'event',
+    items: () => state.snapshot.events,
+    uses: id => state.model.transactions.filter(tx => tx.eventIds.includes(id)).length,
     archivable: () => true
   },
   merchants: {
@@ -99,7 +107,7 @@ async function setArchived(path, item, archived) {
 }
 
 async function deleteManaged(path, config, item, uses) {
-  const consequence = path === 'tags' && uses > 0
+  const consequence = (path === 'tags' || path === 'events') && uses > 0
     ? ` It will be removed from ${plural(uses, 'transaction')}; the transactions themselves are kept.`
     : '';
   if (!await confirmAction(`Delete ${config.singular}`, `Delete ${item.name}?${consequence}`, 'Delete')) return;

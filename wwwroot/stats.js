@@ -2,7 +2,7 @@
 
 /*
  * Stats tab. Every number is computed only from recorded entries; nothing is estimated or categorized
- * automatically. Refunds count on their own date and under the person, tags, and merchant of their purchase.
+ * automatically. Refunds count on their own date and under the person, tags, events, and merchant of their purchase.
  */
 
 let statsPeriodSelect = null;
@@ -19,7 +19,7 @@ function statsPeriodOptions() {
     options.push({ value: `y:${year}`, label: String(year) });
   for (let month = monthOf(latest); month >= monthOf(first); month = shiftMonth(month, -1))
     options.push({ value: `m:${month}`, label: formatMonth(month) });
-  for (const event of [...state.model.events].reverse())
+  for (const event of state.snapshot.events)
     options.push({ value: `e:${event.id}`, label: `Event: ${event.name}` });
   return options;
 }
@@ -35,8 +35,13 @@ function statsRange(period) {
     return { start: monthStart(month), end: monthEnd(month), label: formatMonth(month) };
   }
   if (period.startsWith('e:')) {
-    const event = state.model.events.find(e => String(e.id) === period.slice(2));
-    if (event) return { start: event.startDate, end: event.endDate, label: event.name };
+    // An event covers the purchases you put on it and their refunds, from its first entry to its last.
+    const event = state.model.events.get(Number(period.slice(2)));
+    if (event) {
+      const filter = tx => eventIdsOf(tx).includes(event.id);
+      const dates = state.model.transactions.filter(filter).map(tx => tx.date);
+      return { start: dates[0] ?? today, end: dates.at(-1) ?? today, label: event.name, filter };
+    }
   }
   const transactions = state.model.transactions;
   const first = transactions[0]?.date ?? today;
@@ -46,7 +51,7 @@ function statsRange(period) {
 
 function computeStats(range) {
   const today = todayKey();
-  const transactions = transactionsInRange(range.start, range.end);
+  const transactions = transactionsInRange(range.start, range.end).filter(range.filter ?? (() => true));
   const purchases = transactions.filter(tx => tx.kind === 'Purchase');
   const refunds = transactions.filter(tx => tx.kind === 'Refund');
   const paybacks = transactions.filter(tx => tx.kind === 'Payback');
@@ -335,7 +340,7 @@ function renderStatsTables(stats) {
       const changeText = change == null ? '—' : `${change > 0 ? '+' : change < 0 ? '−' : ''}${formatMoney(Math.abs(change))}`;
       return {
         onClick: () => {
-          state.month = month.month;
+          state.timeFrame = { all: false, months: [month.month] };
           switchTab('transactions');
         },
         cells: [formatMonth(month.month) + (month.complete ? '' : ' (partial)'), numberFormat.format(month.purchases), formatMoney(month.spent), formatMoney(month.refunded), formatMoney(month.net), changeText, formatMoney(month.paidBack)]

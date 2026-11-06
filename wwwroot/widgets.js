@@ -96,9 +96,9 @@ function createSingleSelect(host, { onChange = () => {} } = {}) {
 
 /**
  * A Win95 dropdown of check items, like the TaskList Stats list filter. The menu stays open while items are
- * toggled. Options are [{ value, label }]; the button summarizes the selection.
+ * toggled. Options are [{ value, label }]; the button summarizes the selection, by default as a list of labels.
  */
-function createMultiSelect(host, { empty = 'None', onChange = () => {} } = {}) {
+function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', ') } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -124,7 +124,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {} } = {}) {
 
   function render() {
     const names = options.filter(option => selected.has(option.value)).map(option => option.label);
-    label.textContent = names.length ? names.join(', ') : empty;
+    label.textContent = names.length ? summary(names) : empty;
     button.title = label.textContent;
     button.disabled = options.length === 0;
     menu.replaceChildren(...options.map(option => {

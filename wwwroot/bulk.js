@@ -86,19 +86,10 @@ const BULK_ACTIONS = {
     alreadyDone: 'not archived',
     request: tx => ({ body: transactionRequest(tx, { archived: false }) })
   },
-  addTag: {
-    label: 'Add Tag',
-    choose: () => chooseFrom('Add Tag', 'Tag to add', state.snapshot.tags.filter(tag => !tag.archived), 'Add'),
-    request: (tx, tagId) => tx.kind !== 'Purchase' ? { skip: 'only purchases have tags' }
-      : tx.tagIds.includes(tagId) ? { skip: 'already has that tag' }
-      : { body: transactionRequest(tx, { tagIds: [...tx.tagIds, tagId] }) }
-  },
-  removeTag: {
-    label: 'Remove Tag',
-    choose: items => chooseFrom('Remove Tag', 'Tag to remove', state.snapshot.tags.filter(tag => items.some(tx => tx.tagIds.includes(tag.id))), 'Remove'),
-    request: (tx, tagId) => !tx.tagIds.includes(tagId) ? { skip: 'does not have that tag' }
-      : { body: transactionRequest(tx, { tagIds: tx.tagIds.filter(id => id !== tagId) }) }
-  },
+  addTag: labelAction('tag', 'tags', 'tagIds', true),
+  removeTag: labelAction('tag', 'tags', 'tagIds', false),
+  addEvent: labelAction('event', 'events', 'eventIds', true),
+  removeEvent: labelAction('event', 'events', 'eventIds', false),
   addPerson: {
     label: 'Add Person',
     detail: 'Each changed purchase is split evenly again between everyone on it.',
@@ -135,6 +126,21 @@ const BULK_ACTIONS = {
     request: () => ({ method: 'DELETE' })
   }
 };
+
+/** Add or remove one tag or event. Tags and events work the same way: only purchases have them. */
+function labelAction(noun, list, field, adding) {
+  const title = `${adding ? 'Add' : 'Remove'} ${noun[0].toUpperCase()}${noun.slice(1)}`;
+  return {
+    label: title,
+    choose: items => chooseFrom(title, `${noun[0].toUpperCase()}${noun.slice(1)} to ${adding ? 'add' : 'remove'}`,
+      state.snapshot[list].filter(item => adding ? !item.archived : items.some(tx => tx[field].includes(item.id))), adding ? 'Add' : 'Remove'),
+    request: (tx, id) => {
+      if (adding && tx.kind !== 'Purchase') return { skip: `only purchases have ${noun}s` };
+      if (adding === tx[field].includes(id)) return { skip: adding ? `already has that ${noun}` : `does not have that ${noun}` };
+      return { body: transactionRequest(tx, { [field]: adding ? [...tx[field], id] : tx[field].filter(other => other !== id) }) };
+    }
+  };
+}
 
 async function chooseFrom(title, label, items, okLabel) {
   if (items.length === 0) {
@@ -244,7 +250,7 @@ function updateBulkControls() {
   menu.className = 'menu-dropdown split-dropdown';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  const items = ['archive', 'restore', null, 'addTag', 'removeTag', 'addPerson', 'removePerson', 'setMerchant', null, 'delete'];
+  const items = ['archive', 'restore', null, 'addTag', 'removeTag', 'addEvent', 'removeEvent', 'addPerson', 'removePerson', 'setMerchant', null, 'delete'];
   menu.append(...items.map(name => {
     if (name == null) return menuSeparator();
     const action = BULK_ACTIONS[name];

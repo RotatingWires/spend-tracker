@@ -102,7 +102,8 @@ class ApiError(Exception):
 class Client:
     def __init__(self, base_url):
         self.base_url = base_url
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        self.cookies = http.cookiejar.CookieJar()
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies))
 
     def request(self, method, path, body=None, raw=None, content_type="application/json", binary_response=False):
         data = raw if raw is not None else (None if body is None else json.dumps(body).encode())
