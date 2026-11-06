@@ -473,6 +473,79 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
 .chart-swatch.series-6 { background: var(--chart-series-6); }
 .chart-swatch.series-7 { background: var(--chart-series-7); }
 .chart-swatch.series-8 { background: var(--chart-series-8); }
+/* The comparison line in Trends → Running Total is dashed; its swatch is striped to match. */
+.chart-swatch.dashed { background-image: linear-gradient(90deg, transparent 50%, var(--face) 50%); background-size: 5px 100%; }
+
+/* ---------- Stats sub-tabs and heatmaps, as in TaskList Stats ---------- */
+.subtabs {
+  display: flex;
+  gap: 2px;
+  margin: 2px 0 8px;
+  padding: 5px;
+  border-bottom: 1px solid var(--shadow);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs button { white-space: nowrap; padding: 5px 11px 6px; position: relative; top: 1px; }
+.subtabs button[aria-selected="true"] { padding-top: 7px; margin-top: -2px; border-bottom-color: var(--face); font-weight: 700; z-index: 2; }
+.small-row { margin-bottom: 5px; }
+.wrap-row { flex-wrap: wrap; }
+
+.year-heatmap,
+.month-year-heatmap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.year-heatmap { padding: 6px 2px 3px; }
+.heatmap-grid {
+  display: grid;
+  grid-template-rows: 20px repeat(7, 24px);
+  grid-auto-columns: 24px;
+  gap: 2px;
+  min-width: max-content;
+}
+.heat-label { font-size: 10px; line-height: 18px; text-align: right; padding-right: 3px; min-width: 30px; }
+.heat-month { font-size: 10px; line-height: 18px; white-space: nowrap; overflow: visible; }
+.heat {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  border-top: 1px solid var(--light-edge);
+  border-left: 1px solid var(--light-edge);
+  border-right: 1px solid var(--shadow);
+  border-bottom: 1px solid var(--shadow);
+  vertical-align: middle;
+}
+.heat-outside { visibility: hidden; }
+/* A cell with entries is a button: it presses in like one. */
+button.heat:active {
+  border-top-color: var(--shadow);
+  border-left-color: var(--shadow);
+  border-right-color: var(--light-edge);
+  border-bottom-color: var(--light-edge);
+}
+.h0 { background: var(--heat-0); color: var(--heat-0-text); }
+.h1 { background: var(--heat-1); color: var(--heat-1-text); }
+.h2 { background: var(--heat-2); color: var(--heat-2-text); }
+.h3 { background: var(--heat-3); color: var(--heat-3-text); }
+.h4 { background: var(--heat-4); color: var(--heat-4-text); }
+.heat-legend .heat { width: 16px; height: 16px; font-size: 0; }
+.month-year-grid { display: grid; gap: 3px; align-items: center; min-width: max-content; }
+.month-year-cell { width: 56px; min-width: 56px; height: 36px; display: grid; place-items: center; font-size: 12px; }
+.month-year-cell.week-cell { width: 64px; min-width: 64px; }
+.month-year-head, .month-year-year { font-size: 11px; font-weight: 700; text-align: center; }
+.month-year-head { width: 56px; align-self: end; padding-bottom: 3px; }
+.month-year-head.week-head { width: 64px; }
+.label-month-name { text-align: right; padding-right: 6px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Hover/tap help and chart tooltips, as in TaskList Stats: help on the note color, charts on their own tokens. */
 .help-tooltip,

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.13.0 Manual
+# SpendTracker v0.14.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -33,7 +33,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **People ledger** showing what each person owes you, purchase by purchase.
 - **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the collections of each day's entries.
 - **Collections**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
-- **Stats** for any month, year, collection, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, weekday, person, tag, collection, merchant, and month.
+- **Stats** for any month, year, collection, or all time, on five sub-tabs: totals, daily averages, streaks, records, and a chart (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; running total against the period before, average by month of year, and purchase sizes (**Trends**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -61,10 +61,12 @@ wwwroot/
   index.html            app shell, tabs, and dialogs
   app.js                shared state, money and date helpers, API client, derived model
   widgets.js            menus, dropdowns, tables, stat cards, confirm/prompt dialogs
-  charts.js             canvas bar chart and tooltips
+  charts.js             canvas bar and line charts and tooltips
   transactions.js       monthly ledger, CSV export, transaction editor
   calendar.js           month calendar and day detail
-  stats.js              statistics calculations and Stats tab
+  stats.js              statistics calculations, Stats sub-tabs, and Overview
+  heatmaps.js           Stats → Heatmaps
+  insights.js           Stats → Trends, Compare, and People & Places
   people.js             people balances and person detail
   summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
   search.js             File → Search... dialog
@@ -214,6 +216,14 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 **Period** is a dropdown of check items: all time, or any mix of years, months, and collections. All time and the others exclude each other, and the last choice cannot be unchecked. With several periods checked, an entry counts when it falls in any of them, and day-based numbers (counted days, averages, streaks, day of week, months, and the chart's days) use only the days inside the checked periods; a no-spend streak does not carry across the gap between two of them. A collection's period runs from its first to its last entry and counts only its own purchases and the refunds on them (paybacks are not part of collections). See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
 
+Stats has five sub-tabs, like TaskList Stats' tabs; the one you were last on is remembered in this browser:
+
+- **Overview:** totals, Daily, Records, Streaks, the chart, By Payment Method, and Day of Week.
+- **Heatmaps:** a year of days, months by year, tags or merchants by month, and weekdays by week of the month. See [Heatmaps](#heatmaps).
+- **Trends:** the running total (against the month or year before), average by month of year, purchase sizes, and the Months table.
+- **Compare:** two periods of your choice side by side. It has its own **A** and **B** dropdowns (this month and last month to start), and the Period dropdown does not apply.
+- **People & Places:** People, People Over Time, Tags, Collections, Merchants, Merchant Loyalty, and Recurring Purchases.
+
 ### People
 
 An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
@@ -259,6 +269,8 @@ All statistics cover the selected period. A transaction is in a period when its 
 | No-spend days | Counted days with no purchase. Refunds and paybacks do not count as spending. |
 | Longest no-spend streak | Most consecutive counted days without a purchase. |
 | Current no-spend streak | Consecutive days up to today without a purchase; shown only when the period includes today. |
+| Longest / current spending streak | The same, for consecutive days with at least one purchase each. |
+| Longest streak at or under average | Most consecutive counted days whose net spent was at or under the period's average per day. |
 | Highest day | The day with the most net spent (among days with a purchase). |
 | Highest week | The Monday–Sunday week with the most net spent, clipped to the days inside the period. |
 | Highest month | The month with the most net spent. |
@@ -277,9 +289,26 @@ Breakdown tables:
 - **Merchants:** grouped by merchant ID, so a renamed merchant keeps its whole history under its current name, plus *(no merchant)*.
 
 Refunds count under the tags, collections, and merchant of their purchase.
+
+- **People Over Time:** each other person's balance (as on the People tab, following **Include gifts in Balance**) at the end of every month in the period, counting all earlier history too, as a line chart (up to eight people) and a table: the balance just before the period, at its end, the change, and the highest month-end balance. Select a row for the person's dialog.
+- **Merchant Loyalty:** for merchants with purchases in the period: visits, first and last visit, months of the period with a visit, the average days between visits on different days, days since your latest purchase there ever, spent, and average visit.
+- **Recurring Purchases:** from all history, whatever the period. Three or more purchases at the same merchant (or, without a merchant, with the same description, ignoring case) for exactly the same amount, where every gap between them fits one interval: weekly (6–8 days), every 2 weeks (12–16), monthly (26–35), every 3 months (84–98), every 6 months (174–192), or yearly (355–376). A price change starts a new series. **Next Expected** is the last date plus the average gap (monthly ones keep the first charge's day of the month); one overdue by more than the interval's slack is marked *Stopped?* and left out of the **Active per year** total. **Per Year** is the amount times the repeats in a year. Select a row to edit its latest purchase.
+- **Purchase Sizes:** purchases in six size bands (under $10, $10–25, $25–50, $50–100, $100–250, $250 and up), with each band's share of purchases and of spent; and the smallest, median, average, middle half (25th to 75th percentile), and largest purchase.
+- **Running Total:** net spent added up day by day through the period, as a line. With a single month or year as the period, a dashed line shows the month or year before, day for day, and the note compares the two at the latest day counted so far (a shorter period before, like February before March, counts at its final total).
+- **Average by Month of Year:** net spent in each calendar month, averaged over the years that month appears in the period.
+- **Compare:** spent, refunds, net spent, purchases, average purchase, average per day, days counted, spending and no-spend days, paid back, spent for others, and largest purchase for A and B, with A − B and the change as a share of B; then net spent per tag and per merchant in each, the biggest change first.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
 The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar right against the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
+
+### Heatmaps
+
+Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show** picks what every heatmap measures: net spent (the default), spent, refunds, or number of purchases. Darker cells hold more. The darkest shade starts at the 90th percentile of the heatmap's cells, so one very large purchase does not wash out everything else; a cell with nothing (or a net of zero or less, from refunds only) is the lightest. Hover a cell for its exact value.
+
+- **Year Heatmap:** every day of the chosen **Year** (this year to start), a column per week, Sunday first, whatever the Period. Purchase counts show inside the squares. Select a day with entries to open its day dialog, as on the Calendar; empty days cannot be selected.
+- **Month × Year:** every month of every year with entries, all time. Select a month to open it on the Transactions tab.
+- **Tags × Month** (or **Merchants × Month**, from **Rows**): one row per tag or merchant with anything in the period, biggest first, and one column per month of the period. A purchase with two tags counts in both rows, and refunds count under their purchase's tags and merchant. Select a cell for that tag's or merchant's entries in that month.
+- **Weekday × Week of Month:** each weekday in each week of the month (days 1–7, 8–14, 15–21, 22–28, and 29–31), as an average per day: the total on those days divided by how many of them the period has, so the short fifth week compares fairly.
 
 ## Data and backups
 
@@ -487,6 +516,15 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.14.0
+
+- **Stats sub-tabs**, like TaskList Stats: Overview, Heatmaps, Trends, Compare, and People & Places.
+- **Heatmaps** in TaskList Stats' style: a year of days, months by year, tags or merchants by month, and weekdays by week of the month, with one Show choice (net spent, spent, refunds, or purchases).
+- **Trends:** running total against the month or year before, average by month of year, and purchase sizes (size bands, median, middle half).
+- **Compare** two periods side by side, overall and per tag and merchant.
+- **Streaks:** longest and current spending streaks and the longest streak at or under the daily average, beside the no-spend streaks.
+- **People & Places:** People Over Time (month-end balances), Merchant Loyalty, and Recurring Purchases (weekly to yearly repeats, next expected date, yearly cost).
 
 ### v0.13.0
 

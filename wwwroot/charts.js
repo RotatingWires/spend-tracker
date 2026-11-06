@@ -4,7 +4,7 @@
  * Minimal canvas bar chart with hover/tap tooltips. Several series stack into one bar per day or month, each section
  * in its own theme color (--chart-series-1 to -8); negative values stack below the zero line. Money series use the
  * left axis. Counts cannot share that scale, so when both are shown counts stack in a second, narrower bar beside it,
- * on the right axis.
+ * on the right axis. A line chart draws running totals and balances, one line per series, dashed ones for comparisons.
  */
 
 const Charts = (() => {
@@ -176,5 +176,97 @@ const Charts = (() => {
     canvas.onpointerleave = hideTooltip;
   }
 
-  return { bars, hideTooltip };
+  /**
+   * labels: one per point. titles: tooltip heading per point. series: [{ label, color (1-8), values, format, dashed }].
+   * A null value leaves a gap, so a period still in progress stops at today while the one it is compared with goes on.
+   */
+  function lines(canvas, { labels, titles, series }) {
+    const ratio = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    const context = canvas.getContext('2d');
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    const padding = { top: 14, right: 12, bottom: 34, left: 70 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const values = series.flatMap(s => s.values.filter(value => value != null));
+    const high = Math.max(0, ...values);
+    const low = Math.min(0, ...values);
+    const step = Math.max(100, niceStep((high - low) / 4));
+    const axis = { max: Math.ceil(high / step) * step || step, min: Math.floor(low / step) * step };
+    const y = value => padding.top + plotHeight * (axis.max - value) / (axis.max - axis.min);
+    const slot = labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
+    const x = index => padding.left + (labels.length > 1 ? slot * index : plotWidth / 2);
+
+    context.font = '11px Tahoma, Arial, sans-serif';
+    context.textBaseline = 'middle';
+    context.lineWidth = 1;
+    const format = series[0]?.format ?? String;
+    for (let value = axis.max; value >= axis.min; value -= step) {
+      const lineY = Math.round(y(value)) + 0.5;
+      context.strokeStyle = themeColor(value === 0 ? '--chart-axis' : '--chart-grid');
+      context.beginPath();
+      context.moveTo(padding.left, lineY);
+      context.lineTo(width - padding.right, lineY);
+      context.stroke();
+      context.fillStyle = themeColor('--chart-text');
+      context.textAlign = 'right';
+      context.fillText(format(value), padding.left - 6, lineY);
+    }
+
+    for (const s of series) {
+      context.strokeStyle = themeColor(`--chart-series-${s.color}`);
+      context.lineWidth = 2;
+      context.setLineDash(s.dashed ? [6, 4] : []);
+      context.beginPath();
+      let drawing = false;
+      s.values.forEach((value, index) => {
+        if (value == null) {
+          drawing = false;
+          return;
+        }
+        if (drawing) context.lineTo(x(index), y(value));
+        else context.moveTo(x(index), y(value));
+        drawing = true;
+      });
+      context.stroke();
+    }
+    context.setLineDash([]);
+    context.lineWidth = 1;
+
+    const labelEvery = Math.max(1, Math.ceil(labels.length / Math.max(1, Math.floor(plotWidth / 50))));
+    context.fillStyle = themeColor('--chart-text');
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+    labels.forEach((label, index) => {
+      if (index % labelEvery === 0) context.fillText(label, x(index), height - padding.bottom + 8);
+    });
+
+    context.strokeStyle = themeColor('--chart-axis');
+    context.beginPath();
+    context.moveTo(padding.left + 0.5, padding.top);
+    context.lineTo(padding.left + 0.5, height - padding.bottom);
+    context.lineTo(width - padding.right, height - padding.bottom);
+    context.stroke();
+
+    canvas.onpointermove = event => {
+      const offset = event.clientX - canvas.getBoundingClientRect().left - padding.left;
+      const index = labels.length > 1 ? Math.round(offset / slot) : 0;
+      if (index < 0 || index >= labels.length) {
+        hideTooltip();
+        return;
+      }
+      showTooltip([
+        { text: titles[index], strong: true },
+        ...series.map(s => ({ text: `${s.label}: ${s.values[index] == null ? '—' : s.format(s.values[index])}`, series: s.color }))
+      ], event.clientX, event.clientY);
+    };
+    canvas.onpointerleave = hideTooltip;
+  }
+
+  return { bars, lines, hideTooltip };
 })();

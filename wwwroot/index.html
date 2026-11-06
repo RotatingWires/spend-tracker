@@ -86,23 +86,77 @@
         <div class="note">Every number comes only from entries you recorded. Hover or tap underlined labels for exact definitions.</div>
         <div id="statsEmpty" class="message-panel" hidden>No entries in this period yet.</div>
         <div id="statsContent">
-          <div class="section-title">Totals</div>
-          <div id="statsTotals" class="stat-grid"></div>
-          <div class="two-column">
-            <fieldset class="groupbox"><legend>Daily</legend><div id="statsDaily" class="metric-list"></div></fieldset>
-            <fieldset class="groupbox"><legend>Records</legend><div id="statsRecords" class="metric-list"></div></fieldset>
+          <div class="subtabs" role="tablist" aria-label="Stats sections">
+            <button type="button" role="tab" data-stats-tab="overview" aria-selected="true">Overview</button>
+            <button type="button" role="tab" data-stats-tab="heatmaps" aria-selected="false">Heatmaps</button>
+            <button type="button" role="tab" data-stats-tab="trends" aria-selected="false">Trends</button>
+            <button type="button" role="tab" data-stats-tab="compare" aria-selected="false">Compare</button>
+            <button type="button" role="tab" data-stats-tab="places" aria-selected="false">People &amp; Places</button>
           </div>
-          <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="control-row"><span class="control-label" id="statsChartMetricLabel">Show:</span><div id="statsChartMetric" aria-labelledby="statsChartMetricLabel"></div></div><div id="statsChartKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
-          <div class="two-column">
-            <fieldset class="groupbox"><legend>By Payment Method</legend><div class="table-wrap"><table id="statsMethodsTable"></table></div></fieldset>
-            <fieldset class="groupbox"><legend>Day of Week</legend><div class="table-wrap"><table id="statsWeekdayTable"></table></div></fieldset>
+
+          <div class="stats-panel" data-stats-panel="overview" role="tabpanel">
+            <div class="section-title">Totals</div>
+            <div id="statsTotals" class="stat-grid"></div>
+            <div class="two-column">
+              <fieldset class="groupbox"><legend>Daily</legend><div id="statsDaily" class="metric-list"></div></fieldset>
+              <fieldset class="groupbox"><legend>Records</legend><div id="statsRecords" class="metric-list"></div></fieldset>
+            </div>
+            <fieldset class="groupbox"><legend>Streaks</legend><div id="statsStreaks" class="metric-list"></div></fieldset>
+            <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="control-row"><span class="control-label" id="statsChartMetricLabel">Show:</span><div id="statsChartMetric" aria-labelledby="statsChartMetricLabel"></div></div><div id="statsChartKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
+            <div class="two-column">
+              <fieldset class="groupbox"><legend>By Payment Method</legend><div class="table-wrap"><table id="statsMethodsTable"></table></div></fieldset>
+              <fieldset class="groupbox"><legend>Day of Week</legend><div class="table-wrap"><table id="statsWeekdayTable"></table></div></fieldset>
+            </div>
           </div>
-          <div class="note">Select a person, tag, collection, or merchant below to list its entries.</div>
-          <fieldset class="groupbox"><legend>People</legend><div class="note">For a split purchase, each person counts their own share.</div><div class="table-wrap"><table id="statsPeopleTable"></table></div></fieldset>
-          <fieldset class="groupbox"><legend>Tags</legend><div class="note">A purchase with two tags counts toward both, so tag totals can add up to more than total spent.</div><div class="table-wrap"><table id="statsTagsTable"></table></div></fieldset>
-          <fieldset class="groupbox"><legend>Collections</legend><div class="note">A purchase in two collections counts toward both.</div><div class="table-wrap"><table id="statsCollectionsTable"></table></div></fieldset>
-          <fieldset class="groupbox"><legend>Merchants</legend><div class="table-wrap"><table id="statsMerchantsTable"></table></div></fieldset>
-          <fieldset class="groupbox"><legend>Months</legend><div class="table-wrap"><table id="statsMonthsTable"></table></div></fieldset>
+
+          <div class="stats-panel" data-stats-panel="heatmaps" role="tabpanel" hidden>
+            <div class="control-row"><span class="control-label" id="heatMeasureLabel">Show:</span><div id="heatMeasure" aria-labelledby="heatMeasureLabel"></div></div>
+            <fieldset class="groupbox"><legend>Year Heatmap</legend>
+              <div class="control-row small-row"><span class="control-label" id="heatYearLabel">Year:</span><div id="heatYear" aria-labelledby="heatYearLabel"></div></div>
+              <div id="yearHeatmap" class="year-heatmap"></div>
+              <div class="heat-legend" aria-hidden="true">Less <span class="heat h0"></span><span class="heat h1"></span><span class="heat h2"></span><span class="heat h3"></span><span class="heat h4"></span> More</div>
+              <div class="note">Every day of the year, whatever the period. Select a day with entries to list them.</div>
+            </fieldset>
+            <fieldset class="groupbox"><legend>Month × Year</legend><div id="monthYearHeatmap" class="month-year-heatmap"></div><div class="note">All time. Select a month to open it on the Transactions tab.</div></fieldset>
+            <fieldset class="groupbox"><legend id="labelMonthLegend">Tags × Month</legend>
+              <div class="control-row small-row"><span class="control-label" id="heatRowsLabel">Rows:</span><div id="heatRows" aria-labelledby="heatRowsLabel"></div></div>
+              <div id="labelMonthHeatmap" class="month-year-heatmap"></div>
+              <div class="note">Months in the period. A purchase with two tags counts in both rows; refunds count under their purchase. Select a cell to list its entries.</div>
+            </fieldset>
+            <fieldset class="groupbox"><legend>Weekday × Week of Month</legend><div id="weekHeatmap" class="month-year-heatmap"></div><div class="note">Average per day: the total on that weekday in that week of the month (days 1–7, 8–14, 15–21, 22–28, 29–31), divided by how many such days the period has.</div></fieldset>
+          </div>
+
+          <div class="stats-panel" data-stats-panel="trends" role="tabpanel" hidden>
+            <fieldset class="groupbox"><legend>Running Total</legend><div id="runningKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="runningChart"></canvas></div><div id="runningNote" class="note"></div></fieldset>
+            <fieldset class="groupbox"><legend>Average by Month of Year</legend><div class="chart-frame"><canvas id="seasonChart"></canvas></div><div class="note">Net spent in each calendar month, averaged over the years that month appears in the period.</div></fieldset>
+            <div class="two-column">
+              <fieldset class="groupbox"><legend>Purchase Sizes</legend><div class="table-wrap"><table id="sizeTable"></table></div></fieldset>
+              <fieldset class="groupbox"><legend>Size Summary</legend><div id="sizeSummary" class="metric-list"></div></fieldset>
+            </div>
+            <fieldset class="groupbox"><legend>Months</legend><div class="table-wrap"><table id="statsMonthsTable"></table></div></fieldset>
+          </div>
+
+          <div class="stats-panel" data-stats-panel="compare" role="tabpanel" hidden>
+            <div class="control-row wrap-row">
+              <span class="control-label" id="compareALabel">A:</span><div id="compareA" aria-labelledby="compareALabel"></div>
+              <span class="control-label" id="compareBLabel">B:</span><div id="compareB" aria-labelledby="compareBLabel"></div>
+            </div>
+            <div class="note">Compare picks its own two periods; the Period dropdown above does not apply here.</div>
+            <fieldset class="groupbox"><legend>Difference (A − B)</legend><div class="table-wrap"><table id="compareTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>By Tag</legend><div class="table-wrap"><table id="compareTagsTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>By Merchant</legend><div class="table-wrap"><table id="compareMerchantsTable"></table></div></fieldset>
+          </div>
+
+          <div class="stats-panel" data-stats-panel="places" role="tabpanel" hidden>
+            <div class="note">Select a person, tag, collection, or merchant below to list its entries.</div>
+            <fieldset class="groupbox"><legend>People</legend><div class="note">For a split purchase, each person counts their own share.</div><div class="table-wrap"><table id="statsPeopleTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>People Over Time</legend><div id="balanceKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="balanceChart"></canvas></div><div class="table-wrap"><table id="balanceTable"></table></div><div class="note">What each person owed you at the end of each month, counting everything before it too. Gifts follow People → Include gifts in Balance.</div></fieldset>
+            <fieldset class="groupbox"><legend>Tags</legend><div class="note">A purchase with two tags counts toward both, so tag totals can add up to more than total spent.</div><div class="table-wrap"><table id="statsTagsTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>Collections</legend><div class="note">A purchase in two collections counts toward both.</div><div class="table-wrap"><table id="statsCollectionsTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>Merchants</legend><div class="table-wrap"><table id="statsMerchantsTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>Merchant Loyalty</legend><div class="table-wrap"><table id="loyaltyTable"></table></div></fieldset>
+            <fieldset class="groupbox"><legend>Recurring Purchases</legend><div class="table-wrap"><table id="recurringTable"></table></div><div class="note">From all of your history, whatever the period: three or more purchases at the same merchant (or with the same description) for the same amount, a regular number of days apart. A price change starts a new series.</div></fieldset>
+          </div>
         </div>
       </section>
 
@@ -337,6 +391,8 @@
   <script src="/transactions.js"></script>
   <script src="/calendar.js"></script>
   <script src="/stats.js"></script>
+  <script src="/heatmaps.js"></script>
+  <script src="/insights.js"></script>
   <script src="/people.js"></script>
   <script src="/summaries.js"></script>
   <script src="/history.js"></script>

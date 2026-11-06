@@ -9,21 +9,23 @@
 const SCOPE_TITLES = { person: 'Person', tag: 'Tag', collection: 'Collection', merchant: 'Merchant', method: 'Payment method' };
 let scopeListTarget = null;
 
-function openScopeList(scope, scopeId) {
-  scopeListTarget = { scope, scopeId };
+/** With month ("YYYY-MM"), only that month's entries are listed (Stats → Heatmaps → Tags × Month). */
+function openScopeList(scope, scopeId, { month = null } = {}) {
+  scopeListTarget = { scope, scopeId, month };
   renderScopeList();
   $('#scopeDialog').showModal();
 }
 
 function renderScopeList() {
   if (!scopeListTarget) return;
-  const { scope, scopeId } = scopeListTarget;
+  const { scope, scopeId, month } = scopeListTarget;
   const entries = state.model.transactions
+    .filter(tx => !month || monthOf(tx.date) === month)
     .map(tx => ({ tx, number: numberIn(tx, scope, scopeId) }))
     .filter(entry => entry.number != null)
     .sort((a, b) => b.number - a.number);
   const name = SCOPE_NAMES[scope](scopeId);
-  $('#scopeDialogTitle').textContent = `${SCOPE_TITLES[scope]}: ${name}`;
+  $('#scopeDialogTitle').textContent = `${SCOPE_TITLES[scope]}: ${name}${month ? ` · ${formatMonth(month)}` : ''}`;
   const archived = entries.filter(entry => entry.tx.archived).length;
   $('#scopeSummary').textContent = entries.length === 0
     ? ''

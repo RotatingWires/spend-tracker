@@ -3,7 +3,7 @@ const CACHE = 'spend-tracker-shell';
 const STATIC = [
   '/', '/index.html', '/login.html', '/login.js', '/version.json', '/manifest.webmanifest', '/icons/spend.svg',
   '/theme.css', '/style.css', '/auth.css', '/theme.js',
-  '/app.js', '/widgets.js', '/charts.js', '/transactions.js', '/calendar.js', '/stats.js',
+  '/app.js', '/widgets.js', '/charts.js', '/transactions.js', '/calendar.js', '/stats.js', '/heatmaps.js', '/insights.js',
   '/people.js', '/summaries.js', '/history.js', '/manage.js', '/bulk.js', '/scopes.js', '/search.js', '/fresh-start.js', '/ui.js'
 ];
 

@@ -290,7 +290,9 @@ class BrowserTests(unittest.TestCase):
 
         page.click('.tabs [data-tab="stats"]')
         expect(page.locator("#statsTotals")).to_contain_text("$52.17")  # spent
+        page.click('[data-stats-tab="places"]')
         expect(page.locator("#statsTagsTable")).to_contain_text("Untagged")
+        page.click('[data-stats-tab="overview"]')
 
         page.click('.tabs [data-tab="people"]')
         expect(page.locator("#peopleTable")).to_contain_text("overpaid")  # refunded in full, then paid $10 back
@@ -512,9 +514,11 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
         expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
         # Stats lists people, tags, collections, and merchants in the same table layout; a row opens its numbered list.
+        page.click('[data-stats-tab="places"]')
         expect(page.locator("#statsCollectionsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
         expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
         self.shot(page, "stats-collection")
+        page.click('[data-stats-tab="overview"]')
         # The chart can show other measures than net spent, per day here because the collection spans 17 days.
         # Measures are check items; each gets a color in the key, whose definition shows on hover.
         self.choose_checks(page, "#statsChartMetric", ["Spent", "Refunds", "Purchases"])
@@ -535,6 +539,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="tags"]')
         expect(page.locator("#tagsTable")).to_be_visible()
         page.click('.tabs [data-tab="stats"]')
+        page.click('[data-stats-tab="places"]')
         page.locator("#statsMerchantsTable tbody tr", has_text="Hotel").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -719,8 +724,12 @@ class BrowserTests(unittest.TestCase):
         expect(daily).to_contain_text("Average per day$1.00")
         expect(daily).to_contain_text("Average per spending day$10.33")
         expect(daily).to_contain_text("No-spend days28")
-        expect(daily).to_contain_text("Longest no-spend streak20 days (03/11/2025 – 03/30/2025)")
-        expect(daily).not_to_contain_text("Current no-spend streak")  # the period is over
+        streaks = page.locator("#statsStreaks")
+        expect(streaks).to_contain_text("Longest no-spend streak20 days (03/11/2025 – 03/30/2025)")
+        expect(streaks).not_to_contain_text("Current no-spend streak")  # the period is over
+        expect(streaks).to_contain_text("Longest spending streak1 day (03/01/2025)")
+        # Average per day is $1.00; the 31st's $1 purchase is at it, so the run after the 10th lasts to the end.
+        expect(streaks).to_contain_text("Longest streak at or under average21 days (03/11/2025 – 03/31/2025)")
 
         records = page.locator("#statsRecords")
         expect(records).to_contain_text("Highest day$20.00 on 03/10/2025")
@@ -728,10 +737,41 @@ class BrowserTests(unittest.TestCase):
         expect(records).to_contain_text("Lowest full month$31.00 in March 2025")
 
         # Refunds count under their purchase's tag and merchant, regardless of the refund's own merchant.
+        page.click('[data-stats-tab="places"]')
         expect(page.locator("#statsTagsTable tbody tr", has_text="groceries")).to_contain_text("$20.00$5.00$15.00")
         expect(page.locator("#statsTagsTable tbody tr", has_text="Untagged")).to_contain_text("3$16.00$0.00$16.00")
         expect(page.locator("#statsMerchantsTable tbody tr").first).to_contain_text("Market3$31.00$5.00$26.00$10.33")
         expect(page.locator("#statsMerchantsTable")).not_to_contain_text("Returned desk")
+        # Merchant loyalty: Market's three visits fall on three days, 9 and 21 days apart (15 on average).
+        expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("Market3")
+        expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("1 of 1")
+        expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("15 days")
+
+        # Trends: purchase sizes and the running total against February.
+        page.click('[data-stats-tab="trends"]')
+        expect(page.locator("#sizeTable tbody tr").first).to_contain_text("Under $10250%$6.0016.7%")  # the $5 and $1 purchases
+        expect(page.locator("#sizeSummary")).to_contain_text("Median purchase$7.50")
+        expect(page.locator("#runningKey .chart-key-item")).to_have_text(["March 2025", "February 2025"])
+        expect(page.locator("#runningNote")).to_contain_text("By day 31: $31.00, $31.00 more than February 2025")
+
+        # Heatmaps: the year grid marks March 10 darkest, and an empty day cannot be selected.
+        page.click('[data-stats-tab="heatmaps"]')
+        self.pick(page, "#heatYear", "2025")
+        expect(page.locator('#yearHeatmap [data-date="2025-03-10"]')).to_have_class(re.compile(r"\bh4\b"))
+        expect(page.locator('#yearHeatmap span[data-date="2025-03-11"]')).to_have_count(1)
+        expect(page.locator('#monthYearHeatmap [data-month="2025-03"]')).to_have_text("$31")
+        expect(page.locator("#labelMonthHeatmap")).to_contain_text("groceries")
+        self.shot(page, "stats-heatmaps")
+        page.locator('#yearHeatmap button[data-date="2025-03-10"]').click()
+        expect(page.locator("#dayDialogTitle")).to_contain_text("03/10/2025")
+        page.locator("#dayDialog button", has_text="Close").click()
+
+        # Compare March with February: everything in March is new.
+        page.click('[data-stats-tab="compare"]')
+        self.pick(page, "#compareA", "March 2025")
+        self.pick(page, "#compareB", "February 2025")
+        expect(page.locator("#compareTable tbody tr", has_text="Net spent")).to_contain_text("$31.00$0.00+$31.00")
+        page.click('[data-stats-tab="overview"]')
 
         # Periods are check items: two months together count only their own days.
         self.choose_checks(page, "#statsPeriodSelect", ["March 2025", "February 2025"])

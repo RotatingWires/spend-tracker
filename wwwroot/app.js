@@ -10,6 +10,10 @@ const state = {
   timeFrame: { all: false, months: [] },
   statsPeriod: ['all'],
   statsChart: savedChartMeasures(),
+  // The Stats sub-tab, and the choices on the Heatmaps and Compare sub-tabs.
+  statsTab: readSetting('spend-tracker-stats-tab') || 'overview',
+  heat: { measure: 'net', year: null, rows: 'tags' },
+  compare: { a: null, b: null },
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
   includeGifts: readSetting('spend-tracker-include-gifts') === 'true',
   loading: null

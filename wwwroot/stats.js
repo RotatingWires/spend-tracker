@@ -274,6 +274,18 @@ function renderStats() {
   $('#statsContent').hidden = empty;
   if (empty) return;
 
+  if (!$(`[data-stats-panel="${state.statsTab}"]`)) state.statsTab = 'overview';
+  $$('[data-stats-tab]').forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.statsTab === state.statsTab)));
+  $$('[data-stats-panel]').forEach(panel => { panel.hidden = panel.dataset.statsPanel !== state.statsTab; });
+  // Only the visible sub-tab is drawn: charts need their real width, and the rest is redrawn when its tab opens.
+  if (state.statsTab === 'heatmaps') renderHeatmaps(stats);
+  else if (state.statsTab === 'trends') renderTrends(stats);
+  else if (state.statsTab === 'compare') renderCompare();
+  else if (state.statsTab === 'places') renderPlaces(stats);
+  else renderOverview(stats);
+}
+
+function renderOverview(stats) {
   $('#statsTotals').replaceChildren(
     statCard('Spent', formatMoney(stats.spent), { sub: plural(stats.purchases.length, 'purchase'), title: 'Total of every purchase dated in this period.' }),
     statCard('Refunds', formatMoney(stats.refunded), { title: 'Total of every refund dated in this period, counted on the refund date.' }),
@@ -294,9 +306,19 @@ function renderStats() {
     ['Average per day', averageMoney(stats.net, stats.countedDays), 'Net spent divided by every counted day, including days with no purchases.'],
     ['Average per spending day', averageMoney(stats.net, stats.spendingDays), 'Net spent divided only by days with at least one purchase.'],
     ['Spending days', `${numberFormat.format(stats.spendingDays)} (${share(stats.spendingDays, stats.countedDays)})`, 'Days with at least one purchase.'],
-    ['No-spend days', numberFormat.format(stats.noSpendDays), 'Counted days with no purchases. Refunds and paybacks do not count as spending.'],
+    ['No-spend days', numberFormat.format(stats.noSpendDays), 'Counted days with no purchases. Refunds and paybacks do not count as spending.']
+  ]);
+
+  const average = stats.countedDays ? stats.net / stats.countedDays : 0;
+  const spendingRun = longestRun(stats, day => (day?.purchases ?? 0) > 0);
+  const underRun = longestRun(stats, day => (day?.net ?? 0) <= average);
+  const runText = run => (run.length ? `${plural(run.length, 'day')} (${formatDateRange(run.start, run.end)})` : '0 days');
+  renderMetrics($('#statsStreaks'), [
     ['Longest no-spend streak', stats.longestNoSpend ? `${plural(stats.longestNoSpend, 'day')} (${formatDateRange(...stats.longestNoSpendRange)})` : '0 days', 'Most consecutive counted days without a purchase.'],
-    ...(stats.currentNoSpend == null ? [] : [['Current no-spend streak', plural(stats.currentNoSpend, 'day'), 'Consecutive days up to today without a purchase.']])
+    ...(stats.currentNoSpend == null ? [] : [['Current no-spend streak', plural(stats.currentNoSpend, 'day'), 'Consecutive days up to today without a purchase.']]),
+    ['Longest spending streak', runText(spendingRun), 'Most consecutive counted days with at least one purchase each.'],
+    ...(spendingRun.current == null ? [] : [['Current spending streak', plural(spendingRun.current, 'day'), 'Consecutive days up to today with at least one purchase each.']]),
+    ['Longest streak at or under average', runText(underRun), `Most consecutive counted days whose net spent was at or under the period's average per day (${averageMoney(stats.net, stats.countedDays)}).`]
   ]);
 
   renderMetrics($('#statsRecords'), [
@@ -309,6 +331,32 @@ function renderStats() {
 
   renderStatsChart(stats);
   renderStatsTables(stats);
+}
+
+/**
+ * The longest run of counted days that pass test(day bucket or undefined), with its dates, and the run still going
+ * today (null when the period is over). A run does not carry across the gap between two checked periods.
+ */
+function longestRun(stats, test) {
+  let run = 0;
+  let best = { length: 0, start: null, end: null };
+  for (let number = dayNumber(stats.range.start); stats.countedDays > 0 && number <= dayNumber(stats.countedEnd); number++) {
+    const key = keyFromDayNumber(number);
+    if (!stats.included(key) || !test(stats.days.get(key))) {
+      run = 0;
+      continue;
+    }
+    run++;
+    if (run > best.length) best = { length: run, start: addDays(key, 1 - run), end: key };
+  }
+  return { ...best, current: stats.countedEnd === todayKey() ? run : null };
+}
+
+/** Shows the chosen Stats sub-tab and remembers it in this browser. */
+function showStatsTab(name) {
+  state.statsTab = name;
+  writeSetting('spend-tracker-stats-tab', name);
+  renderStats();
 }
 
 /**
@@ -381,11 +429,17 @@ function renderStatsTables(stats) {
       return { cells: [name, numberFormat.format(weekday.purchases), formatMoney(weekday.net), averageMoney(weekday.net, weekday.occurrences)] };
     }));
 
+}
+
+/** People, tags, collections, and merchants on the People & Places sub-tab. */
+function renderBreakdowns(stats) {
   renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true });
   renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged' });
   renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection' });
   renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits' });
+}
 
+function renderMonthsTable(stats) {
   renderTable($('#statsMonthsTable'),
     [{ label: 'Month' }, { label: 'Purchases', num: true }, { label: 'Spent', num: true }, { label: 'Refunds', num: true }, { label: 'Net', num: true }, { label: 'Change', num: true, title: 'Net compared with the month before.' }, { label: 'Paid Back', num: true }],
     [...stats.months].reverse().map((month, index, list) => {
@@ -452,4 +506,7 @@ function initializeStats() {
     },
     summary: names => (names.length > 3 ? `${names.length} periods` : names.join(', '))
   });
+  $$('[data-stats-tab]').forEach(tab => tab.addEventListener('click', () => showStatsTab(tab.dataset.statsTab)));
+  initializeHeatmaps();
+  initializeCompare();
 }

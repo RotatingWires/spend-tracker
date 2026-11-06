@@ -43,6 +43,11 @@
   --heat-2: #6f9bb5;
   --heat-3: #2d6587;
   --heat-4: #003b5c;
+  --heat-0-text: var(--ink);
+  --heat-1-text: var(--ink);
+  --heat-2-text: var(--ink);
+  --heat-3-text: #fff;
+  --heat-4-text: #fff;
 }
 
 :root[data-theme-effective="dark"] {
@@ -88,4 +93,9 @@
   --heat-2: #3f6f8d;
   --heat-3: #5b91b2;
   --heat-4: #86bde0;
+  --heat-0-text: #d7d7d7;
+  --heat-1-text: #fff;
+  --heat-2-text: #fff;
+  --heat-3-text: #fff;
+  --heat-4-text: #101010;
 }
