@@ -211,6 +211,9 @@ button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1
 .toolbar-group { display: flex; align-items: center; gap: 5px; }
 .toolbar-separator { width: 2px; height: 24px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--light-edge); margin: 0 3px; }
 .icon-button { min-width: 30px; padding: 4px 7px; }
+/* The month arrows match the Time frame dropdown between them exactly, in every browser. */
+#monthControls .icon-button, #monthControls .retro-select { box-sizing: border-box; height: 30px; }
+#monthControls .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0; }
 
 /* ---------- controls ---------- */
 
@@ -299,6 +302,11 @@ button:disabled { color: var(--shadow); cursor: default; }
   z-index: 2;
 }
 
+/*
+ * At fractional display scaling (a Windows laptop at 125% or 150%, or browser zoom), Chromium can draw this scrolling
+ * area one device pixel off whenever something in an open dialog repaints, so the page behind it jumps by 1px. Its own
+ * permanent layer keeps the rounding the same every time.
+ */
 .workspace {
   flex: 1 1 0;
   padding: 8px;
@@ -306,6 +314,7 @@ button:disabled { color: var(--shadow); cursor: default; }
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  will-change: transform;
 }
 .section-title {
   font-weight: 700;
@@ -421,21 +430,31 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
   overflow-y: hidden;
 }
 .chart-frame canvas { display: block; width: 100%; min-width: 600px; height: 220px; }
+/* Hover/tap help and chart tooltips, as in TaskList Stats: help on the note color, charts on their own tokens. */
+.help-tooltip,
 .chart-tooltip {
   position: fixed;
   z-index: 1000;
-  max-width: min(320px, calc(100vw - 20px));
-  padding: 6px 8px;
-  color: var(--ink);
-  background: var(--note);
+  max-width: min(360px, calc(100vw - 20px));
+  padding: 7px 9px;
   border-top: 2px solid var(--light-edge);
   border-left: 2px solid var(--light-edge);
   border-right: 2px solid var(--dark-edge);
   border-bottom: 2px solid var(--dark-edge);
   box-shadow: 1px 1px 0 var(--black);
-  font-size: 13px;
+  font: 13px Tahoma, "MS Sans Serif", Arial, sans-serif;
+  line-height: 1.4;
   white-space: pre-line;
   pointer-events: none;
+}
+.help-tooltip { background: var(--note); color: var(--ink); }
+.chart-tooltip {
+  background: var(--chart-tooltip-surface);
+  color: var(--chart-tooltip-text);
+  border-top-color: var(--chart-tooltip-light-edge);
+  border-left-color: var(--chart-tooltip-light-edge);
+  border-right-color: var(--chart-tooltip-dark-edge);
+  border-bottom-color: var(--chart-tooltip-dark-edge);
 }
 
 /* ---------- calendar ---------- */

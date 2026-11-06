@@ -318,7 +318,7 @@ function scopeNumbers(tx) {
 function transactionRequest(tx, changes = {}) {
   return {
     kind: tx.kind, date: tx.date, amountCents: tx.amountCents, paymentMethodId: tx.paymentMethodId, personId: tx.personId,
-    linkedId: tx.linkedId, merchant: tx.merchant, description: tx.description, note: tx.note, tagIds: tx.tagIds, eventIds: tx.eventIds,
+    linkedId: tx.linkedId, merchantId: tx.merchantId, description: tx.description, note: tx.note, tagIds: tx.tagIds, eventIds: tx.eventIds,
     shares: tx.shares.map(share => ({ personId: share.personId, amountCents: share.amountCents })), archived: tx.archived,
     ...changes
   };

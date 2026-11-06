@@ -104,6 +104,14 @@ class BrowserTests(unittest.TestCase):
                 item.click()
         page.keyboard.press("Escape")
 
+    def merchant_id(self, name):
+        """The ID of the merchant with this name, adding it through the API if needed; "" means no merchant."""
+        if not name:
+            return None
+        api = self.api_client()
+        found = next((m["id"] for m in api.get("/api/snapshot")["merchants"] if m["name"] == name), None)
+        return found or api.post("/api/merchants", {"name": name})["id"]
+
     def add_transaction(self, page, kind="Purchase", amount=None, merchant=None, description=None, people=None, person=None, linked=None):
         """Fills only the given fields, so values the editor copies from a linked purchase are kept."""
         page.click("#newTransactionButton")
@@ -114,7 +122,9 @@ class BrowserTests(unittest.TestCase):
             self.pick(page, "#txPerson", person)
         if linked:
             self.pick(page, "#txLinked", linked)
-        for selector, value in (("#txAmount", amount), ("#txMerchant", merchant), ("#txDescription", description)):
+        if merchant:
+            self.pick(page, "#txMerchant", merchant)
+        for selector, value in (("#txAmount", amount), ("#txDescription", description)):
             if value is not None:
                 page.fill(selector, value)
         page.click("#txSaveButton")
@@ -133,12 +143,17 @@ class BrowserTests(unittest.TestCase):
         page.fill('form[data-add="tags"] input', "food")
         page.click('form[data-add="tags"] button')
         expect(page.locator("#tagsTable")).to_contain_text("food")
+        # Merchants are added here too; the editor only chooses from them.
+        for name in ("BK", "Diner", "After backup"):
+            page.fill('form[data-add="merchants"] input', name)
+            page.click('form[data-add="merchants"] button')
+            expect(page.locator("#merchantsTable")).to_contain_text(name)
 
         # Transactions: purchase for me (with a tag), purchase for Alex, refund, payback.
         page.click('.tabs [data-tab="transactions"]')
         page.click("#newTransactionButton")
         page.fill("#txAmount", "12.17")
-        page.fill("#txMerchant", "BK")
+        self.pick(page, "#txMerchant", "BK")
         page.fill("#txDescription", "food")
         expect(page.locator("#txNewTag")).to_have_count(0)  # tags are only created under Manage
         self.set_checks(page, "#txTags", ["food"])
@@ -249,10 +264,11 @@ class BrowserTests(unittest.TestCase):
 
     def test_split_purchase_in_editor(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.merchant_id("Pizza")
         self.log_in(page)
         page.click("#newTransactionButton")
         page.fill("#txAmount", "30.01")
-        page.fill("#txMerchant", "Pizza")
+        self.pick(page, "#txMerchant", "Pizza")
         self.set_checks(page, "#txPeople", ["Me", "Alex"])
         expect(page.locator("#txShares")).to_be_visible()
         page.locator("#txShares button", has_text="Split Evenly").click()
@@ -285,7 +301,7 @@ class BrowserTests(unittest.TestCase):
         def add(kind, date, cents, merchant, linked=None, events=()):
             return api.post("/api/transactions", {
                 "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": card, "personId": None if kind == "Purchase" else me,
-                "linkedId": linked, "merchant": merchant, "description": "", "note": "", "tagIds": [], "eventIds": list(events),
+                "linkedId": linked, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [], "eventIds": list(events),
                 "shares": [{"personId": me, "amountCents": cents}] if kind == "Purchase" else []})
 
         # January and February 2024 belong to this test alone; amounts stay large for the Stats test's lowest month.
@@ -322,6 +338,13 @@ class BrowserTests(unittest.TestCase):
         row.locator("button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
         expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
+        # Stats lists people, tags, events, and merchants in the same table layout; a row opens its numbered list.
+        expect(page.locator("#statsEventsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
+        expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
+        self.shot(page, "stats-event")
+        page.locator("#statsMerchantsTable tbody tr", has_text="Hotel").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
+        page.locator("#scopeDialog button", has_text="Close").click()
 
         # New Transaction... stands out, and purchases choose events like tags.
         page.click('.tabs [data-tab="transactions"]')
@@ -348,7 +371,7 @@ class BrowserTests(unittest.TestCase):
         def buy(date, cents, merchant):
             return api.post("/api/transactions", {
                 "kind": "Purchase", "date": date, "amountCents": cents, "paymentMethodId": cash, "personId": None, "linkedId": None,
-                "merchant": merchant, "description": "", "note": "", "tagIds": [], "shares": [{"personId": me, "amountCents": cents}]})
+                "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [], "shares": [{"personId": me, "amountCents": cents}]})
 
         # June 2024 is used by no other test. Amounts are large so they never become another test's lowest month.
         first, second, third = buy("2024-06-01", 10000, "Hardware"), buy("2024-06-02", 20000, "Bakery"), buy("2024-06-03", 30001, "Garage")
@@ -378,7 +401,7 @@ class BrowserTests(unittest.TestCase):
         # A rule the server enforces skips that entry, says why, and leaves it selected.
         api.post("/api/transactions", {
             "kind": "Payback", "date": "2024-06-04", "amountCents": 15000, "paymentMethodId": cash, "personId": riley, "linkedId": third["id"],
-            "merchant": "", "description": "Venmo", "note": "", "tagIds": [], "shares": []})
+            "merchantId": None, "description": "Venmo", "note": "", "tagIds": [], "shares": []})
         page.click("#fileMenuButton")
         page.click("#refreshButton")
         for tx in (first, second, third):
@@ -473,12 +496,12 @@ class BrowserTests(unittest.TestCase):
             shares = [{"personId": person, "amountCents": cents}] if kind == "Purchase" else []
             return api.post("/api/transactions", {
                 "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": method, "personId": None if kind == "Purchase" else person,
-                "linkedId": linked, "merchant": merchant, "description": "x", "note": "", "tagIds": list(tags), "shares": shares})
+                "linkedId": linked, "merchantId": self.merchant_id(merchant), "description": "x", "note": "", "tagIds": list(tags), "shares": shares})
 
         # March 2025 has 31 days. Purchases on the 1st, 10th, and 31st; a refund on the 12th is not spending.
         add("Purchase", "2025-03-01", 1000, cash, me, merchant="Market")
         add("Purchase", "2025-03-01", 500, card, friend, merchant="Cafe")
-        big = add("Purchase", "2025-03-10", 2000, card, me, merchant="market", tags=[groceries])
+        big = add("Purchase", "2025-03-10", 2000, card, me, merchant="Market", tags=[groceries])
         add("Refund", "2025-03-12", 500, card, me, linked=big["id"], merchant="Returned desk")
         add("Purchase", "2025-03-31", 100, cash, me, merchant="Market")
 
@@ -507,7 +530,7 @@ class BrowserTests(unittest.TestCase):
         expect(records).to_contain_text("Highest week$15.00 (03/01/2025 – 03/02/2025)")  # clipped Mon 02/24 week
         expect(records).to_contain_text("Lowest full month$31.00 in March 2025")
 
-        # Refunds count under their purchase's tag and merchant, regardless of the refund's own merchant text.
+        # Refunds count under their purchase's tag and merchant, regardless of the refund's own merchant.
         expect(page.locator("#statsTagsTable tbody tr", has_text="groceries")).to_contain_text("$20.00$5.00$15.00")
         expect(page.locator("#statsTagsTable tbody tr", has_text="Untagged")).to_contain_text("3$16.00$0.00$16.00")
         expect(page.locator("#statsMerchantsTable tbody tr").first).to_contain_text("Market3$31.00$5.00$26.00$10.33")

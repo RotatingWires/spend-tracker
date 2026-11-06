@@ -252,7 +252,7 @@ function initializeRowHover() {
 function initializeTooltips() {
   // Touch screens have no hover, so tapping an underlined label shows its definition.
   const popup = document.createElement('div');
-  popup.className = 'chart-tooltip';
+  popup.className = 'help-tooltip';
   popup.hidden = true;
   document.body.append(popup);
   document.addEventListener('click', event => {

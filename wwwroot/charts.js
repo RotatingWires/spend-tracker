@@ -24,8 +24,9 @@ const Charts = (() => {
     tooltip.hidden = false;
     const width = tooltip.offsetWidth;
     const height = tooltip.offsetHeight;
-    tooltip.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2))}px`;
-    tooltip.style.top = `${y - height - 12 < 8 ? y + 16 : y - height - 12}px`;
+    // Below the pointer, as in TaskList Stats, or above it near the bottom of the window.
+    tooltip.style.left = `${Math.max(10, Math.min(window.innerWidth - width - 10, x - width / 2))}px`;
+    tooltip.style.top = `${y + 12 + height + 10 > window.innerHeight ? Math.max(10, y - height - 12) : y + 12}px`;
   }
 
   /** Rounds a raw gridline spacing (in cents) up to 1, 2, 2.5, or 5 times a power of ten dollars-and-cents. */

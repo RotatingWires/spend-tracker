@@ -26,6 +26,10 @@
   --chart-axis: #808080;
   --chart-grid: #e0e0e0;
   --chart-bar: #000080;
+  --chart-tooltip-surface: #111;
+  --chart-tooltip-text: #fff;
+  --chart-tooltip-light-edge: #555;
+  --chart-tooltip-dark-edge: #000;
 
   --heat-0: #d7d7d7;
   --heat-1: #b7cbd8;
@@ -60,6 +64,10 @@
   --chart-axis: #777;
   --chart-grid: #333;
   --chart-bar: #8fa8ff;
+  --chart-tooltip-surface: #e8e8e8;
+  --chart-tooltip-text: #111;
+  --chart-tooltip-light-edge: #fff;
+  --chart-tooltip-dark-edge: #777;
 
   --heat-0: #242424;
   --heat-1: #30485a;

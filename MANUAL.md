@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.5.0 Manual
+# SpendTracker v0.6.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, events you put on purchases, an edit history, and statistics.
 
@@ -33,7 +33,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **People ledger** showing what each person owes you, purchase by purchase.
 - **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the events of each day's entries.
 - **Events**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
-- **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, person, tag, merchant, weekday, and month.
+- **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, weekday, person, tag, event, merchant, and month.
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -68,7 +68,7 @@ wwwroot/
   people.js             people balances and person detail
   events.js             events tab: totals per event
   history.js            history log rendering
-  manage.js             payment methods, people, tags, and merchants
+  manage.js             payment methods, people, tags, events, and merchants
   bulk.js               selection mode and bulk actions in the ledger
   scopes.js             numbered list of one person, tag, merchant, or payment method
   ui.js                 startup, tabs, toolbar, menus, backup/restore, session
@@ -151,7 +151,7 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 
 ### Merchants
 
-A merchant is created the first time you save a transaction with a new merchant name; names match ignoring case, so *diner* and *Diner* are the same merchant and the first spelling is kept. The editor suggests your active merchants, most used first. Under **Manage → Merchants** you can add, rename (every entry follows, since entries store the merchant's ID), archive, and delete unused merchants. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
+Merchants are managed like tags and people: add them under **Manage → Merchants** (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
 
 ### Events
 
@@ -181,7 +181,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 - **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid.
 - **Tags** is a dropdown of check items, so a purchase can have several. Tags are created, renamed, archived, and deleted only under **Manage**.
 - **Events** works the same way as Tags, for events created under **Manage → Events**.
-- **Merchant** suggests your active merchants; a new name becomes a new merchant when you save. An archived merchant can stay on entries that already have it but is refused for others.
+- **Merchant** is a dropdown of your active merchants, like payment methods, plus **No merchant**. Merchants are added under **Manage → Merchants**. An archived merchant can stay on entries that already have it but is not offered for others.
 - Errors from the server are shown in the dialog exactly as returned; nothing is saved until the server accepts the entry.
 
 ### Selecting several entries
@@ -195,7 +195,7 @@ The split button's main action is **Archive** (or **Restore** when every selecte
 | **Archive** / **Restore** | hides or lists the entries | already archived / not archived |
 | **Add Tag...** / **Remove Tag...** | adds or removes one tag | not a purchase, or already has / lacks the tag |
 | **Add Person...** / **Remove Person...** | adds or removes one person, then **splits the purchase evenly** between everyone left on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
-| **Set Merchant...** | sets one merchant, chosen from a dropdown of your active merchants like tags and people (**No merchant** clears it; new merchants come from the editor or Manage) | already has that merchant |
+| **Set Merchant...** | sets one merchant, chosen from a dropdown of your active merchants like tags and people (**No merchant** clears it; merchants are added under Manage) | already has that merchant |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
 
 Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Skipped entries stay selected.
@@ -264,13 +264,19 @@ All statistics cover the selected period. A transaction is in a period when its 
 Breakdown tables:
 
 - **By Payment Method:** purchases, spent, refunds, and net per method, and each method's share of spent.
-- **By Person:** for each person, the purchases they had a share of and the total of their shares, refunds on their shares, net, and paybacks from them.
-- **By Tag:** purchases, spent, refunds, and net per tag, plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
 - **Day of Week:** purchases and net per weekday, and the average per occurrence of that weekday in the counted days.
-- **Merchants:** visits (purchases), spent, refunds, net, average purchase, and last purchase date. Merchant names are grouped ignoring capitalization and shown with their latest spelling. Refunds count under their purchase's merchant.
+
+**People**, **Tags**, **Events**, and **Merchants** share one layout, highest net first: purchases (*visits* for merchants), spent, refunds, net, average purchase, and last purchase date. Select a row for that person's, tag's, event's, or merchant's numbered list of entries.
+
+- **People:** each person's purchases and the total of their shares (a split purchase counts each person's own share), refunds on their shares, and **Paid Back** (paybacks from them).
+- **Tags:** plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
+- **Events:** plus **No event**, the same way as tags.
+- **Merchants:** grouped by merchant ID, so a renamed merchant keeps its whole history under its current name, plus *(no merchant)*.
+
+Refunds count under the tags, events, and merchant of their purchase.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
-The chart shows net spent per day for periods of 62 counted days or fewer, otherwise net spent per month.
+The chart shows net spent per day for periods of 62 counted days or fewer, otherwise net spent per month. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
 
 ## Data and backups
 
@@ -378,7 +384,7 @@ A transaction body is:
   "paymentMethodId": 2,
   "personId": null,
   "linkedId": null,
-  "merchant": "BK",
+  "merchantId": 4,
   "description": "food",
   "note": "",
   "tagIds": [3],
@@ -388,7 +394,7 @@ A transaction body is:
 }
 ```
 
-`merchant` is a name: an existing merchant is matched ignoring case, a new name creates a merchant, and an empty string means none. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchantId`, `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, …]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
+`merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, …]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
 
 Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares`; refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `eventIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
 
@@ -458,6 +464,14 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.6.0
+
+- **Merchant is a dropdown** in the editor, like payment methods and tags, with **No merchant**; merchants are added and managed only under **Manage → Merchants**. The API takes `merchantId` instead of a merchant name.
+- **Stats** lists **People**, **Tags**, **Events**, and **Merchants** in the same table layout (purchases, spent, refunds, net, average purchase, last purchase); selecting a row opens its numbered list.
+- The chart tooltip matches TaskList Stats: its colors (light in the Dark theme), font, and position below the pointer. Hover help popups keep the note color.
+- The Time frame ◀ / ▶ buttons are exactly the dropdown's height.
+- **Fixed: the page behind the transaction editor jumped by a pixel** when hovering or clicking in the editor on Windows at fractional scaling (Brave/Chrome). The Merchant box's suggestion arrow, which triggered most of it, is gone with the dropdown, and the scrolling area behind dialogs now keeps one stable layer.
 
 ### v0.5.0
 

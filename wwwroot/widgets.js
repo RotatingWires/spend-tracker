@@ -315,15 +315,13 @@ function confirmAction(title, message, okLabel = 'OK', { detail = '', notice = f
   });
 }
 
-/** Asks for a line of text. suggestions names a <datalist>; maxLength matches the server's limit for that field. */
-function promptText(title, label, value = '', { maxLength = 60, suggestions = null } = {}) {
+/** Asks for a line of text. maxLength matches the server's limit for that field. */
+function promptText(title, label, value = '', { maxLength = 60 } = {}) {
   const dialog = $('#promptDialog');
   const input = $('#promptInput');
   $('#promptTitle').textContent = title;
   $('#promptLabel').textContent = label;
   input.maxLength = maxLength;
-  if (suggestions) input.setAttribute('list', suggestions);
-  else input.removeAttribute('list');
   input.value = value;
   dialog.returnValue = '';
   dialog.showModal();

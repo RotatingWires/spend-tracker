@@ -97,12 +97,12 @@
           <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
           <div class="two-column">
             <fieldset class="groupbox"><legend>By Payment Method</legend><div class="table-wrap"><table id="statsMethodsTable"></table></div></fieldset>
-            <fieldset class="groupbox"><legend>By Person</legend><div class="table-wrap"><table id="statsPeopleTable"></table></div></fieldset>
-          </div>
-          <div class="two-column">
-            <fieldset class="groupbox"><legend>By Tag</legend><div class="note">A purchase with two tags counts toward both, so tag totals can add up to more than total spent.</div><div class="table-wrap"><table id="statsTagsTable"></table></div></fieldset>
             <fieldset class="groupbox"><legend>Day of Week</legend><div class="table-wrap"><table id="statsWeekdayTable"></table></div></fieldset>
           </div>
+          <div class="note">Select a person, tag, event, or merchant below to list its entries.</div>
+          <fieldset class="groupbox"><legend>People</legend><div class="note">For a split purchase, each person counts their own share.</div><div class="table-wrap"><table id="statsPeopleTable"></table></div></fieldset>
+          <fieldset class="groupbox"><legend>Tags</legend><div class="note">A purchase with two tags counts toward both, so tag totals can add up to more than total spent.</div><div class="table-wrap"><table id="statsTagsTable"></table></div></fieldset>
+          <fieldset class="groupbox"><legend>Events</legend><div class="note">A purchase in two events counts toward both.</div><div class="table-wrap"><table id="statsEventsTable"></table></div></fieldset>
           <fieldset class="groupbox"><legend>Merchants</legend><div class="table-wrap"><table id="statsMerchantsTable"></table></div></fieldset>
           <fieldset class="groupbox"><legend>Months</legend><div class="table-wrap"><table id="statsMonthsTable"></table></div></fieldset>
         </div>
@@ -147,7 +147,7 @@
         </fieldset>
         <fieldset class="groupbox">
           <legend>Merchants</legend>
-          <div class="note">Typing a new merchant on a transaction adds it here when you save.</div>
+          <div class="note">Merchants added here are offered in the Merchant dropdown of the editor.</div>
           <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant" aria-label="New merchant name" required><button type="submit">Add</button></form>
           <div class="table-wrap"><table id="merchantsTable"></table></div>
         </fieldset>
@@ -187,8 +187,8 @@
           <span class="form-label" id="txMethodLabel">Paid with</span>
           <div id="txMethod" aria-labelledby="txMethodLabel"></div>
 
-          <label for="txMerchant">Merchant</label>
-          <input id="txMerchant" class="retro-input" type="text" maxlength="120" autocomplete="off" list="merchantList" placeholder="Where (e.g. a store)">
+          <span class="form-label" id="txMerchantLabel">Merchant</span>
+          <div id="txMerchant" aria-labelledby="txMerchantLabel"></div>
 
           <label for="txDescription">What</label>
           <input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was">
@@ -213,7 +213,6 @@
       </div>
     </form>
   </dialog>
-  <datalist id="merchantList"></datalist>
 
   <dialog id="dayDialog" class="retro-dialog wide" aria-labelledby="dayDialogTitle">
     <form method="dialog" class="dialog-window">

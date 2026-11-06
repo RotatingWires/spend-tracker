@@ -138,28 +138,15 @@ function computeStats(range) {
 
   result.byMethod = groupBy(transactions, tx => tx.paymentMethodId);
   result.byPerson = groupByPerson(transactions);
-  result.byTag = new Map();
-  result.untagged = { purchases: 0, spent: 0, refunded: 0 };
-  for (const tx of [...purchases, ...refunds]) {
-    const tagIds = tagIdsOf(tx);
-    const buckets = tagIds.length ? tagIds.map(id => {
-      if (!result.byTag.has(id)) result.byTag.set(id, { purchases: 0, spent: 0, refunded: 0 });
-      return result.byTag.get(id);
-    }) : [result.untagged];
-    for (const bucket of buckets) addToBucket(bucket, tx);
-  }
-
+  // Refunds count under the tags, events, and merchant of the purchase they refund.
+  const spending = transactions.filter(tx => tx.kind !== 'Payback');
+  result.byTag = groupByIds(spending, tagIdsOf);
+  result.byEvent = groupByIds(spending, eventIdsOf);
   // Grouped by merchant ID, so a renamed merchant keeps its whole history under its current name.
-  result.merchants = new Map();
-  for (const tx of [...purchases, ...refunds]) {
+  result.byMerchant = groupByIds(spending, tx => {
     const source = tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId) ?? tx : tx;
-    const key = source.merchantId ?? 'none';
-    const name = source.merchantId == null ? '(no merchant)' : state.model.merchants.get(source.merchantId)?.name ?? source.merchant;
-    const entry = result.merchants.get(key) ?? { name, purchases: 0, spent: 0, refunded: 0, last: null };
-    if (tx.kind === 'Purchase') entry.last = tx.date;
-    addToBucket(entry, tx);
-    result.merchants.set(key, entry);
-  }
+    return source.merchantId == null ? [] : [source.merchantId];
+  });
 
   result.weekdays = WEEKDAYS.map(() => ({ purchases: 0, net: 0, occurrences: 0 }));
   for (let number = dayNumber(range.start); countedDays > 0 && number <= dayNumber(countedEnd); number++)
@@ -177,10 +164,27 @@ function largestOf(transactions) {
 }
 
 /** Each purchase counts once for every person with a share, with that share as their spent amount. */
+function newBucket() {
+  return { purchases: 0, spent: 0, refunded: 0, paidBack: 0, last: null };
+}
+
+/** Purchases and refunds per tag, event, or merchant, plus a bucket (key null) for entries with none. */
+function groupByIds(transactions, idsOf) {
+  const groups = new Map();
+  for (const tx of transactions) {
+    const ids = idsOf(tx);
+    for (const id of ids.length ? ids : [null]) {
+      if (!groups.has(id)) groups.set(id, newBucket());
+      addToBucket(groups.get(id), tx);
+    }
+  }
+  return groups;
+}
+
 function groupByPerson(transactions) {
   const groups = new Map();
   const bucket = personId => {
-    if (!groups.has(personId)) groups.set(personId, { purchases: 0, spent: 0, refunded: 0, paidBack: 0 });
+    if (!groups.has(personId)) groups.set(personId, newBucket());
     return groups.get(personId);
   };
   for (const tx of transactions) {
@@ -188,6 +192,7 @@ function groupByPerson(transactions) {
       for (const share of tx.shares) {
         bucket(share.personId).purchases++;
         bucket(share.personId).spent += share.amountCents;
+        bucket(share.personId).last = tx.date;
       }
     } else if (tx.kind === 'Refund') {
       bucket(tx.personId).refunded += tx.amountCents;
@@ -202,16 +207,18 @@ function groupBy(transactions, keyOf) {
   const groups = new Map();
   for (const tx of transactions) {
     const key = keyOf(tx);
-    if (!groups.has(key)) groups.set(key, { purchases: 0, spent: 0, refunded: 0, paidBack: 0 });
+    if (!groups.has(key)) groups.set(key, newBucket());
     addToBucket(groups.get(key), tx);
   }
   return groups;
 }
 
+/** Transactions arrive in date order, so the last purchase seen is the latest one. */
 function addToBucket(bucket, tx) {
   if (tx.kind === 'Purchase') {
     bucket.purchases++;
     bucket.spent += tx.amountCents;
+    bucket.last = tx.date;
   } else if (tx.kind === 'Refund') {
     bucket.refunded += tx.amountCents;
   } else if ('paidBack' in bucket) {
@@ -307,19 +314,6 @@ function renderStatsTables(stats) {
       .map(([id, g]) => ({ cells: [methodName(id), numberFormat.format(g.purchases), formatMoney(g.spent), formatMoney(g.refunded), formatMoney(g.spent - g.refunded), share(g.spent, stats.spent)] })),
     { empty: 'No purchases or refunds.' });
 
-  renderTable($('#statsPeopleTable'), [{ label: 'For Who' }, ...moneyColumns, { label: 'Paid Back', num: true }],
-    [...stats.byPerson]
-      .filter(([id]) => id != null)
-      .sort((a, b) => b[1].spent - a[1].spent)
-      .map(([id, g]) => ({ cells: [personName(id), numberFormat.format(g.purchases), formatMoney(g.spent), formatMoney(g.refunded), formatMoney(g.spent - g.refunded), formatMoney(g.paidBack)] })));
-
-  const tagRows = [...stats.byTag]
-    .sort((a, b) => (b[1].spent - b[1].refunded) - (a[1].spent - a[1].refunded))
-    .map(([id, g]) => ({ cells: [tagName(id), numberFormat.format(g.purchases), formatMoney(g.spent), formatMoney(g.refunded), formatMoney(g.spent - g.refunded)] }));
-  if (stats.untagged.purchases || stats.untagged.refunded)
-    tagRows.push({ cells: ['Untagged', numberFormat.format(stats.untagged.purchases), formatMoney(stats.untagged.spent), formatMoney(stats.untagged.refunded), formatMoney(stats.untagged.spent - stats.untagged.refunded)] });
-  renderTable($('#statsTagsTable'), [{ label: 'Tag' }, ...moneyColumns], tagRows);
-
   renderTable($('#statsWeekdayTable'),
     [{ label: 'Day' }, { label: 'Purchases', num: true }, { label: 'Net', num: true }, { label: 'Avg per Day', num: true, title: 'Net spent on this weekday divided by how many of this weekday are in the counted days.' }],
     WEEKDAY_NAMES.map((name, index) => {
@@ -327,10 +321,10 @@ function renderStatsTables(stats) {
       return { cells: [name, numberFormat.format(weekday.purchases), formatMoney(weekday.net), averageMoney(weekday.net, weekday.occurrences)] };
     }));
 
-  const merchants = [...stats.merchants.values()].sort((a, b) => (b.spent - b.refunded) - (a.spent - a.refunded));
-  renderTable($('#statsMerchantsTable'),
-    [{ label: 'Merchant' }, { label: 'Visits', num: true, title: 'Number of purchases.' }, { label: 'Spent', num: true }, { label: 'Refunds', num: true }, { label: 'Net', num: true }, { label: 'Avg Purchase', num: true }, { label: 'Last Purchase' }],
-    merchants.map(m => ({ cells: [m.name, numberFormat.format(m.purchases), formatMoney(m.spent), formatMoney(m.refunded), formatMoney(m.spent - m.refunded), averageMoney(m.spent, m.purchases), m.last ? formatDate(m.last) : '—'] })));
+  renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true });
+  renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged' });
+  renderBreakdown($('#statsEventsTable'), 'Event', 'event', stats.byEvent, { none: 'No event' });
+  renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits' });
 
   renderTable($('#statsMonthsTable'),
     [{ label: 'Month' }, { label: 'Purchases', num: true }, { label: 'Spent', num: true }, { label: 'Refunds', num: true }, { label: 'Net', num: true }, { label: 'Change', num: true, title: 'Net compared with the month before.' }, { label: 'Paid Back', num: true }],
@@ -346,6 +340,31 @@ function renderStatsTables(stats) {
         cells: [formatMonth(month.month) + (month.complete ? '' : ' (partial)'), numberFormat.format(month.purchases), formatMoney(month.spent), formatMoney(month.refunded), formatMoney(month.net), changeText, formatMoney(month.paidBack)]
       };
     }));
+}
+
+/**
+ * People, tags, events, and merchants share one table layout, highest net first. Selecting a row lists that scope's
+ * entries; the "none" row (untagged, no event, no merchant) is listed last and is not selectable.
+ */
+function renderBreakdown(table, label, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false } = {}) {
+  const net = group => group.spent - group.refunded;
+  const rows = [...groups]
+    .filter(([id, group]) => (id != null || none) && (group.purchases || group.refunded || group.paidBack))
+    .sort((a, b) => (a[0] == null) - (b[0] == null) || net(b[1]) - net(a[1]))
+    .map(([id, group]) => ({
+      onClick: id == null ? undefined : () => openScopeList(scope, id),
+      cells: [
+        id == null ? none : SCOPE_NAMES[scope](id),
+        numberFormat.format(group.purchases), formatMoney(group.spent), formatMoney(group.refunded), formatMoney(net(group)),
+        averageMoney(group.spent, group.purchases), group.last ? formatDate(group.last) : '—',
+        ...(paidBack ? [formatMoney(group.paidBack)] : [])
+      ]
+    }));
+  renderTable(table, [
+    { label }, { label: countLabel, num: true, title: 'Number of purchases.' }, { label: 'Spent', num: true }, { label: 'Refunds', num: true },
+    { label: 'Net', num: true }, { label: 'Avg Purchase', num: true }, { label: 'Last Purchase' },
+    ...(paidBack ? [{ label: 'Paid Back', num: true, title: 'Paybacks this person made to you in the period.' }] : [])
+  ], rows, { empty: 'No purchases or refunds.' });
 }
 
 function initializeStats() {

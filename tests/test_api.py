@@ -28,30 +28,37 @@ class SpendTrackerApiTests(unittest.TestCase):
 
     # ------------------------------------------------------------ helpers
 
-    def purchase(self, amount=1000, date="2026-10-01", person=None, method=None, shares=None, **extra):
+    def merchant_id(self, name):
+        """The ID of the merchant with this name, adding it under Manage first if needed; "" means no merchant."""
+        if not name:
+            return None
+        found = next((m["id"] for m in self.api.get("/api/snapshot")["merchants"] if m["name"] == name), None)
+        return found or self.api.post("/api/merchants", {"name": name})["id"]
+
+    def purchase(self, amount=1000, date="2026-10-01", person=None, method=None, shares=None, merchant="Store", **extra):
         """A purchase for one person (the whole amount), or split by shares=[(person, cents), ...]."""
         shares = [(person or self.me, amount)] if shares is None else shares
         body = {"kind": "Purchase", "date": date, "amountCents": amount, "paymentMethodId": method or self.card,
-                "personId": None, "linkedId": None, "merchant": "Store", "description": "", "note": "", "tagIds": [],
+                "personId": None, "linkedId": None, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [],
                 "shares": [{"personId": who, "amountCents": cents} for who, cents in shares]}
         body.update(extra)
         return self.api.post("/api/transactions", body)
 
-    def refund(self, purchase_id, amount, person=None, date="2026-10-05", **extra):
+    def refund(self, purchase_id, amount, person=None, date="2026-10-05", merchant="Store", **extra):
         body = {"kind": "Refund", "date": date, "amountCents": amount, "paymentMethodId": self.card,
-                "personId": person or self.me, "linkedId": purchase_id, "merchant": "Store", "description": "", "note": "", "tagIds": [], "shares": []}
+                "personId": person or self.me, "linkedId": purchase_id, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [], "shares": []}
         body.update(extra)
         return self.api.post("/api/transactions", body)
 
     def payback(self, amount, person=None, linked=None, date="2026-10-06"):
         return self.api.post("/api/transactions", {
             "kind": "Payback", "date": date, "amountCents": amount, "paymentMethodId": self.cash,
-            "personId": person or self.alex, "linkedId": linked, "merchant": "", "description": "Venmo", "note": "", "tagIds": [], "shares": []})
+            "personId": person or self.alex, "linkedId": linked, "merchantId": None, "description": "Venmo", "note": "", "tagIds": [], "shares": []})
 
     @staticmethod
     def editable(tx):
         """A saved transaction as a PUT body."""
-        return {k: tx[k] for k in ("kind", "date", "amountCents", "paymentMethodId", "personId", "linkedId", "merchant", "description", "note", "tagIds", "eventIds", "shares")}
+        return {k: tx[k] for k in ("kind", "date", "amountCents", "paymentMethodId", "personId", "linkedId", "merchantId", "description", "note", "tagIds", "eventIds", "shares")}
 
     def assertRejected(self, call, status=400, contains=None):
         with self.assertRaises(ApiError) as context:
@@ -163,7 +170,7 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertRejected(lambda: put({**base, "date": "2026-10-07"}), contains="dated before")
         self.assertRejected(lambda: put({**base, "kind": "Payback", "personId": self.alex, "shares": []}), contains="must stay a purchase")
         self.assertRejected(lambda: self.api.delete(f"/api/transactions/{bought['id']}"), contains="Delete those first")
-        edited = put({**base, "amountCents": 1500, "shares": [{"personId": self.alex, "amountCents": 1500}], "merchant": "Renamed"})
+        edited = put({**base, "amountCents": 1500, "shares": [{"personId": self.alex, "amountCents": 1500}], "merchantId": self.merchant_id("Renamed")})
         self.assertEqual((edited["amountCents"], edited["merchant"]), (1500, "Renamed"))
         self.assertIsNotNone(edited["updatedAt"])
 
@@ -303,14 +310,13 @@ class SpendTrackerApiTests(unittest.TestCase):
     def test_numbers_per_person_tag_and_merchant(self):
         food = self.api.post("/api/tags", {"name": "food"})["id"]
         first = self.purchase(shares=[(self.me, 600), (self.alex, 400)], tagIds=[food], merchant="Diner")
-        second = self.purchase(person=self.alex, merchant="diner")
+        second = self.purchase(person=self.alex, merchant="Diner")
         payback = self.payback(400, linked=first["id"])
 
         def numbers(tx):
             return {(n["scope"], n["scopeId"]): n["number"] for n in tx["numbers"]}
 
-        self.assertEqual(second["merchantId"], first["merchantId"], "merchant names match ignoring case")
-        self.assertEqual(second["merchant"], "Diner", "the first spelling is kept")
+        self.assertEqual(second["merchant"], "Diner", "responses name the merchant as well as its ID")
         self.assertEqual(numbers(first), {("person", self.me): 1, ("person", self.alex): 1, ("tag", food): 1, ("merchant", first["merchantId"]): 1, ("method", self.card): 1})
         self.assertEqual(numbers(second), {("person", self.alex): 2, ("merchant", first["merchantId"]): 2, ("method", self.card): 2})
         self.assertEqual(numbers(payback), {("person", self.alex): 3, ("method", self.cash): 1})
@@ -331,11 +337,12 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual(numbers(self.api.get("/api/snapshot")["transactions"][0]).get(("tag", food)), None)
 
     def test_merchants(self):
-        bought = self.purchase(merchant="  Corner Shop ")
-        merchant = bought["merchantId"]
-        self.assertEqual(bought["merchant"], "Corner Shop")
-        self.assertEqual([m["name"] for m in self.api.get("/api/snapshot")["merchants"]], ["Corner Shop"])
-        self.assertEqual(self.history()[1]["entity"], "Merchant", "typing a new merchant records it before the transaction")
+        # Merchants are added under Manage and chosen by ID, like payment methods.
+        merchant = self.api.post("/api/merchants", {"name": "  Corner Shop "})["id"]
+        bought = self.purchase(merchant="Corner Shop")
+        self.assertEqual((bought["merchantId"], bought["merchant"]), (merchant, "Corner Shop"))
+        self.assertRejected(lambda: self.purchase(merchant=None, merchantId=999), contains="no longer exists")
+        self.assertRejected(lambda: self.api.post("/api/transactions", {**self.editable(bought), "merchant": "Corner Shop"}), contains="merchant")  # names are not accepted
 
         renamed = self.api.patch(f"/api/merchants/{merchant}", {"name": "Corner Store"})
         self.assertEqual(renamed["name"], "Corner Store")
@@ -344,14 +351,14 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertRejected(lambda: self.api.delete(f"/api/merchants/{merchant}"), contains="Archive it instead")
 
         self.api.patch(f"/api/merchants/{merchant}", {"archived": True})
-        self.assertRejected(lambda: self.purchase(merchant="Corner Store"), contains="archived merchant")
-        kept = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "merchant": "Corner Store", "note": "still fine"})
+        self.assertRejected(lambda: self.purchase(merchant=None, merchantId=merchant), contains="archived merchant")
+        kept = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "note": "still fine"})
         self.assertEqual(kept["merchantId"], merchant, "an archived merchant stays on entries that already had it")
 
-        cleared = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "merchant": "", "description": "Snacks"})
-        self.assertIsNone(cleared["merchantId"])
+        cleared = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "merchantId": None, "description": "Snacks"})
+        self.assertEqual((cleared["merchantId"], cleared["merchant"]), (None, ""))
         self.api.delete(f"/api/merchants/{merchant}")
-        self.assertEqual(self.api.get("/api/snapshot")["merchants"], [])
+        self.assertNotIn("Corner Store", [m["name"] for m in self.api.get("/api/snapshot")["merchants"]])
         unused = self.api.post("/api/merchants", {"name": "x" * 120})
         self.assertEqual(len(unused["name"]), 120)
         self.assertRejected(lambda: self.api.post("/api/merchants", {"name": "x" * 121}))

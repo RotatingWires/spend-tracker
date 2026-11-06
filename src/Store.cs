@@ -455,8 +455,6 @@ sealed class Store
         if (before is not null && Unchanged(before, values)) return before; // Keeps the original updated_at and adds no history.
 
         var now = Now();
-        if (values.MerchantId is null && values.Merchant.Length > 0)
-            values = values with { MerchantId = CreateMerchant(connection, transaction, values.Merchant) };
         long savedId;
         if (before is null)
         {
@@ -503,7 +501,7 @@ sealed class Store
     static bool Unchanged(SpendTransaction before, TransactionValues values) =>
         before.Kind == values.Kind && before.Date == values.Date && before.AmountCents == values.AmountCents &&
         before.PaymentMethodId == values.PaymentMethodId && before.PersonId == values.PersonId && before.LinkedId == values.LinkedId &&
-        before.MerchantId == values.MerchantId && before.Merchant == values.Merchant && before.Description == values.Description &&
+        before.MerchantId == values.MerchantId && before.Description == values.Description &&
         before.Note == values.Note && before.Archived == values.Archived &&
         before.TagIds.SequenceEqual(values.TagIds) && before.EventIds.SequenceEqual(values.EventIds) && before.Shares.SequenceEqual(values.Shares);
 
@@ -529,20 +527,17 @@ sealed class Store
         if (Convert.ToInt64(methodArchived, CultureInfo.InvariantCulture) != 0 && before?.PaymentMethodId != methodId)
             throw RequestException.Invalid("That payment method is archived. Restore it under Manage to use it again.");
 
-        var merchant = OptionalText(request.Merchant, MaxMerchantLength, "Merchant");
-        long? merchantId = null;
-        if (merchant.Length > 0)
+        // Merchants are chosen by ID, like payment methods; they are created and renamed under Manage.
+        var merchantId = request.MerchantId;
+        var merchant = "";
+        if (merchantId is not null)
         {
-            // Merchants are matched by name, ignoring case; a name never seen before becomes a new merchant on save.
-            using var lookup = Sql(connection, transaction, "SELECT id, name, archived FROM merchants WHERE name = $name;", ("$name", merchant));
+            using var lookup = Sql(connection, transaction, "SELECT name, archived FROM merchants WHERE id = $id;", ("$id", merchantId));
             using var found = lookup.ExecuteReader();
-            if (found.Read())
-            {
-                merchantId = found.GetInt64(0);
-                merchant = found.GetString(1);
-                if (found.GetInt64(2) != 0 && before?.MerchantId != merchantId)
-                    throw RequestException.Invalid($"{merchant} is an archived merchant. Restore it under Manage to use it again.");
-            }
+            if (!found.Read()) throw RequestException.Invalid("That merchant no longer exists. Refresh and try again.");
+            merchant = found.GetString(0);
+            if (found.GetInt64(1) != 0 && before?.MerchantId != merchantId)
+                throw RequestException.Invalid($"{merchant} is an archived merchant. Restore it under Manage to use it again.");
         }
         var description = OptionalText(request.Description, MaxDescriptionLength, "Description");
         var note = OptionalText(request.Note, MaxNoteLength, "Note");
@@ -869,24 +864,19 @@ sealed class Store
         transaction.Commit();
     }
 
-    static long CreateMerchant(SqliteConnection connection, SqliteTransaction transaction, string name)
-    {
-        var id = Convert.ToInt64(Scalar(connection, transaction,
-            "INSERT INTO merchants (name, created_at) VALUES ($name, $now); SELECT last_insert_rowid();",
-            ("$name", name), ("$now", Now())), CultureInfo.InvariantCulture);
-        RecordHistory(connection, transaction, "Created", "Merchant", id, null, ReadMerchants(connection, transaction).Single(m => m.Id == id));
-        return id;
-    }
-
     public Merchant CreateMerchant(NameRequest request)
     {
         var name = RequireName(request.Name, "Merchant name", MaxMerchantLength);
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         EnsureNameFree(connection, transaction, "merchants", name, null, "A merchant with that name already exists.");
-        var id = CreateMerchant(connection, transaction, name);
+        var id = Convert.ToInt64(Scalar(connection, transaction,
+            "INSERT INTO merchants (name, created_at) VALUES ($name, $now); SELECT last_insert_rowid();",
+            ("$name", name), ("$now", Now())), CultureInfo.InvariantCulture);
+        var created = ReadMerchants(connection, transaction).Single(m => m.Id == id);
+        RecordHistory(connection, transaction, "Created", "Merchant", id, null, created);
         transaction.Commit();
-        return ReadMerchants(connection, null).Single(m => m.Id == id);
+        return created;
     }
 
     public Merchant UpdateMerchant(long id, UpdateNameRequest request)
@@ -1251,7 +1241,7 @@ record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person>
     List<Label> Events, List<SpendTransaction> Transactions);
 
 record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? PaymentMethodId, long? PersonId, long? LinkedId,
-    string? Merchant, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares, bool? Archived = null, List<long>? EventIds = null);
+    long? MerchantId, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares, bool? Archived = null, List<long>? EventIds = null);
 record ShareRequest(long? PersonId, long? AmountCents);
 record TransactionValues(string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
     long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<long> EventIds, List<Share> Shares);

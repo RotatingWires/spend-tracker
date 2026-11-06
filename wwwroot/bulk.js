@@ -112,11 +112,11 @@ const BULK_ACTIONS = {
   },
   setMerchant: {
     label: 'Set Merchant',
-    // Like tags and people, merchants are chosen from a list; new ones come from the editor or Manage.
+    // Like tags and people, merchants are chosen from a list; they are added under Manage.
     choose: () => chooseFrom('Set Merchant', 'Merchant', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
-      .then(choice => choice && { value: choice.value === 0 ? '' : choice.label, label: choice.label }),
-    request: (tx, name) => tx.merchant.toLowerCase() === name.toLowerCase() ? { skip: 'already has that merchant' }
-      : { body: transactionRequest(tx, { merchant: name }) }
+      .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: choice.label }),
+    request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
+      : { body: transactionRequest(tx, { merchantId }) }
   },
   delete: {
     label: 'Delete',

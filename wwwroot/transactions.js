@@ -173,6 +173,7 @@ const editor = {
   transaction: null,
   kind: null,
   method: null,
+  merchant: null,
   people: null,
   person: null,
   linked: null,
@@ -185,6 +186,7 @@ function initializeTransactionEditor() {
   editor.kind = createSingleSelect($('#txKind'), { onChange: () => applyEditorKind() });
   editor.kind.setOptions(KIND_OPTIONS, 'Purchase');
   editor.method = createSingleSelect($('#txMethod'));
+  editor.merchant = createSingleSelect($('#txMerchant'));
   editor.people = createMultiSelect($('#txPeople'), { empty: 'Choose people', onChange: () => renderShareRows() });
   editor.person = createSingleSelect($('#txPerson'), { onChange: () => onEditorPersonChange() });
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
@@ -211,7 +213,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   $('#transactionDialogTitle').textContent = tx ? `Edit ${KIND_LABELS[tx.kind]} #${tx.id}` : 'New Transaction';
   $('#txDate').value = tx?.date ?? defaults.date ?? todayKey();
   $('#txAmount').value = tx ? centsToInput(tx.amountCents) : '';
-  $('#txMerchant').value = tx?.merchant ?? '';
+  editor.merchant.setOptions(merchantOptions(tx?.merchantId ?? null), tx?.merchantId ?? '');
   $('#txDescription').value = tx?.description ?? '';
   $('#txNote').value = tx?.note ?? '';
   $('#txError').textContent = '';
@@ -233,7 +235,6 @@ function openTransactionEditor(tx = null, defaults = {}) {
   editor.person.setOptions([], null);
   editor.linked.setOptions([], null);
   applyEditorKind({ personId: tx?.personId ?? defaults.personId, linkedId: tx?.linkedId ?? defaults.linkedId });
-  renderMerchantSuggestions();
 
   $('#transactionDialog').showModal();
   $('#txAmount').focus();
@@ -493,29 +494,17 @@ function prefillFromLinkedPurchase() {
   if (!purchase || editor.transaction) return;
   if (!$('#txAmount').value.trim() && personId != null) $('#txAmount').value = centsToInput(shareRemaining(purchase, personId));
   if (editorKind() === 'Refund') {
-    if (!$('#txMerchant').value.trim() && !$('#txDescription').value.trim()) {
-      $('#txMerchant').value = purchase.merchant;
+    if (!editor.merchant.value && !$('#txDescription').value.trim()) {
+      editor.merchant.value = purchase.merchantId ?? '';
       $('#txDescription').value = purchase.description;
     }
     editor.method.setOptions(methodOptions(purchase.paymentMethodId), purchase.paymentMethodId);
   }
 }
 
-/** Suggests active merchants, most used first. Typing a new name adds a merchant when the entry is saved. */
-function renderMerchantSuggestions() {
-  const counts = new Map();
-  for (const tx of state.model.transactions) {
-    if (tx.merchantId != null) counts.set(tx.merchantId, (counts.get(tx.merchantId) ?? 0) + 1);
-  }
-  const options = state.snapshot.merchants
-    .filter(merchant => !merchant.archived)
-    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.name.localeCompare(b.name))
-    .map(merchant => {
-      const option = document.createElement('option');
-      option.value = merchant.name;
-      return option;
-    });
-  $('#merchantList').replaceChildren(...options);
+/** Merchants are chosen like payment methods: the active ones, plus an archived one the entry already has. */
+function merchantOptions(currentId) {
+  return [{ value: '', label: 'No merchant' }, ...labelOptions(state.snapshot.merchants, currentId == null ? [] : [currentId])];
 }
 
 /** Saves the editor. changes overrides fields, such as { archived: true } from the Archive button. */
@@ -545,7 +534,7 @@ async function saveTransaction(changes = {}) {
     paymentMethodId: editor.method.value ? Number(editor.method.value) : null,
     personId: kind === 'Purchase' || !editor.person.value ? null : Number(editor.person.value),
     linkedId: kind === 'Purchase' || !editor.linked.value ? null : Number(editor.linked.value),
-    merchant: $('#txMerchant').value,
+    merchantId: editor.merchant.value ? Number(editor.merchant.value) : null,
     description: $('#txDescription').value,
     note: $('#txNote').value,
     tagIds: kind === 'Purchase' ? editor.tags.values.map(Number) : [],
