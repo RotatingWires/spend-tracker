@@ -73,8 +73,10 @@ function renderMonthGrid(month) {
     const day = days.get(key);
     // Collections are not dated; a day shows the collections of the entries recorded on it.
     const collections = collectionsOf(listed.filter(tx => tx.date === key));
-    const cell = document.createElement('button');
-    cell.type = 'button';
+    // Only days with entries open a dialog; empty days are plain cells, like Stats' rows that have nothing to list.
+    const cell = document.createElement(day ? 'button' : 'div');
+    if (day) cell.type = 'button';
+    cell.dataset.date = key;
     cell.className = `calendar-day heat-${heatLevel(day?.net ?? 0, max)}`;
     if (key === today) cell.classList.add('today');
     if (calendarCollectionId != null && listed.some(tx => tx.date === key && collectionIdsOf(tx).includes(calendarCollectionId))) {
@@ -107,7 +109,7 @@ function renderMonthGrid(month) {
       summary.push(`collection ${name}`);
     }
     cell.setAttribute('aria-label', summary.join(', '));
-    cell.addEventListener('click', () => openDayDialog(key));
+    if (day) cell.addEventListener('click', () => openDayDialog(key));
     grid.append(cell);
   }
   return box;
@@ -134,12 +136,15 @@ function renderDayDialog() {
   if (collectionIds.length) line.append('Collections: ');
   collectionIds.forEach((id, index) => {
     if (index) line.append(', ');
-    const link = document.createElement('button');
-    link.type = 'button';
+    // A plain click shows the collection here in the calendar; opened in a new tab, the link goes to its Collections entry.
+    const link = document.createElement('a');
     link.className = 'collection-link';
+    link.href = collectionLink(id);
     link.textContent = collectionName(id);
-    link.title = `Show every day of ${collectionName(id)} in the calendar`;
-    link.addEventListener('click', () => {
+    link.title = `Show every day of ${collectionName(id)} in the calendar. Open in a new tab for its entries on the Collections tab.`;
+    link.addEventListener('click', event => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
       $('#dayDialog').close();
       showCollectionCalendar(id);
     });

@@ -431,13 +431,24 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#calendarMonths legend")).to_have_text(["February 2024", "January 2024"])
         expect(page.locator('#calendarMonths [data-month="2024-01"] .calendar-day', has_text="Beach trip")).to_have_count(1)
         # A day's entries have their own Net Spent column, as in the ledger.
-        page.locator('#calendarMonths [data-month="2024-02"] button.calendar-day').nth(4).click()  # Feb 5: the refund
+        page.locator('#calendarMonths [data-date="2024-02-05"]').click()  # the refund
         expect(page.locator("#dayTable thead th").last).to_have_text("Net Spent")
         expect(page.locator("#dayTable tbody td").last).to_have_text("−$100.00")
         expect(page.locator("#dayAddButton")).to_have_text("Add to This Day")
         self.shot(page, "day-dialog")
         # A collection's name opens it in the calendar: the months it spans, with its days outlined.
-        page.locator("#dayDialogCollections .collection-link", has_text="Beach trip").click()
+        # Days with no entries are not buttons, so they cannot be selected.
+        expect(page.locator('#calendarMonths div[data-date="2024-02-04"]')).to_have_count(1)
+        expect(page.locator('#calendarMonths button[data-date="2024-02-04"]')).to_have_count(0)
+        # Opened in a new tab, the link goes to the collection's entries on the Collections tab.
+        link = page.locator("#dayDialogCollections .collection-link", has_text="Beach trip")
+        linked = page.context.new_page()
+        linked.goto(self.server.url + link.get_attribute("href"))
+        expect(linked.locator('.tabs [data-tab="collections"]')).to_have_attribute("aria-selected", "true")
+        expect(linked.locator("#scopeDialogTitle")).to_have_text("Collection: Beach trip")
+        self.assertEqual(linked.evaluate("location.pathname"), "/")
+        linked.close()
+        link.click()
         expect(page.locator("#dayDialog")).not_to_be_visible()
         expect(page.locator("#titleScope")).to_have_text("Jan 2024, Feb 2024")
         expect(page.locator("#calendarMonths .collection-focus")).to_have_count(2)

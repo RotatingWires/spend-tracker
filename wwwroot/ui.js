@@ -355,7 +355,24 @@ function startApp() {
     }, 150);
   });
 
-  loadSnapshot();
+  loadSnapshot().then(openLinkedPage);
+}
+
+/** A collection's deep link, like TaskList's /task/{id}: the server answers it with the app, which opens it. */
+function collectionLink(collectionId) {
+  return `/collection/${collectionId}`;
+}
+
+/** /collection/3 (a collection link opened in a new tab) shows that collection's entries on the Collections tab. */
+function openLinkedPage() {
+  const match = /^\/collection\/(\d+)\/?$/.exec(location.pathname);
+  if (!match) return;
+  history.replaceState(null, '', '/');
+  if (!state.model) return;
+  const id = Number(match[1]);
+  switchTab('collections');
+  if (state.model.collections.has(id)) openScopeList('collection', id);
+  else setStatus(`Collection #${id} no longer exists.`);
 }
 
 /** New entries default to today, unless one other month is being viewed, then its first day. */
