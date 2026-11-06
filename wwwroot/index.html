@@ -18,28 +18,30 @@
     <header class="titlebar"><span class="title-left">SpendTracker</span><span class="title-center" id="titleScope"></span><span class="title-buttons" aria-hidden="true"><span class="title-minimize"></span><span class="title-maximize"></span><span class="title-close"></span></span></header>
 
     <nav class="menubar" aria-label="Application menu">
-      <div class="menu-wrap">
-        <button id="fileMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu">File</button>
-        <div id="fileMenu" class="menu-dropdown" role="menu" hidden>
-          <button type="button" id="newTransactionMenuItem" role="menuitem"><span></span><span class="menu-label">New Transaction...</span></button>
-          <button type="button" id="refreshButton" role="menuitem"><span></span><span class="menu-label">Refresh</span></button>
-          <button type="button" id="selectModeButton" role="menuitemcheckbox" aria-checked="false"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Select...</span></button>
-          <div class="menu-separator" role="separator"></div>
-          <button type="button" id="exportCsvButton" role="menuitem"><span></span><span class="menu-label">Export Transactions CSV...</span></button>
-          <button type="button" id="backupButton" role="menuitem"><span></span><span class="menu-label">Download Backup...</span></button>
-          <button type="button" id="restoreButton" role="menuitem"><span></span><span class="menu-label">Restore Backup...</span></button>
-          <div class="menu-separator" role="separator"></div>
-          <button type="button" id="highlightRowsButton" role="menuitemcheckbox" aria-checked="true"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Highlight rows on hover</span></button>
-          <div class="menu-separator" role="separator"></div>
-          <button type="button" id="logoutButton" role="menuitem"><span></span><span class="menu-label">Log Out</span></button>
+      <div class="menubar-menus">
+        <div class="menu-wrap">
+          <button id="fileMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="fileMenu">File</button>
+          <div id="fileMenu" class="menu-dropdown" role="menu" hidden>
+            <button type="button" id="newTransactionMenuItem" role="menuitem"><span></span><span class="menu-label">New Transaction...</span></button>
+            <button type="button" id="refreshButton" role="menuitem"><span></span><span class="menu-label">Refresh</span></button>
+            <button type="button" id="selectModeButton" role="menuitemcheckbox" aria-checked="false"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Select...</span></button>
+            <div class="menu-separator" role="separator"></div>
+            <button type="button" id="exportCsvButton" role="menuitem"><span></span><span class="menu-label">Export Transactions CSV...</span></button>
+            <button type="button" id="backupButton" role="menuitem"><span></span><span class="menu-label">Download Backup...</span></button>
+            <button type="button" id="restoreButton" role="menuitem"><span></span><span class="menu-label">Restore Backup...</span></button>
+            <div class="menu-separator" role="separator"></div>
+            <button type="button" id="highlightRowsButton" role="menuitemcheckbox" aria-checked="true"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Highlight rows on hover</span></button>
+            <div class="menu-separator" role="separator"></div>
+            <button type="button" id="logoutButton" role="menuitem"><span></span><span class="menu-label">Log Out</span></button>
+          </div>
         </div>
+        <div class="menu-wrap">
+          <button id="viewMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="viewMenu">View</button>
+          <div id="viewMenu" class="menu-dropdown" role="menu" hidden></div>
+        </div>
+        <button id="helpButton" type="button" aria-haspopup="dialog" aria-controls="aboutDialog">Help</button>
+        <input id="restoreFileInput" type="file" accept=".zip,application/zip" hidden>
       </div>
-      <div class="menu-wrap">
-        <button id="viewMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="viewMenu">View</button>
-        <div id="viewMenu" class="menu-dropdown" role="menu" hidden></div>
-      </div>
-      <button id="helpButton" type="button" aria-haspopup="dialog" aria-controls="aboutDialog">Help</button>
-      <input id="restoreFileInput" type="file" accept=".zip,application/zip" hidden>
       <div id="bulkControls" class="bulk-controls" hidden>
         <span id="selectedCount" aria-live="polite">Selected: 0</span>
         <div id="bulkActions" class="bulk-actions"></div>
@@ -226,6 +228,14 @@
     </form>
   </dialog>
 
+  <dialog id="scopeDialog" class="retro-dialog wide" aria-labelledby="scopeDialogTitle">
+    <form method="dialog" class="dialog-window">
+      <div class="dialog-title" id="scopeDialogTitle">List</div>
+      <div class="dialog-body"><div id="scopeSummary" class="note"></div><div class="table-wrap"><table id="scopeTable"></table></div></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="submit">Close</button></div>
+    </form>
+  </dialog>
+
   <dialog id="eventDialog" class="retro-dialog" aria-labelledby="eventDialogTitle">
     <form class="dialog-window" id="eventForm" novalidate>
       <div class="dialog-title" id="eventDialogTitle">New Event</div>
@@ -277,7 +287,7 @@
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
         <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
         <p><strong>Archiving</strong> a payment method, person, tag, or merchant under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats. Archiving a <strong>transaction</strong> hides it from the ledger and calendar (View → Show Archived lists it again); it still counts in Stats, People balances, and refund limits.</p>
-        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, and merchant it belongs to, such as Alex #3 or food #12, shown at the top of the editor.</p>
+        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, and merchant it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or a person, tag, or merchant under Manage, to see its whole numbered list.</p>
         <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape stops) to archive, tag, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
         <p>Amounts are shown in US dollars.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
@@ -297,6 +307,7 @@
   <script src="/history.js"></script>
   <script src="/manage.js"></script>
   <script src="/bulk.js"></script>
+  <script src="/scopes.js"></script>
   <script src="/ui.js"></script>
 </body>
 </html>

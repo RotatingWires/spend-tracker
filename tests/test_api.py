@@ -403,6 +403,7 @@ class SpendTrackerApiTests(unittest.TestCase):
                 self.assertRejected(lambda: self.api.upload_zip("/api/restore", data), 400)
                 self.assertEqual(self.api.get("/api/snapshot"), before)
         self.assertRejected(lambda: self.api.upload_zip("/api/restore", b""), 400, contains="Choose a backup")
+        self.assertRejected(lambda: self.api.request("POST", "/api/restore", raw=archive, content_type="text/plain"), 400, contains="application/zip")
         self.assertFalse((self.server.data_dir / "backups").exists() and any((self.server.data_dir / "backups").iterdir()),
                          "a rejected restore must not write a recovery copy")
 

@@ -331,6 +331,28 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
         page.locator("#transactionsTable tbody tr").first.click()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
+
+        # Each number opens that scope's numbered list; Manage rows open the same list.
+        page.locator("#txNumbers button", has_text="Hardware #1").click()
+        expect(page.locator("#transactionDialog")).not_to_be_visible()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hardware")
+        expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
+        page.locator("#scopeDialog button", has_text="Close").click()
+        page.click('.tabs [data-tab="manage"]')
+        page.locator("#peopleManageTable tbody tr", has_text="Riley").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Person: Riley")
+        # Riley left #1 and #2 (numbers 1 and 2), so the archived Garage purchase (#3) and the payback (#4) remain.
+        rows = page.locator("#scopeTable tbody tr")
+        expect(rows).to_have_count(2)
+        expect(rows.nth(0)).to_contain_text(f"#4#{third['id'] + 1}")
+        expect(rows.nth(1)).to_contain_text("(archived)")
+        expect(rows.nth(1)).to_contain_text("$150.00")  # her share of the split purchase
+        self.shot(page, "scope-list")
+        page.locator("#scopeDialog button", has_text="Close").click()
+        page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
+        page.locator("#scopeTable tbody tr").first.click()
+        expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")
 
     def test_stats_for_a_known_month(self):

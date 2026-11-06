@@ -256,11 +256,11 @@ function numberIn(tx, scope, scopeId) {
 
 const SCOPE_NAMES = { person: personName, tag: tagName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}` };
 
-/** "Alex #3 · food #12 · Diner #5": every per-scope number of a transaction, people first. */
-function scopeNumbersLabel(tx) {
-  return Object.keys(SCOPE_NAMES)
-    .flatMap(scope => tx.numbers.filter(entry => entry.scope === scope).map(entry => `${SCOPE_NAMES[scope](entry.scopeId)} #${entry.number}`))
-    .join(' · ');
+/** Every per-scope number of a transaction, people first, each labelled like "Alex #3". */
+function scopeNumbers(tx) {
+  return Object.keys(SCOPE_NAMES).flatMap(scope => tx.numbers
+    .filter(entry => entry.scope === scope)
+    .map(entry => ({ ...entry, label: `${SCOPE_NAMES[scope](entry.scopeId)} #${entry.number}` })));
 }
 
 /** A saved transaction as a request body, with any fields replaced by changes. */

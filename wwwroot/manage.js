@@ -13,6 +13,7 @@ const MANAGED = {
   people: {
     table: '#peopleManageTable',
     singular: 'person',
+    scope: 'person',
     items: () => state.snapshot.people,
     uses: id => state.model.transactions.filter(tx => peopleOf(tx).includes(id)).length,
     archivable: item => !item.isSelf
@@ -20,6 +21,7 @@ const MANAGED = {
   tags: {
     table: '#tagsTable',
     singular: 'tag',
+    scope: 'tag',
     items: () => state.snapshot.tags,
     uses: id => state.model.transactions.filter(tx => tx.tagIds.includes(id)).length,
     archivable: () => true
@@ -27,6 +29,7 @@ const MANAGED = {
   merchants: {
     table: '#merchantsTable',
     singular: 'merchant',
+    scope: 'merchant',
     maxLength: 120,
     items: () => state.snapshot.merchants,
     uses: id => state.model.transactions.filter(tx => tx.merchantId === id).length,
@@ -44,7 +47,9 @@ function renderManage() {
       if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
 
       const name = item.isSelf ? `${item.name} (you)` : item.name;
-      return { cells: [`#${item.id}`, name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
+      // People, tags, and merchants number their entries; selecting the row lists them.
+      const onClick = config.scope ? () => openScopeList(config.scope, item.id) : undefined;
+      return { onClick, cells: [`#${item.id}`, name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
     });
     renderTable($(config.table), [
       { label: 'ID', title: 'Permanent ID, never reused. Entries are also numbered within each person, tag, and merchant.' },

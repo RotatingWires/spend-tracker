@@ -49,6 +49,7 @@ function renderAll() {
   updateBulkControls();
   if ($('#personDialog').open) renderPersonDialog();
   if ($('#dayDialog').open) renderDayDialog();
+  if ($('#scopeDialog').open) renderScopeList();
 
   const count = state.model.transactions.length;
   // Messages go on the left and totals on the right, as in TaskList.

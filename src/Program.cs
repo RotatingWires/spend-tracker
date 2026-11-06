@@ -289,6 +289,8 @@ api.MapGet("/backup", async (HttpContext context) =>
 
 api.MapPost("/restore", async (HttpRequest request) =>
 {
+    if (!string.Equals(request.ContentType, "application/zip", StringComparison.OrdinalIgnoreCase))
+        throw RequestException.Invalid("Send the backup ZIP as the request body with Content-Type: application/zip.");
     var workDirectory = Directory.CreateTempSubdirectory("spend-tracker-upload-");
     try
     {

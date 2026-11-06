@@ -209,12 +209,11 @@ function openTransactionEditor(tx = null, defaults = {}) {
   $('#txError').textContent = '';
   $('#txDeleteButton').hidden = !tx;
   $('#txArchiveButton').hidden = !tx;
-  $('#txArchiveButton').textContent = tx?.archived ? 'Unarchive' : 'Archive';
+  $('#txArchiveButton').textContent = tx?.archived ? 'Restore' : 'Archive';
   $('#txArchiveButton').title = tx?.archived
     ? 'Save and list this entry in the ledger and calendar again.'
     : 'Save and hide this entry from the ledger and calendar. It still counts in Stats and balances.';
-  $('#txNumbers').hidden = !tx;
-  $('#txNumbers').textContent = tx ? [tx.archived ? 'Archived.' : '', scopeNumbersLabel(tx)].filter(Boolean).join(' ') : '';
+  renderEditorNumbers(tx);
 
   // New entries start on the method of the latest purchase; the user sees and can change it before saving.
   const lastPurchase = state.model.transactions.findLast(entry => entry.kind === 'Purchase');
@@ -229,6 +228,27 @@ function openTransactionEditor(tx = null, defaults = {}) {
 
   $('#transactionDialog').showModal();
   $('#txAmount').focus();
+}
+
+/** "Archived. Me #4 Alex #3 food #12": each number opens that person's, tag's, or merchant's numbered list. */
+function renderEditorNumbers(tx) {
+  const line = $('#txNumbers');
+  line.hidden = !tx;
+  line.replaceChildren();
+  if (!tx) return;
+  if (tx.archived) line.append('Archived. ');
+  for (const entry of scopeNumbers(tx)) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'number-chip';
+    button.textContent = entry.label;
+    button.title = `List every entry numbered in ${entry.label.replace(/ #\d+$/, '')}`;
+    button.addEventListener('click', () => {
+      $('#transactionDialog').close();
+      openScopeList(entry.scope, entry.scopeId);
+    });
+    line.append(button);
+  }
 }
 
 function showEditorRow(id, visible) {
@@ -531,7 +551,7 @@ async function saveTransaction(changes = {}) {
       : await api('/transactions', { method: 'POST', body });
     $('#transactionDialog').close();
     await loadSnapshot();
-    const verb = existing && saved.archived !== existing.archived ? (saved.archived ? 'Archived' : 'Unarchived') : existing ? 'Saved' : 'Added';
+    const verb = existing && saved.archived !== existing.archived ? (saved.archived ? 'Archived' : 'Restored') : existing ? 'Saved' : 'Added';
     setStatus(`${verb} ${KIND_LABELS[saved.kind].toLowerCase()} #${saved.id}, ${formatMoney(saved.amountCents)} on ${formatDate(saved.date)}.`);
   } catch (saveError) {
     error.textContent = saveError.message;

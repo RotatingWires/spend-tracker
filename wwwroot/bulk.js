@@ -80,8 +80,8 @@ const BULK_ACTIONS = {
     alreadyDone: 'already archived',
     request: tx => ({ body: transactionRequest(tx, { archived: true }) })
   },
-  unarchive: {
-    label: 'Unarchive',
+  restore: {
+    label: 'Restore',
     applies: tx => tx.archived,
     alreadyDone: 'not archived',
     request: tx => ({ body: transactionRequest(tx, { archived: false }) })
@@ -223,7 +223,7 @@ function updateBulkControls() {
   const selected = selectedTransactions();
   $('#selectedCount').textContent = `Selected: ${selected.length}`;
   const none = bulkBusy || selected.length === 0;
-  const primary = selected.length > 0 && selected.every(tx => tx.archived) ? 'unarchive' : 'archive';
+  const primary = selected.length > 0 && selected.every(tx => tx.archived) ? 'restore' : 'archive';
 
   const group = document.createElement('div');
   group.className = 'split-group';
@@ -246,7 +246,7 @@ function updateBulkControls() {
   menu.className = 'menu-dropdown split-dropdown';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  const items = ['archive', 'unarchive', null, 'addTag', 'removeTag', 'addPerson', 'removePerson', 'setMerchant', null, 'delete'];
+  const items = ['archive', 'restore', null, 'addTag', 'removeTag', 'addPerson', 'removePerson', 'setMerchant', null, 'delete'];
   menu.append(...items.map(name => {
     if (name == null) return menuSeparator();
     const action = BULK_ACTIONS[name];
