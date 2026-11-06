@@ -69,8 +69,8 @@ function renderMonthGrid(month) {
   for (let dayOfMonth = 1; dayOfMonth <= daysInMonth(month); dayOfMonth++) {
     const key = `${month}-${pad2(dayOfMonth)}`;
     const day = days.get(key);
-    // Events are not dated; a day shows the events of the entries recorded on it.
-    const events = eventsOf(listed.filter(tx => tx.date === key));
+    // Collections are not dated; a day shows the collections of the entries recorded on it.
+    const collections = collectionsOf(listed.filter(tx => tx.date === key));
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = `calendar-day heat-${heatLevel(day?.net ?? 0, max)}`;
@@ -94,12 +94,12 @@ function renderMonthGrid(month) {
     } else {
       summary.push('no entries');
     }
-    for (const name of events) {
+    for (const name of collections) {
       const label = document.createElement('span');
-      label.className = 'calendar-event';
+      label.className = 'calendar-collection';
       label.textContent = name;
       cell.append(label);
-      summary.push(`event ${name}`);
+      summary.push(`collection ${name}`);
     }
     cell.setAttribute('aria-label', summary.join(', '));
     cell.addEventListener('click', () => openDayDialog(key));
@@ -120,9 +120,9 @@ function renderDayDialog() {
   const rows = listedTransactions(key, key);
   const totals = monthTotals(rows);
   $('#dayDialogTitle').textContent = `${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`;
-  const events = eventsOf(rows);
-  $('#dayDialogEvents').textContent = events.length ? `Events: ${events.join(', ')}` : '';
-  $('#dayDialogEvents').hidden = events.length === 0;
+  const collections = collectionsOf(rows);
+  $('#dayDialogCollections').textContent = collections.length ? `Collections: ${collections.join(', ')}` : '';
+  $('#dayDialogCollections').hidden = collections.length === 0;
 
   renderTable($('#dayTable'), [{ label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],
     rows.map(tx => {

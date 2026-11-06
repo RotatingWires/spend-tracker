@@ -18,7 +18,7 @@
   --title-text: #fff;
   --error: #800000;
   --money-in: #006000;
-  --event: #6a2c91;
+  --collection: #6a2c91;
   --backdrop: rgba(0, 0, 0, .3);
 
   --chart-surface: #fff;
@@ -64,7 +64,7 @@
   --title-text: #fff;
   --error: #ff8585;
   --money-in: #69d37d;
-  --event: #d2a8ff;
+  --collection: #d2a8ff;
 
   --chart-surface: #191919;
   --chart-text: #eeeeee;

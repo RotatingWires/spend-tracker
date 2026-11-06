@@ -87,7 +87,7 @@ const BULK_ACTIONS = {
     request: tx => ({ body: transactionRequest(tx, { archived: false }) })
   },
   tags: labelAction('tag', 'tags', 'tagIds'),
-  events: labelAction('event', 'events', 'eventIds'),
+  collections: labelAction('collection', 'collections', 'collectionIds'),
   people: {
     label: 'People',
     detail: 'Each changed purchase is split evenly again between everyone on it.',
@@ -139,7 +139,7 @@ function changedIds(current, { ids, mode }) {
   return next.length === current.length && next.every(id => current.includes(id)) ? null : next;
 }
 
-/** Add or remove tags or events. Tags and events work the same way: only purchases have them. */
+/** Add or remove tags or collections. Tags and collections work the same way: only purchases have them. */
 function labelAction(noun, list, field) {
   const title = `${noun[0].toUpperCase()}${noun.slice(1)}s`;
   return {
@@ -263,7 +263,7 @@ function updateBulkControls() {
   menu.className = 'menu-dropdown split-dropdown';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  const items = ['archive', 'restore', null, 'tags', 'events', 'people', 'merchant', null, 'delete'];
+  const items = ['archive', 'restore', null, 'tags', 'collections', 'people', 'merchant', null, 'delete'];
   menu.append(...items.map(name => {
     if (name == null) return menuSeparator();
     const action = BULK_ACTIONS[name];

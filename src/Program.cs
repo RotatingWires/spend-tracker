@@ -263,11 +263,11 @@ api.MapDelete("/merchants/{id:long}", (long id) =>
     return Results.NoContent();
 });
 
-api.MapPost("/events", (NameRequest request) => Results.Ok(store.CreateLabel(Store.Events, request)));
-api.MapPatch("/events/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateLabel(Store.Events, id, request)));
-api.MapDelete("/events/{id:long}", (long id) =>
+api.MapPost("/collections", (NameRequest request) => Results.Ok(store.CreateLabel(Store.Collections, request)));
+api.MapPatch("/collections/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateLabel(Store.Collections, id, request)));
+api.MapDelete("/collections/{id:long}", (long id) =>
 {
-    store.DeleteLabel(Store.Events, id);
+    store.DeleteLabel(Store.Collections, id);
     return Results.NoContent();
 });
 

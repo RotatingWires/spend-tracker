@@ -16,7 +16,7 @@ try:
 except ImportError:  # Playwright is a development-only tool.
     sync_playwright = None
 
-TABS = ["Transactions", "Calendar", "Stats", "People", "Payment Methods", "Tags", "Events", "Merchants", "History"]
+TABS = ["Transactions", "Calendar", "Stats", "People", "Payment Methods", "Tags", "Collections", "Merchants", "History"]
 
 
 @unittest.skipIf(sync_playwright is None, "Playwright is not installed")
@@ -151,6 +151,18 @@ class BrowserTests(unittest.TestCase):
         page.fill('form[data-add="tags"] input', "food")
         page.click('form[data-add="tags"] button')
         expect(page.locator("#tagsTable")).to_contain_text("food")
+        box, button = (page.locator(f'form[data-add="tags"] {part}').bounding_box() for part in ("input", "button"))
+        self.assertEqual(box["height"], button["height"], "the Add box is as tall as its Add button")
+        # Rename asks with Cancel, then Save; Enter saves.
+        page.locator("#tagsTable tbody tr", has_text="food").locator("button", has_text="Rename").click()
+        expect(page.locator("#promptDialog .dialog-buttons button")).to_have_text(["Cancel", "Save"])
+        page.fill("#promptInput", "groceries")
+        page.keyboard.press("Enter")
+        expect(page.locator("#tagsTable")).to_contain_text("groceries")
+        page.locator("#tagsTable tbody tr", has_text="groceries").locator("button", has_text="Rename").click()
+        page.fill("#promptInput", "food")
+        page.locator("#promptDialog button", has_text="Save").click()
+        expect(page.locator("#tagsTable")).to_contain_text("food")
         # The editor only chooses merchants from the ones added on the Merchants tab.
         page.click('.tabs [data-tab="merchants"]')
         for name in ("BK", "Diner", "After backup"):
@@ -181,7 +193,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
         expect(page.locator("#transactionsTable tbody tr", has_text="Venmo").locator("td").last).to_have_text("—")
 
-        # File → Search..., as in TaskList, looks anywhere in merchant, description, note, tags, events, and amount,
+        # File → Search..., as in TaskList, looks anywhere in merchant, description, note, tags, collections, and amount,
         # but not type, method, or people.
         page.click("#fileMenuButton")
         page.click("#searchMenuItem")
@@ -320,23 +332,23 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
 
-    def test_time_frames_and_events(self):
+    def test_time_frames_and_collections(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
         api = self.api_client()
         snapshot = api.get("/api/snapshot")
         me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
         card = snapshot["paymentMethods"][1]["id"]
-        trip = api.post("/api/events", {"name": "Beach trip"})["id"]
+        trip = api.post("/api/collections", {"name": "Beach trip"})["id"]
 
-        def add(kind, date, cents, merchant, linked=None, events=()):
+        def add(kind, date, cents, merchant, linked=None, collections=()):
             return api.post("/api/transactions", {
                 "kind": kind, "date": date, "amountCents": cents, "paymentMethodId": card, "personId": None if kind == "Purchase" else me,
-                "linkedId": linked, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [], "eventIds": list(events),
+                "linkedId": linked, "merchantId": self.merchant_id(merchant), "description": "", "note": "", "tagIds": [], "collectionIds": list(collections),
                 "shares": [{"personId": me, "amountCents": cents}] if kind == "Purchase" else []})
 
         # January and February 2024 belong to this test alone; amounts stay large for the Stats test's lowest month.
-        hotel = add("Purchase", "2024-01-20", 60000, "Hotel", events=[trip])
+        hotel = add("Purchase", "2024-01-20", 60000, "Hotel", collections=[trip])
         add("Purchase", "2024-02-03", 70000, "Groceries")
         add("Refund", "2024-02-05", 10000, "Hotel", linked=hotel["id"])
         page.click("#fileMenuButton")
@@ -362,18 +374,18 @@ class BrowserTests(unittest.TestCase):
         self.choose_time_frame(page, ["January 2024"])
         expect(page.locator("#calendarMonths legend")).to_have_text(["January 2024"])
 
-        # Events total their own purchases and the refunds on them, wherever they are dated.
-        page.click('.tabs [data-tab="events"]')
-        row = page.locator("#eventsTable tbody tr", has_text="Beach trip")
+        # Collections total their own purchases and the refunds on them, wherever they are dated.
+        page.click('.tabs [data-tab="collections"]')
+        row = page.locator("#collectionsTable tbody tr", has_text="Beach trip")
         expect(row).to_contain_text("1$600.00$100.00$500.00")
         row.locator("button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
         expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
-        # Stats lists people, tags, events, and merchants in the same table layout; a row opens its numbered list.
-        expect(page.locator("#statsEventsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
+        # Stats lists people, tags, collections, and merchants in the same table layout; a row opens its numbered list.
+        expect(page.locator("#statsCollectionsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
         expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
-        self.shot(page, "stats-event")
-        # The chart can show other measures than net spent, per day here because the event spans 17 days.
+        self.shot(page, "stats-collection")
+        # The chart can show other measures than net spent, per day here because the collection spans 17 days.
         # Measures are check items; each gets a color in the key, whose definition shows on hover.
         self.choose_checks(page, "#statsChartMetric", ["Spent", "Refunds", "Purchases"])
         expect(page.locator("#statsChartLegend")).to_have_text("Activity per Day")
@@ -387,7 +399,7 @@ class BrowserTests(unittest.TestCase):
         self.set_checks(page, "#statsChartMetric", [])  # the last measure cannot be unchecked
         expect(page.locator("#statsChartKey .chart-key-item")).to_have_count(1)
         expect(page.locator("#statsChartLegend")).to_have_text("Net spent per Day")
-        # Merchants and Tags tabs total each one like the Events tab.
+        # Merchants and Tags tabs total each one like the Collections tab.
         page.click('.tabs [data-tab="merchants"]')
         expect(page.locator("#merchantsTable tbody tr", has_text="Hotel")).to_contain_text("Hotel1$600.00$100.00$500.00")
         page.click('.tabs [data-tab="tags"]')
@@ -397,16 +409,16 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
         page.locator("#scopeDialog button", has_text="Close").click()
 
-        # New Transaction... stands out, and purchases choose events like tags.
+        # New Transaction... stands out, and purchases choose collections like tags.
         page.click('.tabs [data-tab="transactions"]')
         expect(page.locator("#newTransactionButton")).to_have_text("New Transaction...")
         page.click("#newTransactionButton")
-        self.set_checks(page, "#txEvents", ["Beach trip"])
-        expect(page.locator("#txEvents .retro-select")).to_have_text("Beach trip▼")
+        self.set_checks(page, "#txCollections", ["Beach trip"])
+        expect(page.locator("#txCollections .retro-select")).to_have_text("Beach trip▼")
         page.click("#txCancelButton")
-        page.click('.tabs [data-tab="events"]')
-        page.locator("#eventsTable tbody tr", has_text="Beach trip").click()
-        expect(page.locator("#scopeDialogTitle")).to_have_text("Event: Beach trip")
+        page.click('.tabs [data-tab="collections"]')
+        page.locator("#collectionsTable tbody tr", has_text="Beach trip").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Collection: Beach trip")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
 
@@ -563,7 +575,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#fileMenuButton")
         page.click("#refreshButton")
         page.click('.tabs [data-tab="stats"]')
-        self.pick(page, "#statsPeriodSelect", "March 2025")
+        self.choose_checks(page, "#statsPeriodSelect", ["March 2025"])
         expect(page.locator("#titleScope")).to_have_text("Stats · March 2025")
 
         totals = page.locator("#statsTotals")
@@ -590,6 +602,12 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsTagsTable tbody tr", has_text="Untagged")).to_contain_text("3$16.00$0.00$16.00")
         expect(page.locator("#statsMerchantsTable tbody tr").first).to_contain_text("Market3$31.00$5.00$26.00$10.33")
         expect(page.locator("#statsMerchantsTable")).not_to_contain_text("Returned desk")
+
+        # Periods are check items: two months together count only their own days.
+        self.choose_checks(page, "#statsPeriodSelect", ["March 2025", "February 2025"])
+        expect(page.locator("#titleScope")).to_have_text("Stats · March 2025, February 2025")
+        expect(page.locator("#statsTotals")).to_contain_text("Spent$36.00")
+        expect(page.locator("#statsDaily")).to_contain_text("Days counted59 days")
         self.shot(page, "stats-march-2025")
 
 

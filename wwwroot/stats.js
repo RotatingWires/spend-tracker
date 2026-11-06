@@ -2,7 +2,7 @@
 
 /*
  * Stats tab. Every number is computed only from recorded entries; nothing is estimated or categorized
- * automatically. Refunds count on their own date and under the person, tags, events, and merchant of their purchase.
+ * automatically. Refunds count on their own date and under the person, tags, collections, and merchant of their purchase.
  */
 
 let statsPeriodSelect = null;
@@ -19,12 +19,31 @@ function statsPeriodOptions() {
     options.push({ value: `y:${year}`, label: String(year) });
   for (let month = monthOf(latest); month >= monthOf(first); month = shiftMonth(month, -1))
     options.push({ value: `m:${month}`, label: formatMonth(month) });
-  for (const event of state.snapshot.events)
-    options.push({ value: `e:${event.id}`, label: `Event: ${event.name}` });
+  for (const collection of state.snapshot.collections)
+    options.push({ value: `c:${collection.id}`, label: `Collection: ${collection.name}` });
   return options;
 }
 
-function statsRange(period) {
+/**
+ * The periods checked in the Period dropdown, combined. Entries count when they fall in any of them; with more than
+ * one, day-based numbers (counted days, averages, streaks, weekdays, months, the chart) use only the days inside the
+ * checked periods. All time stands alone.
+ */
+function statsRange(periods) {
+  const parts = periods.filter(period => period !== 'all').map(periodRange);
+  if (parts.length === 0 || periods.includes('all')) return periodRange('all');
+  if (parts.length === 1) return parts[0];
+  const contains = (part, tx) => (part.filter ? part.filter(tx) : tx.date >= part.start && tx.date <= part.end);
+  return {
+    start: parts.map(part => part.start).sort()[0],
+    end: parts.map(part => part.end).sort().at(-1),
+    label: parts.length > 3 ? `${parts.length} periods` : parts.map(part => part.label).join(', '),
+    filter: tx => parts.some(part => contains(part, tx)),
+    includesDay: key => parts.some(part => key >= part.start && key <= part.end)
+  };
+}
+
+function periodRange(period) {
   const today = todayKey();
   if (period.startsWith('y:')) {
     const year = period.slice(2);
@@ -34,13 +53,13 @@ function statsRange(period) {
     const month = period.slice(2);
     return { start: monthStart(month), end: monthEnd(month), label: formatMonth(month) };
   }
-  if (period.startsWith('e:')) {
-    // An event covers the purchases you put on it and their refunds, from its first entry to its last.
-    const event = state.model.events.get(Number(period.slice(2)));
-    if (event) {
-      const filter = tx => eventIdsOf(tx).includes(event.id);
+  if (period.startsWith('c:')) {
+    // A collection covers the purchases you put on it and their refunds, from its first entry to its last.
+    const collection = state.model.collections.get(Number(period.slice(2)));
+    if (collection) {
+      const filter = tx => collectionIdsOf(tx).includes(collection.id);
       const dates = state.model.transactions.filter(filter).map(tx => tx.date);
-      return { start: dates[0] ?? today, end: dates.at(-1) ?? today, label: event.name, filter };
+      return { start: dates[0] ?? today, end: dates.at(-1) ?? today, label: collection.name, filter };
     }
   }
   const transactions = state.model.transactions;
@@ -60,7 +79,10 @@ function computeStats(range) {
   // Days are counted up to today, or up to the latest entry when something is dated in the future.
   const latest = transactions.at(-1)?.date ?? null;
   const countedEnd = range.end <= today ? range.end : latest && latest > today ? latest : today;
-  const countedDays = countedEnd >= range.start ? dayNumber(countedEnd) - dayNumber(range.start) + 1 : 0;
+  const included = range.includesDay ?? (() => true);
+  let countedDays = 0;
+  for (let number = dayNumber(range.start); number <= dayNumber(countedEnd); number++)
+    if (included(keyFromDayNumber(number))) countedDays++;
 
   const spent = sum(purchases);
   const refunded = sum(refunds);
@@ -70,6 +92,7 @@ function computeStats(range) {
     range,
     countedEnd,
     countedDays,
+    included,
     transactions,
     purchases,
     spent,
@@ -89,6 +112,10 @@ function computeStats(range) {
   let longestRunEnd = null;
   for (let number = dayNumber(range.start); countedDays > 0 && number <= dayNumber(countedEnd); number++) {
     const key = keyFromDayNumber(number);
+    if (!included(key)) {
+      run = 0; // A streak does not carry across the gap between two checked periods.
+      continue;
+    }
     if ((days.get(key)?.purchases ?? 0) > 0) {
       spendingDays++;
       run = 0;
@@ -126,9 +153,11 @@ function computeStats(range) {
   const months = [];
   if (countedDays > 0) {
     for (let month = monthOf(range.start); month <= monthOf(countedEnd); month = shiftMonth(month, 1)) {
+      const monthDays = Array.from({ length: daysInMonth(month) }, (_, index) => `${month}-${pad2(index + 1)}`);
+      if (!monthDays.some(included)) continue;
       const rows = transactions.filter(tx => monthOf(tx.date) === month);
       const totals = monthTotals(rows);
-      const complete = monthStart(month) >= range.start && monthEnd(month) <= countedEnd && monthEnd(month) < today;
+      const complete = monthStart(month) >= range.start && monthEnd(month) <= countedEnd && monthEnd(month) < today && monthDays.every(included);
       months.push({ month, ...totals, entries: rows.length, complete });
     }
   }
@@ -138,16 +167,16 @@ function computeStats(range) {
 
   result.byMethod = groupBy(transactions, tx => tx.paymentMethodId);
   result.byPerson = groupByPerson(transactions);
-  // Refunds count under the tags, events, and merchant of the purchase they refund.
+  // Refunds count under the tags, collections, and merchant of the purchase they refund.
   const spending = transactions.filter(tx => tx.kind !== 'Payback');
   result.byTag = groupByIds(spending, tagIdsOf);
-  result.byEvent = groupByIds(spending, eventIdsOf);
+  result.byCollection = groupByIds(spending, collectionIdsOf);
   // Grouped by merchant ID, so a renamed merchant keeps its whole history under its current name.
   result.byMerchant = groupByIds(spending, merchantIdsOf);
 
   result.weekdays = WEEKDAYS.map(() => ({ purchases: 0, net: 0, occurrences: 0 }));
   for (let number = dayNumber(range.start); countedDays > 0 && number <= dayNumber(countedEnd); number++)
-    result.weekdays[weekdayOf(keyFromDayNumber(number))].occurrences++;
+    if (included(keyFromDayNumber(number))) result.weekdays[weekdayOf(keyFromDayNumber(number))].occurrences++;
   for (const [key, day] of days) {
     const weekday = result.weekdays[weekdayOf(key)];
     weekday.purchases += day.purchases;
@@ -165,7 +194,7 @@ function newBucket() {
   return { purchases: 0, spent: 0, refunded: 0, paidBack: 0, last: null };
 }
 
-/** Purchases and refunds per tag, event, or merchant, plus a bucket (key null) for entries with none. */
+/** Purchases and refunds per tag, collection, or merchant, plus a bucket (key null) for entries with none. */
 function groupByIds(transactions, idsOf) {
   const groups = new Map();
   for (const tx of transactions) {
@@ -234,7 +263,9 @@ function averageMoney(total, count) {
 function renderStats() {
   const options = statsPeriodOptions();
   statsPeriodSelect.setOptions(options, state.statsPeriod);
-  state.statsPeriod = statsPeriodSelect.value;
+  // A period that no longer exists (a deleted collection, say) drops out; with nothing left, All time.
+  state.statsPeriod = statsPeriodSelect.values.length ? statsPeriodSelect.values : ['all'];
+  statsPeriodSelect.setOptions(options, state.statsPeriod);
   const stats = computeStats(statsRange(state.statsPeriod));
   $('#titleScope').textContent = `Stats · ${stats.range.label}`;
 
@@ -301,10 +332,9 @@ function renderStatsChart(stats) {
   const empty = { net: 0, spent: 0, refunded: 0, paidBack: 0, purchases: 0, entries: 0 };
   const byDay = stats.countedDays <= 62;
   const points = byDay
-    ? Array.from({ length: Math.max(0, dayNumber(stats.countedEnd) - dayNumber(stats.range.start) + 1) }, (_, index) => {
-      const key = keyFromDayNumber(dayNumber(stats.range.start) + index);
-      return { label: key.slice(8), title: formatDate(key), bucket: stats.days.get(key) ?? empty };
-    })
+    ? Array.from({ length: Math.max(0, dayNumber(stats.countedEnd) - dayNumber(stats.range.start) + 1) }, (_, index) => keyFromDayNumber(dayNumber(stats.range.start) + index))
+      .filter(stats.included)
+      .map(key => ({ label: key.slice(8), title: formatDate(key), bucket: stats.days.get(key) ?? empty }))
     : stats.months.map(month => ({
       label: `${MONTH_NAMES[Number(month.month.slice(5)) - 1].slice(0, 3)} ${month.month.slice(2, 4)}`,
       title: formatMonth(month.month),
@@ -353,7 +383,7 @@ function renderStatsTables(stats) {
 
   renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true });
   renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged' });
-  renderBreakdown($('#statsEventsTable'), 'Event', 'event', stats.byEvent, { none: 'No event' });
+  renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection' });
   renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits' });
 
   renderTable($('#statsMonthsTable'),
@@ -373,8 +403,8 @@ function renderStatsTables(stats) {
 }
 
 /**
- * People, tags, events, and merchants share one table layout, highest net first. Selecting a row lists that scope's
- * entries; the "none" row (untagged, no event, no merchant) is listed last and is not selectable.
+ * People, tags, collections, and merchants share one table layout, highest net first. Selecting a row lists that scope's
+ * entries; the "none" row (untagged, no collection, no merchant) is listed last and is not selectable.
  */
 function renderBreakdown(table, label, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false } = {}) {
   const net = group => group.spent - group.refunded;
@@ -411,10 +441,15 @@ function initializeStats() {
     summary: names => (names.length > 2 ? `${names.length} measures` : names.join(', '))
   });
   statsChartSelect.setOptions(CHART_METRICS, state.statsChart);
-  statsPeriodSelect = createSingleSelect($('#statsPeriodSelect'), {
-    onChange: value => {
-      state.statsPeriod = value;
+  // Check any number of years, months, and collections; All time and the others exclude each other, and the last
+  // choice cannot be unchecked, as in the Time frame dropdown.
+  statsPeriodSelect = createMultiSelect($('#statsPeriodSelect'), {
+    onChange: values => {
+      const periods = values.filter(value => value !== 'all');
+      if (values.includes('all') && !state.statsPeriod.includes('all')) state.statsPeriod = ['all'];
+      else if (periods.length) state.statsPeriod = periods;
       renderStats();
-    }
+    },
+    summary: names => (names.length > 3 ? `${names.length} periods` : names.join(', '))
   });
 }

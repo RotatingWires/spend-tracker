@@ -1,9 +1,9 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.8.2 Manual
+# SpendTracker v0.9.0 Manual
 
-SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, events you put on purchases, an edit history, and statistics.
+SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
 The guiding rule is **real data only**. SpendTracker never assigns categories, guesses merchants, fills in missing amounts, or estimates anything. Tags exist only when you add them; untagged spending is reported as *Untagged*. Every statistic is a defined calculation over recorded entries, and each one's definition is shown when you hover or tap its underlined label.
 
@@ -31,9 +31,9 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **Monthly ledger** laid out like a spending spreadsheet: date, for who, what, tags, and one column per payment method, with monthly totals.
 - **Purchases, refunds, and paybacks.** Refunds link to the purchase they return. Paybacks record money other people gave you back, optionally settling a specific purchase.
 - **People ledger** showing what each person owes you, purchase by purchase.
-- **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the events of each day's entries.
-- **Events**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
-- **Stats** for any month, year, event, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, weekday, person, tag, event, merchant, and month.
+- **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the collections of each day's entries.
+- **Collections**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
+- **Stats** for any month, year, collection, or all time: totals, daily averages, no-spend streaks, highest day/week/month, and breakdowns by payment method, weekday, person, tag, collection, merchant, and month.
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -66,10 +66,10 @@ wwwroot/
   calendar.js           month calendar and day detail
   stats.js              statistics calculations and Stats tab
   people.js             people balances and person detail
-  summaries.js          Payment Methods, Tags, Events, and Merchants tabs: totals and actions per item
+  summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
   search.js             File → Search... dialog
   history.js            history log rendering
-  manage.js             add, rename, archive, and delete payment methods, people, tags, events, and merchants
+  manage.js             add, rename, archive, and delete payment methods, people, tags, collections, and merchants
   bulk.js               selection mode and bulk actions in the ledger
   scopes.js             numbered list of one person, tag, merchant, or payment method
   ui.js                 startup, tabs, toolbar, menus, backup/restore, session
@@ -120,9 +120,9 @@ Every entry is one of three types. All amounts are positive; the type decides wh
 
 Each transaction also has a date, an amount, a payment method, a merchant and/or a description (at least one is required), optional tags (purchases only), and an optional note.
 
-**IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, event, and merchant has its own permanent ID too, shown in the ID column of its tab. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags and events, its merchant, and its payment method. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner, *Cash #40* the fortieth cash entry. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a row on the Payment Methods, Tags, Events, or Merchants tab opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line. When one is added, SpendTracker numbers existing entries in it at the next start (in date order), and restoring an older backup does the same.
+**IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, collection, and merchant has its own permanent ID too, shown in the ID column of its tab. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags and collections, its merchant, and its payment method. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner, *Cash #40* the fortieth cash entry. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a row on the Payment Methods, Tags, Collections, or Merchants tab opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line. When one is added, SpendTracker numbers existing entries in it at the next start (in date order), and restoring an older backup does the same.
 
-**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: the month cards, Stats, People balances, refund and payback limits, events, CSV exports, and backups. **Restore** lists it again.
+**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: the month cards, Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
 **Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
@@ -154,13 +154,13 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 
 Merchants are managed like tags and people: add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
 
-### Events
+### Collections
 
-Events work like tags: named labels such as a trip, a move, or a wedding, created on the **Events** tab and chosen on purchases in the editor (several per purchase if needed). They have no dates of their own; an event covers exactly the purchases you put on it, wherever they are dated, plus the refunds on those purchases. Like tags, events can be renamed, archived (kept on existing purchases but no longer offered), and deleted (removed from every purchase). The calendar shows each day's events from its entries, and an event can be chosen as a Stats period.
+Collections work like tags: named labels such as a trip, a move, or a wedding, created on the **Collections** tab and chosen on purchases in the editor (several per purchase if needed). They have no dates of their own; a collection covers exactly the purchases you put on it, wherever they are dated, plus the refunds on those purchases. Like tags, collections can be renamed, archived (kept on existing purchases but no longer offered), and deleted (removed from every purchase). The calendar shows each day's collections from its entries, and a collection can be chosen as a Stats period.
 
 ### Archiving and deleting
 
-Payment methods, people, tags, events, and merchants can be **archived** on their tabs. An archived item is no longer offered when adding or editing transactions, but nothing else changes: it stays on every transaction that already has it, and it is still searchable and counted in Stats, People, History, CSV exports, and backups. Editing an old transaction keeps its archived choices. **Restore** makes it available again.
+Payment methods, people, tags, collections, and merchants can be **archived** on their tabs. An archived item is no longer offered when adding or editing transactions, but nothing else changes: it stays on every transaction that already has it, and it is still searchable and counted in Stats, People, History, CSV exports, and backups. Editing an old transaction keeps its archived choices. **Restore** makes it available again.
 
 Payment methods, people, and merchants that are used by transactions cannot be deleted; archive them instead. Unused items can be deleted. Deleting a tag removes it from every transaction that had it; the transactions themselves are kept and History records how many were affected.
 
@@ -168,9 +168,9 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The cards above the table show the time frame's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method, and an **Events** column once you have created an event; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden, and the cards still include them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The cards above the table show the time frame's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden, and the cards still include them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
-**File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, events, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
+**File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
 Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button in the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
@@ -181,7 +181,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 - **Refund / return** on a split purchase also asks **Whose share** it refunds.
 - **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid.
 - **Tags** is a dropdown of check items, so a purchase can have several. Tags are created, renamed, archived, and deleted only on the **Tags** tab.
-- **Events** works the same way as Tags, for events created on the **Events** tab.
+- **Collections** works the same way as Tags, for collections created on the **Collections** tab.
 - **Merchant** is a dropdown of your active merchants, like payment methods, plus **No merchant**. Merchants are added on the **Merchants** tab. An archived merchant can stay on entries that already have it but is not offered for others.
 - Errors from the server are shown in the dialog exactly as returned; nothing is saved until the server accepts the entry.
 
@@ -194,7 +194,7 @@ The split button's main action is **Archive** (or **Restore** when every selecte
 | Action | What it does | Skipped when |
 |---|---|---|
 | **Archive** / **Restore** | hides or lists the entries | already archived / not archived |
-| **Tags...** / **Events...** | **Change** chooses *Add to the selected entries* or *Remove from the selected entries*, then check any number of tags or events | adding to a refund or payback, or the entry already has / lacks it |
+| **Tags...** / **Collections...** | **Change** chooses *Add to the selected entries* or *Remove from the selected entries*, then check any number of tags or collections | adding to a refund or payback, or the entry already has / lacks it |
 | **People...** | the same Add / Remove choice for any number of people, then **splits the purchase evenly** between everyone on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
 | **Merchant...** | sets one merchant, chosen from a dropdown of your active merchants (**No merchant** clears it; merchants are added on the Merchants tab) | already has that merchant |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
@@ -203,19 +203,19 @@ Every action first asks for confirmation, listing up to 12 selected entries and 
 
 ### Calendar
 
-One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the events of the entries recorded on it. Select a day to list its entries, edit one, or add a new entry on that date.
+One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Select a day to list its entries, edit one, or add a new entry on that date.
 
 ### Stats
 
-Choose a **Period**: all time, a year, a month, or an event. An event's period runs from its first to its last entry and counts only its own purchases and the refunds on them (paybacks are not part of events). See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
+**Period** is a dropdown of check items: all time, or any mix of years, months, and collections. All time and the others exclude each other, and the last choice cannot be unchecked. With several periods checked, an entry counts when it falls in any of them, and day-based numbers (counted days, averages, streaks, day of week, months, and the chart's days) use only the days inside the checked periods; a no-spend streak does not carry across the gap between two of them. A collection's period runs from its first to its last entry and counts only its own purchases and the refunds on them (paybacks are not part of collections). See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
 
 ### People
 
 An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
 
-### Payment Methods, Tags, Events, and Merchants
+### Payment Methods, Tags, Collections, and Merchants
 
-Four tabs with the same layout: an **Add** form, then one row per payment method, tag, event, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, the dates from its first to its last entry, and **Rename**, **Archive** / **Restore**, and **Delete** buttons. Refunds count under their purchase's tags, events, and merchant; a purchase with two tags (or events) counts toward both. Select a row for its numbered list of entries. On the Events tab, **Stats** opens the Stats tab with that event as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row (not its buttons) for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, the dates from its first to its last entry, and **Rename**, **Archive** / **Restore**, and **Delete** buttons. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row (not its buttons) for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### History
 
@@ -264,14 +264,14 @@ Breakdown tables:
 - **By Payment Method:** purchases, spent, refunds, and net per method, and each method's share of spent.
 - **Day of Week:** purchases and net per weekday, and the average per occurrence of that weekday in the counted days.
 
-**People**, **Tags**, **Events**, and **Merchants** share one layout, highest net first: purchases (*visits* for merchants), spent, refunds, net, average purchase, and last purchase date. Select a row for that person's, tag's, event's, or merchant's numbered list of entries.
+**People**, **Tags**, **Collections**, and **Merchants** share one layout, highest net first: purchases (*visits* for merchants), spent, refunds, net, average purchase, and last purchase date. Select a row for that person's, tag's, collection's, or merchant's numbered list of entries.
 
 - **People:** each person's purchases and the total of their shares (a split purchase counts each person's own share), refunds on their shares, and **Paid Back** (paybacks from them).
 - **Tags:** plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
-- **Events:** plus **No event**, the same way as tags.
+- **Collections:** plus **No collection**, the same way as tags.
 - **Merchants:** grouped by merchant ID, so a renamed merchant keeps its whole history under its current name, plus *(no merchant)*.
 
-Refunds count under the tags, events, and merchant of their purchase.
+Refunds count under the tags, collections, and merchant of their purchase.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
 The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar right against the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
@@ -293,7 +293,7 @@ logs/
 
 **File → Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
 
-- `spend-tracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, event, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
+- `spend-tracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
 
 It never contains `auth.json` or the password hash. Treat it like your bank statements.
@@ -323,9 +323,9 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 
 ### Schema and migrations
 
-The database records its schema version in `PRAGMA user_version` (currently 4). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), and 0.4 (schema 3) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
+The database records its schema version in `PRAGMA user_version` (currently 5). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), and 0.5–0.8 (schema 4) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
 
-Schema 4 tables: `payment_methods`, `people`, `tags`, `merchants`, `events` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares`, `transaction_tags`, `transaction_events`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
+Schema 5 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares`, `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
 
 ## Authentication
 
@@ -361,13 +361,13 @@ All endpoints are under `/api`, use JSON, and require a session except `auth/sta
 | `POST /api/auth/setup` | `{ setupToken, password, confirmPassword }` |
 | `POST /api/auth/login` | `{ password }` |
 | `POST /api/auth/logout` | end the session |
-| `GET /api/snapshot` | all payment methods, people, tags, merchants, events, and transactions |
+| `GET /api/snapshot` | all payment methods, people, tags, merchants, collections, and transactions |
 | `POST /api/transactions` | create; returns the saved transaction |
 | `PUT /api/transactions/{id}` | replace all fields |
 | `DELETE /api/transactions/{id}` | delete |
-| `POST /api/payment-methods`, `/api/people`, `/api/tags`, `/api/events`, `/api/merchants` | `{ name }` |
-| `PATCH /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/events/{id}`, `/api/merchants/{id}` | `{ name?, archived? }` |
-| `DELETE /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/events/{id}`, `/api/merchants/{id}` | delete when allowed (deleting a tag or event removes it from its purchases) |
+| `POST /api/payment-methods`, `/api/people`, `/api/tags`, `/api/collections`, `/api/merchants` | `{ name }` |
+| `PATCH /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/collections/{id}`, `/api/merchants/{id}` | `{ name?, archived? }` |
+| `DELETE /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/collections/{id}`, `/api/merchants/{id}` | delete when allowed (deleting a tag or collection removes it from its purchases) |
 | `GET /api/history?limit=&beforeId=` | newest-first history page (`limit` 1–500, default 200) and `hasMore` |
 | `GET /api/backup` | download a backup ZIP |
 | `POST /api/restore` | restore a backup ZIP (raw body with `Content-Type: application/zip`, up to 256 MiB) |
@@ -386,7 +386,7 @@ A transaction body is:
   "description": "food",
   "note": "",
   "tagIds": [3],
-  "eventIds": [1],
+  "collectionIds": [1],
   "shares": [{ "personId": 1, "amountCents": 617 }, { "personId": 2, "amountCents": 600 }],
   "archived": false
 }
@@ -394,7 +394,7 @@ A transaction body is:
 
 `merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, …]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
 
-Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares`; refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `eventIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
+Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares`; refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `collectionIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
 
 ## Security and privacy
 
@@ -449,7 +449,7 @@ dotnet build
 python3 -m unittest discover -s tests -p "test_api.py"
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, events as labels, history, and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -457,11 +457,18 @@ Optional browser tests use Playwright with Firefox (`pip install playwright` and
 python3 -m unittest discover -s tests -p "test_browser.py"
 ```
 
-They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total events, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
+They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.9.0
+
+- **Events are now Collections**, everywhere: the tab, editor, bulk action, Stats, search, CSV, and Help, and internally too (database tables `collections` and `transaction_collections`, `/api/collections`, `collectionIds`, the `collection` numbering scope, and `Collection` history entries). Database schema 5; databases and backups from earlier versions are not upgraded.
+- **Stats → Period** is a dropdown of check items: combine any years, months, and collections. Entries count when they fall in any checked period, and day-based numbers use only the checked days.
+- The **Rename** dialog has **Cancel**, then **Save**; Enter saves.
+- Add boxes on each tab are exactly as tall as their **Add** button.
 
 ### v0.8.2
 

@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Adding, renaming, archiving, and deleting payment methods, people, tags, events, and merchants. Each has its own
+ * Adding, renaming, archiving, and deleting payment methods, people, tags, collections, and merchants. Each has its own
  * tab with an Add form at the top and these actions on every row.
  */
 
@@ -9,7 +9,7 @@ const MANAGED = {
   'payment-methods': { singular: 'payment method', archivable: () => true },
   people: { singular: 'person', archivable: item => !item.isSelf },
   tags: { singular: 'tag', archivable: () => true, removesFromEntries: true },
-  events: { singular: 'event', archivable: () => true, removesFromEntries: true },
+  collections: { singular: 'collection', archivable: () => true, removesFromEntries: true },
   merchants: { singular: 'merchant', maxLength: 120, archivable: () => true }
 };
 

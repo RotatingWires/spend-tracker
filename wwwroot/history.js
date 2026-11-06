@@ -5,7 +5,7 @@
 const HISTORY_PAGE_SIZE = 100;
 const historyState = { entries: [], hasMore: false, loading: false };
 
-const ENTITY_LABELS = { Transaction: 'Transaction', PaymentMethod: 'Payment method', Person: 'Person', Tag: 'Tag', Merchant: 'Merchant', Event: 'Event', Backup: 'Backup' };
+const ENTITY_LABELS = { Transaction: 'Transaction', PaymentMethod: 'Payment method', Person: 'Person', Tag: 'Tag', Merchant: 'Merchant', Collection: 'Collection', Backup: 'Backup' };
 
 const TRANSACTION_FIELDS = [
   ['kind', 'Type', value => value],
@@ -19,7 +19,7 @@ const TRANSACTION_FIELDS = [
   ['description', 'What', value => value || '—'],
   ['note', 'Note', value => value || '—'],
   ['tagIds', 'Tags', value => (value.length ? value.map(tagName).join(', ') : '—')],
-  ['eventIds', 'Events', value => (value?.length ? value.map(eventName).join(', ') : '—')],
+  ['collectionIds', 'Collections', value => (value?.length ? value.map(collectionName).join(', ') : '—')],
   ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
 ];
 

@@ -324,6 +324,12 @@ function promptText(title, label, value = '', { maxLength = 60 } = {}) {
   input.maxLength = maxLength;
   input.value = value;
   dialog.returnValue = '';
+  // Enter saves: Cancel comes first in the button row, so the form's default submit would cancel.
+  input.onkeydown = event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    dialog.close('ok');
+  };
   dialog.showModal();
   input.select();
   return new Promise(resolve => {

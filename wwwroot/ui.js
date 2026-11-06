@@ -9,7 +9,7 @@ const TAB_RENDERERS = {
   people: renderPeople,
   methods: renderMethodsTab,
   tags: renderTagsTab,
-  events: renderEvents,
+  collections: renderCollectionsTab,
   merchants: renderMerchantsTab,
   history: () => loadHistory()
 };
@@ -56,7 +56,7 @@ function renderAll() {
 
   const count = state.model.transactions.length;
   // Messages go on the left and totals on the right, as in TaskList.
-  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')} • ${plural(state.snapshot.events.length, 'event')}`;
+  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')} • ${plural(state.snapshot.collections.length, 'collection')}`;
   if ($('#statusLeft').textContent === 'Loading...') setStatus('Ready');
 }
 

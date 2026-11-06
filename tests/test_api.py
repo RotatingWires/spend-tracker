@@ -58,7 +58,7 @@ class SpendTrackerApiTests(unittest.TestCase):
     @staticmethod
     def editable(tx):
         """A saved transaction as a PUT body."""
-        return {k: tx[k] for k in ("kind", "date", "amountCents", "paymentMethodId", "personId", "linkedId", "merchantId", "description", "note", "tagIds", "eventIds", "shares")}
+        return {k: tx[k] for k in ("kind", "date", "amountCents", "paymentMethodId", "personId", "linkedId", "merchantId", "description", "note", "tagIds", "collectionIds", "shares")}
 
     def assertRejected(self, call, status=400, contains=None):
         with self.assertRaises(ApiError) as context:
@@ -243,31 +243,31 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertFalse(restored["archived"])
         self.purchase(tagIds=[food])
 
-    def test_events_work_like_tags(self):
-        trip = self.api.post("/api/events", {"name": "Trip"})["id"]
-        self.assertRejected(lambda: self.api.post("/api/events", {"name": "trip"}), contains="already exists")
-        self.assertRejected(lambda: self.api.post("/api/events", {"name": "Trip", "startDate": "2026-10-01"}), contains="startDate")  # no dates any more
-        bought = self.purchase(eventIds=[trip])
-        self.assertEqual(bought["eventIds"], [trip])
-        self.assertIn({"scope": "event", "scopeId": trip, "number": 1}, bought["numbers"])
-        self.assertRejected(lambda: self.refund(bought["id"], 100, eventIds=[trip]), contains="Only purchases have events")
-        self.assertEqual(self.editable(bought)["eventIds"], [trip])
+    def test_collections_work_like_tags(self):
+        trip = self.api.post("/api/collections", {"name": "Trip"})["id"]
+        self.assertRejected(lambda: self.api.post("/api/collections", {"name": "trip"}), contains="already exists")
+        self.assertRejected(lambda: self.api.post("/api/collections", {"name": "Trip", "startDate": "2026-10-01"}), contains="startDate")  # no dates any more
+        bought = self.purchase(collectionIds=[trip])
+        self.assertEqual(bought["collectionIds"], [trip])
+        self.assertIn({"scope": "collection", "scopeId": trip, "number": 1}, bought["numbers"])
+        self.assertRejected(lambda: self.refund(bought["id"], 100, collectionIds=[trip]), contains="Only purchases have collections")
+        self.assertEqual(self.editable(bought)["collectionIds"], [trip])
 
-        self.api.patch(f"/api/events/{trip}", {"archived": True})
-        self.assertRejected(lambda: self.purchase(eventIds=[trip]), contains="event is archived")
+        self.api.patch(f"/api/collections/{trip}", {"archived": True})
+        self.assertRejected(lambda: self.purchase(collectionIds=[trip]), contains="collection is archived")
         kept = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "note": "still on the trip"})
-        self.assertEqual(kept["eventIds"], [trip])
-        # Leaving eventIds out of an edit clears them, the same as leaving out tagIds.
-        cleared = self.api.put(f"/api/transactions/{bought['id']}", {k: v for k, v in self.editable(kept).items() if k != "eventIds"})
-        self.assertEqual(cleared["eventIds"], [])
+        self.assertEqual(kept["collectionIds"], [trip])
+        # Leaving collectionIds out of an edit clears them, the same as leaving out tagIds.
+        cleared = self.api.put(f"/api/transactions/{bought['id']}", {k: v for k, v in self.editable(kept).items() if k != "collectionIds"})
+        self.assertEqual(cleared["collectionIds"], [])
 
-        self.assertRejected(lambda: self.api.put(f"/api/transactions/{bought['id']}", self.editable(kept)), contains="event is archived")
-        self.api.patch(f"/api/events/{trip}", {"archived": False})
+        self.assertRejected(lambda: self.api.put(f"/api/transactions/{bought['id']}", self.editable(kept)), contains="collection is archived")
+        self.api.patch(f"/api/collections/{trip}", {"archived": False})
         self.api.put(f"/api/transactions/{bought['id']}", self.editable(kept))
-        self.api.delete(f"/api/events/{trip}")
-        self.assertEqual(self.api.get("/api/snapshot")["transactions"][0]["eventIds"], [])
+        self.api.delete(f"/api/collections/{trip}")
+        self.assertEqual(self.api.get("/api/snapshot")["transactions"][0]["collectionIds"], [])
         self.assertEqual(self.history()[0]["before"]["removedFromTransactions"], 1)
-        self.assertRejected(lambda: self.api.delete(f"/api/events/{trip}"), 404)
+        self.assertRejected(lambda: self.api.delete(f"/api/collections/{trip}"), 404)
 
     # ------------------------------------------------------------ backup and restore
 
@@ -276,8 +276,8 @@ class SpendTrackerApiTests(unittest.TestCase):
         bought = self.purchase(amount=2500, shares=[(self.me, 500), (self.alex, 2000)], tagIds=[food])
         self.refund(bought["id"], 500, person=self.alex)
         self.payback(1000, linked=bought["id"])
-        trip = self.api.post("/api/events", {"name": "Trip"})["id"]
-        self.purchase(eventIds=[trip])
+        trip = self.api.post("/api/collections", {"name": "Trip"})["id"]
+        self.purchase(collectionIds=[trip])
         before = self.api.get("/api/snapshot")
         archive = self.api.download("/api/backup")
 
@@ -288,7 +288,7 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual(manifest["format"], "spendtracker-backup")
         self.assertEqual(manifest["sha256"], hashlib.sha256(database).hexdigest())
         self.assertEqual(manifest["totals"]["transactions"], 4)
-        self.assertEqual(manifest["totals"]["transaction_events"], 1)
+        self.assertEqual(manifest["totals"]["transaction_collections"], 1)
         self.assertNotIn(b"PBKDF2", database)  # the password file is never included
 
         self.purchase(amount=999, merchant="Added after backup")
@@ -402,7 +402,7 @@ class SpendTrackerApiTests(unittest.TestCase):
             "impossible date": "UPDATE transactions SET date = '2026-02-30'",
             "text amount": "UPDATE transactions SET amount_cents = 'lots'",
             "no self person": "UPDATE people SET is_self = 0",
-            "event on a refund": f"INSERT INTO events (id, name, created_at) VALUES (9, 'x', 'x'); INSERT INTO transaction_events VALUES ({bought['id'] + 1}, 9)",
+            "collection on a refund": f"INSERT INTO collections (id, name, created_at) VALUES (9, 'x', 'x'); INSERT INTO transaction_collections VALUES ({bought['id'] + 1}, 9)",
             "tag on a refund": f"INSERT INTO tags (id, name, created_at) VALUES (9, 'x', 'x'); INSERT INTO transaction_tags VALUES ({bought['id'] + 1}, 9)",
             "blank name": "UPDATE tags SET name = ' '; INSERT INTO tags (name, created_at) VALUES ('  ', 'x')",
             "damaged history": "UPDATE history SET after_json = '{not json'",
@@ -427,7 +427,8 @@ class SpendTrackerApiTests(unittest.TestCase):
             "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
             "wrong format": rebuild(archive, manifest={"format": "something-else"}),
             "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
-            "newer schema": rebuild(archive, manifest={"schemaVersion": 5}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 6}),
+            "schema 4 from v0.8": rebuild(archive, manifest={"schemaVersion": 4}),
             "schema 3 from v0.4": rebuild(archive, manifest={"schemaVersion": 3}),
             "schema 2 from v0.3": rebuild(archive, manifest={"schemaVersion": 2}),
             "extra member": rebuild(archive, extra={"notes.txt": b"hi"}),

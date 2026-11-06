@@ -1,9 +1,9 @@
 'use strict';
 
 /*
- * Payment Methods, Tags, Events, and Merchants tabs: totals per item from the purchases that have it and the refunds
+ * Payment Methods, Tags, Collections, and Merchants tabs: totals per item from the purchases that have it and the refunds
  * on those purchases, with an Add form and Rename/Archive/Delete on each row. Selecting a row lists that scope's
- * entries; an event can also be opened as a Stats period.
+ * entries; a collection can also be opened as a Stats period.
  */
 
 function merchantIdsOf(tx) {
@@ -16,7 +16,7 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
     const entries = state.model.transactions.filter(tx => tx.kind !== 'Payback' && idsOf(tx).includes(item.id));
     const uses = state.model.transactions.filter(tx => idsOf(tx).includes(item.id)).length;
     const totals = monthTotals(entries);
-    const actions = manageButtons(path, item, uses, stats ? [['Stats', () => showEventStats(item), `Show stats for ${item.name}`]] : []);
+    const actions = manageButtons(path, item, uses, stats ? [['Stats', () => showCollectionStats(item), `Show stats for ${item.name}`]] : []);
     return {
       onClick: () => openScopeList(scope, item.id),
       cells: [
@@ -53,9 +53,9 @@ function renderTagsTab() {
     { label: 'Tag', empty: 'No tags yet. Add one above, then choose it on purchases in the editor.' });
 }
 
-function renderEvents() {
-  renderLabelSummary($('#eventsTable'), 'event', 'events', state.snapshot.events, eventIdsOf,
-    { label: 'Event', empty: 'No events yet. Add one above, then choose it on purchases in the editor.', stats: true });
+function renderCollectionsTab() {
+  renderLabelSummary($('#collectionsTable'), 'collection', 'collections', state.snapshot.collections, collectionIdsOf,
+    { label: 'Collection', empty: 'No collections yet. Add one above, then choose it on purchases in the editor.', stats: true });
 }
 
 function renderMerchantsTab() {
@@ -63,7 +63,7 @@ function renderMerchantsTab() {
     { label: 'Merchant', empty: 'No merchants yet. Add one above, then choose it in the editor.' });
 }
 
-function showEventStats(event) {
-  state.statsPeriod = `e:${event.id}`;
+function showCollectionStats(collection) {
+  state.statsPeriod = [`c:${collection.id}`];
   switchTab('stats');
 }
