@@ -48,7 +48,7 @@
       </div>
     </nav>
 
-    <section class="toolbar" aria-label="Month and quick actions">
+    <section class="toolbar" aria-label="Month and search">
       <div class="toolbar-group" id="monthControls">
         <span class="toolbar-label" id="monthLabel">Month:</span>
         <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month">◀</button>
@@ -56,7 +56,10 @@
         <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month">▶</button>
         <span class="toolbar-separator" aria-hidden="true"></span>
       </div>
-      <button type="button" id="newTransactionButton">New Transaction</button>
+      <form id="searchForm" role="search">
+        <input id="searchInput" class="retro-input" type="search" aria-label="Search transactions" placeholder="Search transactions: merchant, description, note, tag, amount, #ID" autocomplete="off">
+        <button type="submit">Search</button>
+      </form>
     </section>
 
     <section class="tabs" role="tablist" aria-label="Sections">
@@ -69,11 +72,7 @@
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
         <div id="monthCards" class="stat-grid"></div>
-        <form class="panel-actions" id="searchForm" role="search">
-          <label for="searchInput" class="control-label">Search:</label>
-          <input id="searchInput" class="retro-input" type="search" placeholder="Merchant, description, note, tag, amount" autocomplete="off">
-          <button type="submit">Search</button>
-        </form>
+        <div class="panel-actions"><button type="button" id="newTransactionButton">New Transaction</button></div>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="archivedNote" class="note" hidden></div>
       </section>
@@ -263,7 +262,7 @@
   <dialog id="chooseDialog" class="retro-dialog" aria-labelledby="chooseTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="chooseTitle">Choose</div>
-      <div class="dialog-body"><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div></div>
+      <div class="dialog-body choose-body"><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div></div>
       <div class="dialog-buttons"><button type="submit" value="ok" id="chooseOkButton">OK</button><button type="submit" value="cancel">Cancel</button></div>
     </form>
   </dialog>
@@ -287,8 +286,8 @@
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
         <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
         <p><strong>Archiving</strong> a payment method, person, tag, or merchant under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats. Archiving a <strong>transaction</strong> hides it from the ledger and calendar (View → Show Archived lists it again); it still counts in Stats, People balances, and refund limits.</p>
-        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, and merchant it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or a person, tag, or merchant under Manage, to see its whole numbered list.</p>
-        <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape stops) to archive, tag, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
+        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, merchant, and payment method it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or a payment method, person, tag, or merchant under Manage, to see its whole numbered list.</p>
+        <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape or Select... again stops) to archive, tag, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
         <p>Amounts are shown in US dollars.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>

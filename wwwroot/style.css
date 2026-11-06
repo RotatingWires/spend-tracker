@@ -165,16 +165,15 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 .menu-dropdown button:disabled:hover { color: var(--muted); background: transparent; cursor: default; }
 
 /* Selection mode, as in TaskList: the count and actions sit in the middle of the menu bar, on their own row when narrow. */
-.bulk-controls { display: flex; align-items: center; justify-self: center; gap: 8px; white-space: nowrap; }
+.bulk-controls { display: flex; align-items: center; justify-self: center; gap: 10px; white-space: nowrap; }
 .bulk-controls[hidden] { display: none; }
 @media (max-width: 1000px) {
   .menubar { grid-template-columns: 1fr; }
   .bulk-controls { grid-row: 2; }
 }
-.bulk-actions { display: flex; align-items: center; gap: 4px; }
-/* Compact buttons keep the menu bar the same height when selection mode turns on. */
-.bulk-actions button { padding-top: 3px; padding-bottom: 3px; }
-.split-group { position: relative; display: inline-flex; }
+.bulk-actions { display: flex; align-items: center; }
+/* Same sizes and margins as TaskList's bulk split button, so the menu bar grows the same way in selection mode. */
+.split-group { position: relative; display: inline-flex; margin: 2px 3px 2px 0; }
 .split-group > button { margin: 0; }
 .split-primary { min-width: 88px; justify-content: center; }
 .split-arrow { min-width: 25px; padding: 3px 5px; font-size: 9px; }
@@ -187,6 +186,10 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 .archived-badge { font-size: 12px; color: var(--muted); }
 .tx-numbers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 8px; }
 .number-chip { padding: 1px 6px; font-size: 12px; }
+/* The chooser's dropdown may extend past the small dialog instead of making it scroll; the list scrolls itself. */
+#chooseDialog, #chooseDialog .dialog-window, #chooseDialog .choose-body { overflow: visible; }
+.choose-body { display: grid; gap: 6px; }
+.choose-body .inline-select-menu, .choose-body .retro-select { width: 100%; }
 .confirm-detail { max-height: 220px; overflow: auto; margin-top: 8px; padding: 4px 6px; white-space: pre-wrap; background: var(--surface); border: 1px solid var(--shadow); }
 
 .toolbar {
@@ -200,6 +203,9 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
   min-height: 38px;
 }
 .toolbar-label { font-weight: 700; }
+/* The search bar fills the toolbar, like TaskList's new-task bar. */
+#searchForm { display: flex; flex: 1 1 420px; gap: 6px; min-width: 0; }
+#searchInput { flex: 1; min-width: 0; }
 .toolbar-group { display: flex; align-items: center; gap: 5px; }
 .toolbar-separator { width: 2px; height: 24px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--light-edge); margin: 0 3px; }
 .icon-button { min-width: 30px; padding: 4px 7px; }
@@ -578,6 +584,7 @@ textarea:focus-visible,
 
 @media (max-width: 780px) {
   .toolbar-separator { display: none; }
+  #searchForm { flex-basis: 100%; }
   .two-column { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { padding: 5px; }

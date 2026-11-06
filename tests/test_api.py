@@ -292,9 +292,9 @@ class SpendTrackerApiTests(unittest.TestCase):
 
         self.assertEqual(second["merchantId"], first["merchantId"], "merchant names match ignoring case")
         self.assertEqual(second["merchant"], "Diner", "the first spelling is kept")
-        self.assertEqual(numbers(first), {("person", self.me): 1, ("person", self.alex): 1, ("tag", food): 1, ("merchant", first["merchantId"]): 1})
-        self.assertEqual(numbers(second), {("person", self.alex): 2, ("merchant", first["merchantId"]): 2})
-        self.assertEqual(numbers(payback), {("person", self.alex): 3})
+        self.assertEqual(numbers(first), {("person", self.me): 1, ("person", self.alex): 1, ("tag", food): 1, ("merchant", first["merchantId"]): 1, ("method", self.card): 1})
+        self.assertEqual(numbers(second), {("person", self.alex): 2, ("merchant", first["merchantId"]): 2, ("method", self.card): 2})
+        self.assertEqual(numbers(payback), {("person", self.alex): 3, ("method", self.cash): 1})
 
         # Numbers are never reused: deleting #2 and adding another entry gives it #4, and leaving a scope drops its number.
         self.api.delete(f"/api/transactions/{second['id']}")
@@ -350,6 +350,16 @@ class SpendTrackerApiTests(unittest.TestCase):
         restored = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(edited), "archived": False})
         self.assertFalse(restored["archived"])
 
+    def test_restore_fills_in_missing_numbers(self):
+        """A backup from before a scope existed has no numbers for it; restoring numbers its entries in date order."""
+        later = self.purchase(date="2026-10-09", method=self.cash)
+        earlier = self.purchase(date="2026-10-02", method=self.cash)
+        archive = self.api.download("/api/backup")
+        self.api.upload_zip("/api/restore", rebuild(archive, sql="DELETE FROM scope_numbers WHERE scope = 'method'; DELETE FROM scope_counters WHERE scope = 'method'"))
+        numbers = {tx["id"]: {(n["scope"], n["scopeId"]): n["number"] for n in tx["numbers"]} for tx in self.api.get("/api/snapshot")["transactions"]}
+        self.assertEqual((numbers[earlier["id"]][("method", self.cash)], numbers[later["id"]][("method", self.cash)]), (1, 2))
+        self.assertEqual(numbers[later["id"]][("person", self.me)], 1, "numbers that were in the backup are kept")
+
     def test_invalid_restore_changes_nothing(self):
         bought = self.purchase(amount=1000, person=self.alex)
         self.refund(bought["id"], 100, person=self.alex)
@@ -372,7 +382,6 @@ class SpendTrackerApiTests(unittest.TestCase):
             "payback from me": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, description, created_at) VALUES ('Payback', '2026-10-05', 5, 1, {self.me}, 'x', 'x')",
             "missing merchant": "UPDATE transactions SET merchant_id = 99",
             "blank merchant name": "UPDATE merchants SET name = ''",
-            "number missing": "DELETE FROM scope_numbers WHERE scope = 'person'",
             "number for a scope it left": f"INSERT INTO scope_numbers VALUES ('tag', 5, {bought['id']}, 1); INSERT INTO scope_counters VALUES ('tag', 5, 1)",
             "number past its counter": "UPDATE scope_numbers SET number = number + 10 WHERE scope = 'merchant'",
             "unknown scope": "INSERT INTO scope_counters VALUES ('color', 1, 1)",

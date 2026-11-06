@@ -189,6 +189,7 @@ class BrowserTests(unittest.TestCase):
             page.click(f'.tabs button:text-is("{tab}")')
             overflow = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
             self.assertLessEqual(overflow, 0, f"{tab} scrolls sideways on a phone")
+        page.click('.tabs [data-tab="transactions"]')
         page.click("#newTransactionButton")
         box = page.locator("#transactionDialog").bounding_box()
         self.assertLessEqual(box["x"] + box["width"], 390)
@@ -308,6 +309,19 @@ class BrowserTests(unittest.TestCase):
         page.click("#confirmOkButton")
         expect(page.locator("#selectedCount")).to_have_text("Selected: 1")
 
+        # Set Merchant chooses from a dropdown of merchants, like tags and people; the list fits without scrolling the dialog.
+        page.click("#bulkActions .split-arrow")
+        page.locator("#bulkActions .split-dropdown button", has_text="Set Merchant...").click()
+        page.click("#chooseSelect .retro-select")
+        expect(page.locator("#chooseSelect .menu-dropdown")).to_be_in_viewport(ratio=1)  # shown whole, not clipped by the dialog
+        self.assertEqual(page.locator("#chooseDialog .dialog-body").evaluate("b => getComputedStyle(b).overflowY"), "visible")
+        self.shot(page, "choose-merchant")
+        page.locator("#chooseSelect .menu-dropdown button", has_text="Bakery").click()
+        page.click("#chooseOkButton")
+        page.click("#confirmOkButton")
+        expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("Bakery")
+        page.click(f'#transactionsTable tr[data-id="{third["id"]}"] .selection-check')
+
         # Archiving hides an entry from the ledger but it still counts in the month's totals.
         page.click("#bulkActions .split-primary")
         page.click("#confirmOkButton")
@@ -351,9 +365,15 @@ class BrowserTests(unittest.TestCase):
         page.locator("#scopeDialog button", has_text="Close").click()
         page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
-        page.locator("#scopeTable tbody tr").first.click()
+        expect(page.locator("#scopeTable tbody tr")).to_have_count(2)  # #2 is the purchase moved here by Set Merchant
+        page.locator("#scopeTable tbody tr").last.click()
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")
+        page.click('.tabs [data-tab="manage"]')
+        page.locator("#methodsTable tbody tr", has_text="Cash").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Payment method: Cash")
+        expect(page.locator("#scopeTable tbody tr", has_text="Hardware")).to_contain_text(f"#{first['id']}")  # other tests also pay cash
+        page.locator("#scopeDialog button", has_text="Close").click()
 
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})

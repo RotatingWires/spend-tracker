@@ -319,15 +319,17 @@ function startApp() {
   $('#nextMonthButton').addEventListener('click', () => changeMonth(shiftMonth(state.month, 1)));
   // Search runs on the Search button or Enter, as in TaskList and NewsReview, not on every keystroke.
   // Emptying the box is already a complete search, so it shows every row again right away.
+  // The bar sits in the toolbar on every tab; searching shows the results in the Transactions ledger.
   $('#searchForm').addEventListener('submit', event => {
     event.preventDefault();
     state.search = $('#searchInput').value.trim();
-    renderTransactions();
+    if (state.activeTab === 'transactions') renderTransactions();
+    else switchTab('transactions');
   });
   $('#searchInput').addEventListener('input', event => {
     if (event.target.value.trim() || !state.search) return;
     state.search = '';
-    renderTransactions();
+    if (state.activeTab === 'transactions') renderTransactions();
   });
   $$('.tabs [role="tab"]').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   document.addEventListener('click', closeMenus);

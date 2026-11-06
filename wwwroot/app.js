@@ -249,12 +249,12 @@ function listedTransactions(start, end) {
   return transactionsInRange(start, end).filter(tx => state.showArchived || !tx.archived);
 }
 
-/** A transaction's number inside a scope ("person", "tag", "merchant"), such as 3 for Alex's third entry. */
+/** A transaction's number inside a scope ("person", "tag", "merchant", "method"), such as 3 for Alex's third entry. */
 function numberIn(tx, scope, scopeId) {
   return tx.numbers.find(entry => entry.scope === scope && entry.scopeId === scopeId)?.number ?? null;
 }
 
-const SCOPE_NAMES = { person: personName, tag: tagName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}` };
+const SCOPE_NAMES = { person: personName, tag: tagName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}`, method: methodName };
 
 /** Every per-scope number of a transaction, people first, each labelled like "Alex #3". */
 function scopeNumbers(tx) {

@@ -6,6 +6,7 @@ const MANAGED = {
   'payment-methods': {
     table: '#methodsTable',
     singular: 'payment method',
+    scope: 'method',
     items: () => state.snapshot.paymentMethods,
     uses: id => state.model.transactions.filter(tx => tx.paymentMethodId === id).length,
     archivable: () => true
@@ -47,7 +48,7 @@ function renderManage() {
       if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
 
       const name = item.isSelf ? `${item.name} (you)` : item.name;
-      // People, tags, and merchants number their entries; selecting the row lists them.
+      // Every managed item numbers its entries; selecting the row lists them.
       const onClick = config.scope ? () => openScopeList(config.scope, item.id) : undefined;
       return { onClick, cells: [`#${item.id}`, name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
     });

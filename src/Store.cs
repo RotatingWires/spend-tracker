@@ -52,7 +52,14 @@ sealed class Store
         var version = Convert.ToInt32(Scalar(connection, null, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
         if (version > SchemaVersion)
             throw new InvalidOperationException($"spend-tracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
-        if (version == SchemaVersion) return journalMode;
+        if (version == SchemaVersion)
+        {
+            // Gives existing entries their numbers in any scope added to NumberedScopes since they were saved.
+            using var renumber = connection.BeginTransaction();
+            Renumber(connection, renumber, null);
+            renumber.Commit();
+            return journalMode;
+        }
         if (version != 0)
             throw new InvalidOperationException($"spend-tracker.db was created by an earlier SpendTracker (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
 
@@ -192,7 +199,7 @@ sealed class Store
 
     /// <summary>
     /// Besides its permanent global ID, a transaction gets a number inside each scope it belongs to: Alex's 3rd entry,
-    /// the 12th "food" purchase, the 5th visit to a merchant. A new kind of scope only needs a row here: its name and a
+    /// the 12th "food" purchase, the 5th visit to a merchant, the 40th card payment. A new kind of scope only needs a row here: its name and a
     /// query listing (scope_id, transaction_id) memberships. Numbers follow the order entries join a scope and are never
     /// reused, so "Alex #3" keeps meaning the same entry even after others are deleted.
     /// </summary>
@@ -204,6 +211,7 @@ sealed class Store
             """),
         ("tag", "SELECT tag_id AS scope_id, transaction_id FROM transaction_tags"),
         ("merchant", "SELECT merchant_id AS scope_id, id AS transaction_id FROM transactions WHERE merchant_id IS NOT NULL"),
+        ("method", "SELECT payment_method_id AS scope_id, id AS transaction_id FROM transactions"),
     ];
 
     /// <summary>Brings the numbers of one transaction (or all, when null) in line with the scopes it now belongs to.</summary>
@@ -241,7 +249,7 @@ sealed class Store
         }
     }
 
-    /// <summary>Drops the numbers and counter of a scope whose person, tag, or merchant was deleted.</summary>
+    /// <summary>Drops the numbers and counter of a scope whose person, tag, merchant, or payment method was deleted.</summary>
     static void ForgetScope(SqliteConnection connection, SqliteTransaction transaction, string scope, long scopeId) =>
         Execute(connection, transaction, "DELETE FROM scope_numbers WHERE scope = $scope AND scope_id = $id; DELETE FROM scope_counters WHERE scope = $scope AND scope_id = $id;",
             ("$scope", scope), ("$id", scopeId));
@@ -746,6 +754,7 @@ sealed class Store
         var remaining = Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM payment_methods WHERE archived = 0 AND id <> $id;", ("$id", id)), CultureInfo.InvariantCulture);
         if (remaining == 0) throw RequestException.Invalid("Keep at least one active payment method.");
         Execute(connection, transaction, "DELETE FROM payment_methods WHERE id = $id;", ("$id", id));
+        ForgetScope(connection, transaction, "method", id);
         RecordHistory(connection, transaction, "Deleted", "PaymentMethod", id, before, null);
         transaction.Commit();
     }
@@ -1002,6 +1011,8 @@ sealed class Store
 
         ValidateRestoredRows(connection, transaction);
         CheckIntegrity(connection, transaction);
+        // A backup from before a scope was added has no numbers for it yet; they are given out now, in date order.
+        Renumber(connection, transaction, null);
         RecordHistory(connection, transaction, "Restored", "Backup", null, null, restoreDetails);
         transaction.Commit();
     }
@@ -1090,7 +1101,10 @@ sealed class Store
             RequireDate(reader.GetString(0), "Every date in the backup");
     }
 
-    /// <summary>Restored numbers must be exactly the scopes each transaction belongs to, within each scope's counter.</summary>
+    /// <summary>
+    /// Restored numbers must belong to scopes their transaction is in, within each scope's counter. Numbers missing for a
+    /// scope are not an error; ReplaceAllData gives them out after these checks.
+    /// </summary>
     static void ValidateRestoredNumbers(SqliteConnection connection, SqliteTransaction transaction)
     {
         var scopes = string.Join(", ", NumberedScopes.Select(s => $"'{s.Scope}'"));
@@ -1106,15 +1120,12 @@ sealed class Store
 
         foreach (var (scope, members) in NumberedScopes)
         {
-            var missing = Scalar(connection, transaction, $"""
-                SELECT m.transaction_id FROM ({members}) m
-                WHERE NOT EXISTS (SELECT 1 FROM scope_numbers n WHERE n.scope = $scope AND n.scope_id = m.scope_id AND n.transaction_id = m.transaction_id)
-                UNION ALL
+            var stray = Scalar(connection, transaction, $"""
                 SELECT n.transaction_id FROM scope_numbers n
                 WHERE n.scope = $scope AND (n.scope_id, n.transaction_id) NOT IN (SELECT scope_id, transaction_id FROM ({members}))
                 LIMIT 1;
                 """, ("$scope", scope));
-            if (missing is not null) throw RequestException.Invalid($"Transaction #{missing} in the backup has {scope} numbers that do not match its {scope}s.");
+            if (stray is not null) throw RequestException.Invalid($"Transaction #{stray} in the backup has a {scope} number for a {scope} it does not belong to.");
         }
     }
 

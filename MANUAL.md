@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.4.1 Manual
+# SpendTracker v0.4.2 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a monthly ledger, a calendar, a ledger of what other people owe you, user-defined events, an edit history, and statistics.
 
@@ -70,7 +70,7 @@ wwwroot/
   history.js            history log rendering
   manage.js             payment methods, people, tags, and merchants
   bulk.js               selection mode and bulk actions in the ledger
-  scopes.js             numbered list of one person, tag, or merchant
+  scopes.js             numbered list of one person, tag, merchant, or payment method
   ui.js                 startup, tabs, toolbar, menus, backup/restore, session
   theme.js / theme.css  Light/Dark preference and color tokens
   style.css             Windows 95-style layout and components
@@ -119,7 +119,7 @@ Every entry is one of three types. All amounts are positive; the type decides wh
 
 Each transaction also has a date, an amount, a payment method, a merchant and/or a description (at least one is required), optional tags (purchases only), and an optional note.
 
-**IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, merchant, and event has its own permanent ID too, shown under Manage. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags, and its merchant. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a person, tag, or merchant row under **Manage** opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line.
+**IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, merchant, and event has its own permanent ID too, shown under Manage. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags, its merchant, and its payment method. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner, *Cash #40* the fortieth cash entry. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a payment method, person, tag, or merchant row under **Manage** opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line. When one is added, SpendTracker numbers existing entries in it at the next start (in date order), and restoring an older backup does the same.
 
 **Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: the month cards, Stats, People balances, refund and payback limits, events, CSV exports, and backups. **Restore** lists it again.
 
@@ -169,9 +169,9 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 The default tab is a monthly ledger. Use **◀ / ▶** or the month dropdown in the toolbar to change months. The cards above the table show the month's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method; refunds show as −$ and paybacks as +$ in green. The footer row shows net spent per payment method for the listed rows (purchases minus refunds; paybacks are excluded). Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden, and the cards still include them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
-**Search** filters the month's rows by what you typed or tagged: merchant, description, note, tags, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview; emptying the box shows every row again. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
+The **search bar** fills the toolbar, like the new-task bar in TaskList, and is there on every tab; searching from another tab opens the Transactions ledger with the results. It filters the month's rows by what you typed or tagged: merchant, description, note, tags, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview; emptying the box shows every row again. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
-Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction** (toolbar or File menu) opens an empty editor. New entries default to today, or to the first day of the viewed month when you are looking at another month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction** (the button above the ledger, or the File menu from any tab) opens an empty editor. New entries default to today, or to the first day of the viewed month when you are looking at another month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
 
@@ -185,7 +185,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 
 ### Selecting several entries
 
-**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The menu bar shows **Selected: N**, a split button, and **Done**. Escape or Done leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current month and search.
+**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current month and search.
 
 The split button's main action is **Archive** (or **Restore** when every selected entry is archived). Its ▼ menu has:
 
@@ -194,7 +194,7 @@ The split button's main action is **Archive** (or **Restore** when every selecte
 | **Archive** / **Restore** | hides or lists the entries | already archived / not archived |
 | **Add Tag...** / **Remove Tag...** | adds or removes one tag | not a purchase, or already has / lacks the tag |
 | **Add Person...** / **Remove Person...** | adds or removes one person, then **splits the purchase evenly** between everyone left on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
-| **Set Merchant...** | sets one merchant (suggested from your merchants; empty clears it) | already has that merchant |
+| **Set Merchant...** | sets one merchant, chosen from a dropdown of your active merchants like tags and people (**No merchant** clears it; new merchants come from the editor or Manage) | already has that merchant |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
 
 Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Skipped entries stay selected.
@@ -221,7 +221,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 
 ### Manage
 
-Add, rename, archive/restore, and delete payment methods, people, tags, and merchants. Each row shows its permanent **ID**; **Used By** counts the transactions using each one. Select a person, tag, or merchant row (not its buttons) to open its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Add, rename, archive/restore, and delete payment methods, people, tags, and merchants. Each row shows its permanent **ID**; **Used By** counts the transactions using each one. Select any row (not its buttons) to open its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### Menus
 
@@ -304,7 +304,7 @@ The upload is verified before any live data changes. It is rejected when:
 - the database does not match the manifest's checksum or row counts, or fails SQLite's integrity check;
 - the database has different tables or columns than this version, or contains triggers, views, or virtual tables.
 
-SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that match exactly the people, tags, and merchant of each entry and stay within their counters, exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
+SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
 
 Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
 
@@ -445,7 +445,7 @@ dotnet build
 python3 -m unittest discover -s tests -p "test_api.py"
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, events, history, and backup ZIP round trips plus 34 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers that do not match their scopes), each leaving data unchanged. It uses only the Python standard library.
+`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, events, history, and backup ZIP round trips plus 33 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -458,6 +458,14 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.4.2
+
+- **Set Merchant...** in bulk actions is a dropdown of your merchants, like Add Tag and Add Person, with **No merchant** to clear it.
+- The bulk-action chooser no longer scrolls inside a small box: its dropdown opens at full size over the dialog and scrolls on its own.
+- **Payment methods** are numbered like people, tags, and merchants (*Cash #40*), and selecting one under Manage lists its entries. Existing entries are numbered at the next start; restoring a backup without these numbers fills them in.
+- Selection mode spaces the menu bar exactly like TaskList (full-size buttons, same margins), and the extra **Done** button is gone; Escape or **File → Select...** leaves it.
+- The **search bar** moved into the toolbar, filling it like TaskList's new-task bar, and **New Transaction** moved to where the search was, above the ledger.
 
 ### v0.4.1
 

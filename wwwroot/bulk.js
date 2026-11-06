@@ -2,7 +2,7 @@
 
 /*
  * Selection mode and bulk actions for the ledger, as in TaskList: File → Select... adds a checkbox to every row,
- * Shift-click selects a range, and Escape leaves selection mode. Each action runs one ordinary API call per entry,
+ * Shift-click selects a range, and Escape (or File → Select... again) leaves selection mode. Each action runs one ordinary API call per entry,
  * so the server applies the same rules as a single edit. Entries a rule refuses are skipped and listed afterwards.
  */
 
@@ -121,11 +121,9 @@ const BULK_ACTIONS = {
   },
   setMerchant: {
     label: 'Set Merchant',
-    choose: async () => {
-      renderMerchantSuggestions();
-      const name = await promptText('Set Merchant', 'Merchant (leave empty to clear)', '', { maxLength: 120, suggestions: 'merchantList' });
-      return name == null ? null : { value: name, label: name || '(none)' };
-    },
+    // Like tags and people, merchants are chosen from a list; new ones come from the editor or Manage.
+    choose: () => chooseFrom('Set Merchant', 'Merchant', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
+      .then(choice => choice && { value: choice.value === 0 ? '' : choice.label, label: choice.label }),
     request: (tx, name) => tx.merchant.toLowerCase() === name.toLowerCase() ? { skip: 'already has that merchant' }
       : { body: transactionRequest(tx, { merchant: name }) }
   },
@@ -258,14 +256,8 @@ function updateBulkControls() {
     toggleMenu(arrow, menu);
   });
 
-  const done = document.createElement('button');
-  done.type = 'button';
-  done.textContent = 'Done';
-  done.title = 'Leave selection mode (Escape)';
-  done.addEventListener('click', () => setSelectionMode(false));
-
   group.append(main, arrow, menu);
-  $('#bulkActions').replaceChildren(group, done);
+  $('#bulkActions').replaceChildren(group);
 }
 
 function initializeBulk() {
