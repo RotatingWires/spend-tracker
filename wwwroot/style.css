@@ -598,6 +598,10 @@ button.calendar-day:active {
   max-height: calc(100dvh - 24px);
 }
 .retro-dialog.wide { width: min(720px, calc(100vw - 24px)); }
+/* Import/Export copies TaskList's dialog: explanations with a full-width button under each. */
+.transfer-dialog { width: min(560px, calc(100vw - 24px)); }
+.transfer-body { display: grid; gap: 7px; line-height: 1.5; }
+.transfer-body p { margin: 0; }
 .retro-dialog::backdrop { background: var(--backdrop); }
 .dialog-window {
   display: flex;

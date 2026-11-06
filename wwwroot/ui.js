@@ -319,13 +319,15 @@ function startApp() {
     closeMenus();
     loadSnapshot();
   });
-  $('#exportCsvButton').addEventListener('click', () => {
+  // Import/Export... gathers backup download, restore, and CSV export in one dialog, like TaskList's.
+  $('#transferMenuItem').addEventListener('click', () => {
     closeMenus();
-    exportTransactionsCsv();
+    $('#transferDialog').showModal();
   });
+  $('#exportCsvButton').addEventListener('click', exportTransactionsCsv);
   $('#backupButton').addEventListener('click', downloadBackup);
   $('#restoreButton').addEventListener('click', () => {
-    closeMenus();
+    $('#transferDialog').close();
     $('#restoreFileInput').click();
   });
   $('#restoreFileInput').addEventListener('change', event => {

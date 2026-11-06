@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.12.3 Manual
+# SpendTracker v0.13.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -228,7 +228,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 
 ### Menus
 
-- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
+- **File:** New Transaction..., Refresh, Search..., Select..., Import/Export..., Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
 - **View:** switch tabs, **Show Archived**, and choose the Light or Dark theme. Show Archived and the theme are saved in this browser.
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
@@ -294,9 +294,11 @@ logs/
   console.log           runtime log, capped at about 10 MiB
 ```
 
+**File → Import/Export...** opens one dialog for backups and CSV, like TaskList's Import/Export: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button to close it.
+
 ### Download Backup
 
-**File → Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
+**Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
 
 - `spend-tracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
@@ -305,7 +307,7 @@ It never contains `auth.json` or the password hash. Treat it like your bank stat
 
 ### Restore Backup
 
-**File → Restore Backup** uploads a backup ZIP and replaces **all** current data with it. The password is not changed.
+**Choose File to Restore...** closes the dialog, asks for a backup ZIP, and after confirmation uploads it and replaces **all** current data with it. The password is not changed.
 
 The upload is verified before any live data changes. It is rejected when:
 
@@ -336,7 +338,7 @@ The database part runs in one SQLite transaction, so a failure changes nothing. 
 
 ### Export Transactions CSV
 
-**File → Export Transactions CSV** downloads every transaction, archived or not, with its ID, date, type, for who (with each person's amount when a purchase was split), merchant, description, tags, payment method, amount, linked transaction, note, and whether it is archived. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
+**Export Transactions CSV** downloads every transaction, archived or not, with its ID, date, type, for who (with each person's amount when a purchase was split), merchant, description, tags, payment method, amount, linked transaction, note, and whether it is archived. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
 
 ### Copying the database directly
 
@@ -459,7 +461,7 @@ The message explains which rule was broken (for example a refund larger than wha
 
 ### Restore failed
 
-Nothing was changed; the message names the problem. Only files downloaded from **File → Download Backup** (or the automatic `data/backups/` copies) can be restored.
+Nothing was changed; the message names the problem. Only files saved with **File → Import/Export... → Download Backup** (or the automatic `data/backups/` copies) can be restored.
 
 ### The page shows "Could not load data"
 
@@ -485,6 +487,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.13.0
+
+- **File → Import/Export...** replaces the three File menu items Export Transactions CSV, Download Backup, and Restore Backup with one dialog like TaskList's: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button.
 
 ### v0.12.3
 

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.12.3
+# SpendTracker v0.13.0
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -23,7 +23,7 @@ SpendTracker listens on **http://127.0.0.1:8715** unless `--urls` (or `ASPNETCOR
 
 A new database starts with you ("Me") and three payment methods: Cash, Credit Card, and Debit Card. Rename, add, or archive them on the **People** and **Payment Methods** tabs.
 
-All data lives in the `data/` folder next to the project (`data/spend-tracker.db`); logs go to `logs/console.log`. Use **File → Download Backup** regularly. See [Data and backups](MANUAL.md#data-and-backups).
+All data lives in the `data/` folder next to the project (`data/spend-tracker.db`); logs go to `logs/console.log`. Use **File → Import/Export... → Download Backup** regularly. See [Data and backups](MANUAL.md#data-and-backups).
 
 To free disk space later, **File → Fresh Start...** clears only what you pick (archived entries, every entry, unused labels, change history, or pre-restore recovery backups) and compacts the database. Download a backup first if you might want that data back. See [Fresh Start](MANUAL.md#fresh-start).
 

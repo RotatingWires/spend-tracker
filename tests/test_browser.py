@@ -321,14 +321,16 @@ class BrowserTests(unittest.TestCase):
         page.set_viewport_size({"width": 1280, "height": 900})
         page.click('.tabs [data-tab="transactions"]')
         page.click("#fileMenuButton")
+        page.click("#transferMenuItem")
+        self.shot(page, "import-export-dialog")
         with page.expect_download() as download_info:
             page.click("#backupButton")
         download = download_info.value
         self.assertRegex(download.suggested_filename, r"^spend-tracker-\d{8}-\d{6}\.zip$")
         backup_path = Path(download.path())
+        page.locator("#transferDialog").get_by_role("button", name="OK").click()
         self.add_transaction(page, amount="99", merchant="After backup")
         expect(page.locator("#transactionsTable")).to_contain_text("After backup")
-        page.click("#fileMenuButton")
         page.set_input_files("#restoreFileInput", str(backup_path))
         page.click("#confirmOkButton")
         expect(page.locator("#statusLeft")).to_contain_text("Restored 4 transactions")
