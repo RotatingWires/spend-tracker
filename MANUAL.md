@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.8.1 Manual
+# SpendTracker v0.8.2 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, events you put on purchases, an edit history, and statistics.
 
@@ -274,7 +274,7 @@ Breakdown tables:
 Refunds count under the tags, events, and merchant of their purchase.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
-The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar beside the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
+The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar right against the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
 
 ## Data and backups
 
@@ -462,6 +462,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.8.2
+
+- The money and count bars of a chart day touch, with no gap between them.
 
 ### v0.8.1
 

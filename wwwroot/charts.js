@@ -135,7 +135,7 @@ const Charts = (() => {
           const top = y(Math.max(from, to), axis);
           const bottom = y(Math.min(from, to), axis);
           context.fillStyle = themeColor(`--chart-series-${s.color}`);
-          context.fillRect(x, top, stackWidth - (stacks.length > 1 ? 1 : 0), Math.max(1, bottom - top));
+          context.fillRect(x, top, stackWidth, Math.max(1, bottom - top));
           sections.push({ index, series: s, left: x, right: x + stackWidth, top, bottom });
         }
       });
