@@ -19,7 +19,7 @@
   --error: #800000;
   --money-in: #006000;
   --collection: #6a2c91;
-  --backdrop: rgba(0, 0, 0, .3);
+  --backdrop: #0007;
 
   --chart-surface: #fff;
   --chart-text: #222;
@@ -57,7 +57,7 @@
   --surface: #191919;
   --surface-alt: #242424;
   --divider: #3d3d3d;
-  --muted: #c7c7c7;
+  --muted: #b8b8b8;
   --note: #3b3825;
   --row-hover: #2d3850;
   --title: #111858;
