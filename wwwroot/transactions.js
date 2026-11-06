@@ -84,7 +84,7 @@ function renderTransactions() {
         formatDate(tx.date),
         whoLabel(tx),
         what,
-        tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR),
+        tagList(tagIdsOf(tx)),
         ...(showCollections ? [collectionIdsOf(tx).map(collectionName).join(', ')] : []),
         ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true }),
         tx.kind === 'Payback' ? { text: '—', num: true } : moneyCell(tx.amountCents, { direction })
@@ -113,6 +113,20 @@ function renderTransactions() {
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
   $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in the totals above and in Stats. View → Show Archived lists them.`;
   updateBulkControls();
+}
+
+/** The ledger's Tags cell: wraps between tags, never inside one, so a long list does not widen the column. */
+function tagList(tagIds) {
+  const list = document.createElement('span');
+  list.className = 'tag-list';
+  tagIds.forEach((id, index) => {
+    if (index) list.append(TAG_SEPARATOR);
+    const tag = document.createElement('span');
+    tag.className = 'tag-name';
+    tag.textContent = tagName(id);
+    list.append(tag);
+  });
+  return list;
 }
 
 /** Purchases minus refunds; paybacks do not change net spent. */
@@ -426,6 +440,11 @@ function renderShareRows() {
       amount.addEventListener('input', () => updateShareTotal());
       amount.addEventListener('change', () => formatAmountInput(amount));
     }
+    const amountBox = split ? document.createElement('span') : amount;
+    if (split) {
+      amountBox.className = 'money-input';
+      amountBox.append(amount);
+    }
     const gift = document.createElement('label');
     gift.className = 'share-gift';
     if (personId !== state.model.self.id) {
@@ -441,7 +460,7 @@ function renderShareRows() {
     // Each person is a row with a divider under it, like TaskList's task rows.
     const row = document.createElement('div');
     row.className = 'share-row';
-    row.append(name, amount, gift);
+    row.append(name, amountBox, gift);
     container.append(row);
   }
   if (!split) return;

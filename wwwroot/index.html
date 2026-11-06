@@ -109,7 +109,7 @@
       <section class="tab-panel" data-panel="people" role="tabpanel" hidden>
         <form class="panel-actions" data-add="people"><input class="retro-input" name="name" maxlength="60" placeholder="New person" aria-label="New person name" required><button type="submit">Add</button></form>
         <div class="note">What other people owe you, from purchases you marked as for them (gifts left out unless Include gifts is checked), minus refunds on those purchases and paybacks they made. Select a person for their purchases and paybacks. Archiving a person only stops them being offered for new entries.</div>
-        <label class="control-row"><input type="checkbox" id="includeGifts"> Include gifts in Balance</label>
+        <label class="control-row"><input type="checkbox" id="includeGifts" class="retro-check"> Include gifts in Balance</label>
         <div class="table-wrap"><table id="peopleTable"></table></div>
       </section>
 
@@ -160,7 +160,7 @@
           <input id="txDate" class="retro-input" type="date" required>
 
           <label for="txAmount">Amount</label>
-          <input id="txAmount" class="retro-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" required>
+          <span class="money-input"><input id="txAmount" class="retro-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" required></span>
 
           <span class="form-label" id="txLinkedLabel">Refund of</span>
           <div id="txLinkedRow"><div id="txLinked" aria-labelledby="txLinkedLabel"></div><div class="form-hint" id="txLinkedHint"></div></div>
