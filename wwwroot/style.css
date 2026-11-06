@@ -361,9 +361,6 @@ button:disabled { color: var(--shadow); cursor: default; }
 .panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .panel-actions .retro-input { min-width: 0; flex: 1 1 200px; max-width: 360px; }
 
-/* Month cards: four totals, then Net spent alone on the next row under the last of them. */
-#monthCards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-#monthCards .net-card { grid-column: -2 / -1; }
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -650,7 +647,7 @@ textarea:focus-visible,
   .toolbar-separator { display: none; }
   #searchForm { flex-basis: 100%; }
   .two-column { grid-template-columns: 1fr; }
-  .stat-grid, #monthCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { padding: 5px; }
   .groupbox { padding-left: 5px; padding-right: 5px; }
   .statusbar {

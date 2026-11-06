@@ -176,6 +176,10 @@ class BrowserTests(unittest.TestCase):
         self.add_transaction(page, kind="Payback", amount="10", description="Venmo", person="Alex")
         expect(page.locator("#monthCards")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
         expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")
+        # Net Spent is its own column: each row's effect on net spent, with the total in the footer.
+        expect(page.locator("#transactionsTable thead th").last).to_have_text("Net Spent")
+        expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
+        expect(page.locator("#transactionsTable tbody tr", has_text="Venmo").locator("td").last).to_have_text("—")
 
         # File → Search..., as in TaskList, looks anywhere in merchant, description, note, tags, events, and amount,
         # but not type, method, or people.

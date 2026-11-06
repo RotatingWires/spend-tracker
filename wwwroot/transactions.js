@@ -27,10 +27,9 @@ function renderTransactions() {
   $('#monthCards').replaceChildren(
     statCard('Spent', formatMoney(totals.spent), { sub: plural(totals.purchases, 'purchase'), title: 'Total of every purchase dated in the time frame.' }),
     statCard('Refunds', formatMoney(totals.refunded), { title: 'Total of every refund dated in the time frame.' }),
+    statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }),
     statCard('Paid back to you', formatMoney(totals.paidBack), { title: 'Paybacks from other people dated in the time frame. These do not change net spent.' }),
-    statCard('Entries', numberFormat.format(monthRows.length)),
-    // The result of the cards above, on its own row at the right like a total line.
-    Object.assign(statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }), { className: 'stat-card net-card' })
+    statCard('Entries', numberFormat.format(monthRows.length))
   );
 
   const rows = timeFrameTransactions({ listed: true });
@@ -48,7 +47,8 @@ function renderTransactions() {
     { label: 'What' },
     { label: 'Tags' },
     ...(showEvents ? [{ label: 'Events' }] : []),
-    ...methods.map(method => ({ label: method.name, num: true }))
+    ...methods.map(method => ({ label: method.name, num: true })),
+    { label: 'Net Spent', num: true, title: 'What each entry adds to net spent: purchases add, refunds subtract, and paybacks do not change it.' }
   ];
 
   const tableRows = rows.map(tx => {
@@ -86,25 +86,22 @@ function renderTransactions() {
         what,
         tagIdsOf(tx).map(tagName).join(', '),
         ...(showEvents ? [eventIdsOf(tx).map(eventName).join(', ')] : []),
-        ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true })
+        ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true }),
+        tx.kind === 'Payback' ? { text: '—', num: true } : moneyCell(tx.amountCents, { direction })
       ]
     };
   });
 
   const footer = rows.length === 0 ? null : {
     cells: [
+      { text: 'Totals', title: 'Net spent (purchases minus refunds) of the listed rows, per payment method and in all. Paybacks are listed but not included.' },
       '',
       '',
       '',
-      { text: 'Net spent (purchases − refunds)', title: 'Paybacks are rows in the table but not included in these totals.' },
       '',
       ...(showEvents ? [''] : []),
-      ...methods.map(method => {
-        const net = rows
-          .filter(tx => tx.paymentMethodId === method.id && tx.kind !== 'Payback')
-          .reduce((sum, tx) => sum + (tx.kind === 'Purchase' ? tx.amountCents : -tx.amountCents), 0);
-        return { text: formatMoney(net), num: true };
-      })
+      ...methods.map(method => ({ text: formatMoney(netOf(rows.filter(tx => tx.paymentMethodId === method.id))), num: true })),
+      { text: formatMoney(netOf(rows)), num: true }
     ]
   };
 
@@ -116,6 +113,11 @@ function renderTransactions() {
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
   $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in the totals above and in Stats. View → Show Archived lists them.`;
   updateBulkControls();
+}
+
+/** Purchases minus refunds; paybacks do not change net spent. */
+function netOf(transactions) {
+  return transactions.reduce((sum, tx) => sum + (tx.kind === 'Purchase' ? tx.amountCents : tx.kind === 'Refund' ? -tx.amountCents : 0), 0);
 }
 
 function exportTransactionsCsv() {

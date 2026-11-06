@@ -1,8 +1,10 @@
 'use strict';
 
 /*
- * Minimal canvas bar chart with hover/tap tooltips. Several series draw as grouped bars, each in its own theme color
- * (--chart-series-1 to -8). Money series use the left axis; counts use the right one when money is shown too.
+ * Minimal canvas bar chart with hover/tap tooltips. Several series stack into one bar per day or month, each section
+ * in its own theme color (--chart-series-1 to -8); negative values stack below the zero line. Money series use the
+ * left axis. Counts cannot share that scale, so when both are shown counts stack in a second, narrower bar beside it,
+ * on the right axis.
  */
 
 const Charts = (() => {
@@ -51,18 +53,19 @@ const Charts = (() => {
     return Math.max(1, Math.round(factor * magnitude));
   }
 
-  /** Gridlines covering every value of the given series and zero. */
+  /** Gridlines covering zero and every stacked total of the given series: positives added up, and negatives. */
   function scale(seriesList, minimumStep) {
-    const values = seriesList.flatMap(series => series.values);
-    const high = Math.max(0, ...values);
-    const low = Math.min(0, ...values);
+    const slots = seriesList[0]?.values.length ?? 0;
+    const sum = (index, keep) => seriesList.reduce((total, series) => total + (keep(series.values[index]) ? series.values[index] : 0), 0);
+    const high = Math.max(0, ...Array.from({ length: slots }, (_, index) => sum(index, value => value > 0)));
+    const low = Math.min(0, ...Array.from({ length: slots }, (_, index) => sum(index, value => value < 0)));
     const step = Math.max(minimumStep, niceStep((high - low) / 4));
     return { step, max: Math.ceil(high / step) * step || step, min: Math.floor(low / step) * step };
   }
 
   /**
-   * labels: one per bar group. titles: tooltip heading per group. series: [{ label, color (1-8), values, count,
-   * format }]. Hovering a group lists every series' value there, the hovered bar in bold.
+   * labels: one per bar. titles: tooltip heading per bar. series: [{ label, color (1-8), values, count, format }].
+   * Hovering a bar lists every series' value there, the hovered section in bold.
    */
   function bars(canvas, { labels, titles, series }) {
     const ratio = window.devicePixelRatio || 1;
@@ -112,16 +115,29 @@ const Charts = (() => {
     }
 
     const slot = labels.length ? plotWidth / labels.length : plotWidth;
-    const groupWidth = Math.max(2, Math.min(36 * Math.max(1, series.length), slot * 0.8));
-    const barWidth = groupWidth / Math.max(1, series.length);
-    series.forEach((s, seriesIndex) => {
-      const axis = axisOf(s);
-      context.fillStyle = themeColor(`--chart-series-${s.color}`);
-      s.values.forEach((value, index) => {
-        const x = padding.left + slot * index + (slot - groupWidth) / 2 + barWidth * seriesIndex;
-        const top = y(Math.max(0, value), axis);
-        const bottom = y(Math.min(0, value), axis);
-        context.fillRect(x, top, Math.max(1, barWidth - (series.length > 1 ? 1 : 0)), Math.max(value === 0 ? 0 : 1, bottom - top));
+    const stacks = right ? [money, counts] : [series];
+    const stackWidth = Math.max(2, Math.min(36, (slot * 0.8) / stacks.length));
+    // Each drawn section, kept so hovering can find the one under the pointer.
+    const sections = [];
+    stacks.forEach((stack, stackIndex) => {
+      const axis = axisOf(stack[0]);
+      labels.forEach((_, index) => {
+        const x = padding.left + slot * index + (slot - stackWidth * stacks.length) / 2 + stackWidth * stackIndex;
+        let above = 0;
+        let below = 0;
+        for (const s of stack) {
+          const value = s.values[index];
+          if (!value) continue;
+          const from = value > 0 ? above : below;
+          const to = from + value;
+          if (value > 0) above = to;
+          else below = to;
+          const top = y(Math.max(from, to), axis);
+          const bottom = y(Math.min(from, to), axis);
+          context.fillStyle = themeColor(`--chart-series-${s.color}`);
+          context.fillRect(x, top, stackWidth - (stacks.length > 1 ? 1 : 0), Math.max(1, bottom - top));
+          sections.push({ index, series: s, left: x, right: x + stackWidth, top, bottom });
+        }
       });
     });
 
@@ -148,10 +164,13 @@ const Charts = (() => {
         hideTooltip();
         return;
       }
-      const hovered = Math.floor((offset - slot * index - (slot - groupWidth) / 2) / barWidth);
+      const pointerX = event.clientX - canvas.getBoundingClientRect().left;
+      const pointerY = event.clientY - canvas.getBoundingClientRect().top;
+      const hovered = sections.find(section => section.index === index && pointerX >= section.left && pointerX <= section.right
+        && pointerY >= section.top - 1 && pointerY <= section.bottom + 1)?.series;
       showTooltip([
         { text: titles[index], strong: true },
-        ...series.map((s, seriesIndex) => ({ text: `${s.label}: ${s.format(s.values[index])}`, series: s.color, strong: seriesIndex === hovered }))
+        ...series.map(s => ({ text: `${s.label}: ${s.format(s.values[index])}`, series: s.color, strong: s === hovered }))
       ], event.clientX, event.clientY);
     };
     canvas.onpointerleave = hideTooltip;
