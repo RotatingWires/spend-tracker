@@ -62,6 +62,7 @@ function renderAll() {
 
 function switchTab(name) {
   state.activeTab = name;
+  calendarCollectionId = null;
   $$('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.tab === name ? 'true' : 'false'));
   $$('.tab-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
   closeMenus();
@@ -88,12 +89,14 @@ function changeTimeFrame(values) {
   const months = values.filter(value => value !== 'all');
   if (values.includes('all') && !state.timeFrame.all) state.timeFrame = { all: true, months: [] };
   else if (months.length) state.timeFrame = { all: false, months };
+  calendarCollectionId = null;
   renderAll();
 }
 
 function shiftTimeFrame(delta) {
   if (state.timeFrame.all) return;
   state.timeFrame = { all: false, months: state.timeFrame.months.map(month => shiftMonth(month, delta)) };
+  calendarCollectionId = null;
   renderAll();
 }
 

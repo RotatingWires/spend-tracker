@@ -436,7 +436,12 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#dayTable tbody td").last).to_have_text("−$100.00")
         expect(page.locator("#dayAddButton")).to_have_text("Add to This Day")
         self.shot(page, "day-dialog")
-        page.locator("#dayDialog button", has_text="Close").click()
+        # A collection's name opens it in the calendar: the months it spans, with its days outlined.
+        page.locator("#dayDialogCollections .collection-link", has_text="Beach trip").click()
+        expect(page.locator("#dayDialog")).not_to_be_visible()
+        expect(page.locator("#titleScope")).to_have_text("Jan 2024, Feb 2024")
+        expect(page.locator("#calendarMonths .collection-focus")).to_have_count(2)
+        self.shot(page, "collection-calendar")
         self.choose_time_frame(page, ["All time"])
         expect(page.locator("#titleScope")).to_have_text("All time")
         expect(page.locator("#previousMonthButton")).to_be_disabled()

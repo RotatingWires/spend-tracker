@@ -3,6 +3,8 @@
 /* Calendar tab: a month grid of daily net spending for each month in the time frame, and a per-day detail dialog. */
 
 let calendarDialogDay = null;
+// A collection opened from a day's dialog: its days are outlined until the time frame or tab changes.
+let calendarCollectionId = null;
 
 function dailyNet(transactions) {
   const days = new Map();
@@ -75,6 +77,9 @@ function renderMonthGrid(month) {
     cell.type = 'button';
     cell.className = `calendar-day heat-${heatLevel(day?.net ?? 0, max)}`;
     if (key === today) cell.classList.add('today');
+    if (calendarCollectionId != null && listed.some(tx => tx.date === key && collectionIdsOf(tx).includes(calendarCollectionId))) {
+      cell.classList.add('collection-focus');
+    }
 
     const date = document.createElement('span');
     date.className = 'calendar-date';
@@ -120,9 +125,26 @@ function renderDayDialog() {
   const rows = listedTransactions(key, key);
   const totals = monthTotals(rows);
   $('#dayDialogTitle').textContent = `${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`;
-  const collections = collectionsOf(rows);
-  $('#dayDialogCollections').textContent = collections.length ? `Collections: ${collections.join(', ')}` : '';
-  $('#dayDialogCollections').hidden = collections.length === 0;
+  // Each collection name opens that collection in the calendar.
+  const collectionIds = [...new Set(rows.flatMap(collectionIdsOf))]
+    .sort((a, b) => collectionName(a).localeCompare(collectionName(b)));
+  const line = $('#dayDialogCollections');
+  line.replaceChildren();
+  line.hidden = collectionIds.length === 0;
+  if (collectionIds.length) line.append('Collections: ');
+  collectionIds.forEach((id, index) => {
+    if (index) line.append(', ');
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'collection-link';
+    link.textContent = collectionName(id);
+    link.title = `Show every day of ${collectionName(id)} in the calendar`;
+    link.addEventListener('click', () => {
+      $('#dayDialog').close();
+      showCollectionCalendar(id);
+    });
+    line.append(link);
+  });
 
   renderTable($('#dayTable'), [
     { label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true },
@@ -146,6 +168,22 @@ function renderDayDialog() {
       empty: 'No entries on this day.',
       footer: rows.length ? { cells: ['Totals', '', '', '', '', '', { text: formatMoney(totals.net), num: true }] } : null
     });
+}
+
+/** Sets the time frame to the months a collection's entries span, outlines its days, and scrolls to the first one. */
+function showCollectionCalendar(collectionId) {
+  const dates = state.model.transactions.filter(tx => collectionIdsOf(tx).includes(collectionId)).map(tx => tx.date).sort();
+  if (!dates.length) return;
+  const months = [];
+  for (let month = monthOf(dates[0]); month <= monthOf(dates.at(-1)); month = shiftMonth(month, 1)) months.push(month);
+  state.timeFrame = { all: false, months };
+  switchTab('calendar');
+  calendarCollectionId = collectionId;
+  renderCalendar();
+  const days = $$('#calendarMonths .collection-focus');
+  // Months are listed newest first, so the collection's first day is the last outlined one.
+  days.at(-1)?.scrollIntoView({ block: 'center' });
+  setStatus(`Showing ${collectionName(collectionId)} in the calendar: ${plural(days.length, 'day')} outlined.`);
 }
 
 function initializeCalendar() {

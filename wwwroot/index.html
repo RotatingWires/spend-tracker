@@ -152,15 +152,15 @@
       <div class="dialog-title" id="transactionDialogTitle">New Transaction</div>
       <div class="dialog-body">
         <div id="txNumbers" class="form-hint tx-numbers" hidden></div>
-        <div class="form-grid">
+        <div class="form-grid divided">
           <span class="form-label" id="txKindLabel">Type</span>
           <div id="txKind" aria-labelledby="txKindLabel"></div>
 
           <label for="txDate">Date</label>
-          <input id="txDate" class="retro-input" type="date" required>
+          <div><input id="txDate" class="retro-input" type="date" required></div>
 
           <label for="txAmount">Amount</label>
-          <span class="money-input"><input id="txAmount" class="retro-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" required></span>
+          <div><span class="money-input"><input id="txAmount" class="retro-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" required></span></div>
 
           <span class="form-label" id="txLinkedLabel">Refund of</span>
           <div id="txLinkedRow"><div id="txLinked" aria-labelledby="txLinkedLabel"></div><div class="form-hint" id="txLinkedHint"></div></div>
@@ -181,7 +181,7 @@
           <div id="txMerchant" aria-labelledby="txMerchantLabel"></div>
 
           <label for="txDescription">What</label>
-          <input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was">
+          <div><input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was"></div>
 
           <span class="form-label" id="txTagsLabel">Tags</span>
           <div id="txTags" aria-labelledby="txTagsLabel"></div>
@@ -190,7 +190,7 @@
           <div id="txCollections" aria-labelledby="txCollectionsLabel"></div>
 
           <label for="txNote">Note</label>
-          <textarea id="txNote" class="retro-input" rows="2" maxlength="2000"></textarea>
+          <div><textarea id="txNote" class="retro-input" rows="2" maxlength="2000"></textarea></div>
         </div>
         <div id="txError" class="form-error" role="alert" aria-live="polite"></div>
       </div>

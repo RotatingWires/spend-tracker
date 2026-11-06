@@ -624,6 +624,19 @@ button.calendar-day:active {
 .form-grid .inline-select-menu { min-width: 0; }
 .form-grid .retro-select { min-width: 0; }
 .form-grid .full { grid-column: 1 / -1; }
+/* The transaction editor: an etched line under each field, like the For who rows and Win95 menu separators. */
+.form-grid.divided { gap: 0; }
+.form-grid.divided > * {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--shadow);
+  box-shadow: 0 1px 0 var(--light-edge);
+}
+.form-grid.divided > :nth-child(even) { padding-left: 10px; }
+.form-grid.divided > :nth-last-child(-n + 2) { border-bottom: 0; box-shadow: none; }
 .share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; column-gap: 8px; align-items: center; margin-top: 6px; }
 .share-row {
   grid-column: 1 / -1;
@@ -652,6 +665,19 @@ button.calendar-day:active {
 .tag-list { display: block; min-width: 80px; max-width: 200px; }
 .tag-name { white-space: nowrap; }
 #dayDialogCollections { font-size: 14px; color: var(--ink); }
+.collection-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.collection-link:focus-visible { outline: 1px dotted var(--ink); outline-offset: 1px; }
+.calendar-day.collection-focus { outline: 2px solid var(--collection); outline-offset: -4px; }
 .share-gift { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: default; }
 /* A Win95 check box: a sunken white square holding a check mark. */
 .retro-check {
@@ -716,6 +742,9 @@ textarea:focus-visible,
   .statusbar #statusRight { display: none; }
   .form-grid { grid-template-columns: 1fr; gap: 4px; }
   .form-grid > label, .form-grid > .form-label { margin-top: 6px; }
+  /* One column: the label sits on its field, so only the field gets the line. */
+  .form-grid.divided > :nth-child(odd) { padding-bottom: 0; border-bottom: 0; box-shadow: none; }
+  .form-grid.divided > :nth-child(even) { padding-left: 0; padding-top: 4px; }
 }
 
 @media (max-width: 650px) {

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.11.1 Manual
+# SpendTracker v0.11.2 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -207,7 +207,7 @@ Every action first asks for confirmation, listing up to 12 selected entries and 
 
 ### Calendar
 
-One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Select a day to list its entries with their **Amount** and **Net Spent** (as in the ledger, a payback shows — there), edit one, or add a new entry with **Add to This Day**.
+One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Select a day to list its entries with their **Amount** and **Net Spent** (as in the ledger, a payback shows — there), edit one, or add a new entry with **Add to This Day**. Select a collection's name there to show that collection in the calendar: the time frame becomes the months it spans and its days are outlined until you change the time frame or tab.
 
 ### Stats
 
@@ -466,6 +466,11 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.11.2
+
+- The transaction editor has an etched divider under each field.
+- In a calendar day's dialog, each collection name is a link: it sets the time frame to the months that collection spans, opens the Calendar with its days outlined, and scrolls to its first day. Changing the time frame or tab clears the outline.
 
 ### v0.11.1
 
