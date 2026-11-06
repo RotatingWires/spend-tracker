@@ -44,6 +44,12 @@ class BrowserTests(unittest.TestCase):
         self.addCleanup(lambda: self.assertEqual(errors, [], "browser errors"))
         return page
 
+    def api_client(self):
+        """One API session for the whole class, so the tests stay under the login rate limit (5 a minute)."""
+        if not hasattr(type(self), "api"):
+            type(self).api = self.server.logged_in_client()
+        return type(self).api
+
     def shot(self, page, name):
         if self.screenshots:
             self.screenshots.mkdir(parents=True, exist_ok=True)
@@ -245,10 +251,92 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
 
+    def test_select_and_bulk_actions(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        api = self.api_client()
+        snapshot = api.get("/api/snapshot")
+        me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
+        cash = snapshot["paymentMethods"][0]["id"]
+        riley = api.post("/api/people", {"name": "Riley"})["id"]
+
+        def buy(date, cents, merchant):
+            return api.post("/api/transactions", {
+                "kind": "Purchase", "date": date, "amountCents": cents, "paymentMethodId": cash, "personId": None, "linkedId": None,
+                "merchant": merchant, "description": "", "note": "", "tagIds": [], "shares": [{"personId": me, "amountCents": cents}]})
+
+        # June 2024 is used by no other test. Amounts are large so they never become another test's lowest month.
+        first, second, third = buy("2024-06-01", 10000, "Hardware"), buy("2024-06-02", 20000, "Bakery"), buy("2024-06-03", 30001, "Garage")
+        page.click("#fileMenuButton")
+        page.click("#refreshButton")
+        self.pick(page, "#monthSelect", "June 2024")
+        expect(page.locator("#transactionsTable tbody tr").first).to_contain_text(f"#{first['id']}")
+
+        page.click("#fileMenuButton")
+        page.click("#selectModeButton")
+        expect(page.locator("#bulkControls")).to_be_visible()
+        page.click(f'#transactionsTable tr[data-id="{first["id"]}"] .selection-check')
+        page.click(f'#transactionsTable tr[data-id="{third["id"]}"]', modifiers=["Shift"], position={"x": 300, "y": 5})
+        expect(page.locator("#selectedCount")).to_have_text("Selected: 3")
+
+        # Adding a person splits each purchase evenly again; the first person listed keeps the leftover cent.
+        page.click("#bulkActions .split-arrow")
+        page.locator("#bulkActions .split-dropdown button", has_text="Add Person...").click()
+        self.pick(page, "#chooseSelect", "Riley")
+        page.click("#chooseOkButton")
+        expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']} — 06/03/2024 — Garage — $300.01")
+        page.click("#confirmOkButton")
+        expect(page.locator("#statusLeft")).to_have_text("Add Person: 3 entries changed.")
+        shares = {tx["id"]: tx["shares"] for tx in api.get("/api/snapshot")["transactions"]}
+        self.assertEqual(shares[third["id"]], [{"personId": me, "amountCents": 15001}, {"personId": riley, "amountCents": 15000}])
+
+        # A rule the server enforces skips that entry, says why, and leaves it selected.
+        api.post("/api/transactions", {
+            "kind": "Payback", "date": "2024-06-04", "amountCents": 15000, "paymentMethodId": cash, "personId": riley, "linkedId": third["id"],
+            "merchant": "", "description": "Venmo", "note": "", "tagIds": [], "shares": []})
+        page.click("#fileMenuButton")
+        page.click("#refreshButton")
+        for tx in (first, second, third):
+            page.click(f'#transactionsTable tr[data-id="{tx["id"]}"] .selection-check')
+        page.click("#bulkActions .split-arrow")
+        page.locator("#bulkActions .split-dropdown button", has_text="Remove Person...").click()
+        self.pick(page, "#chooseSelect", "Riley")
+        page.click("#chooseOkButton")
+        page.click("#confirmOkButton")
+        expect(page.locator("#confirmMessage")).to_have_text("Remove Person: 2 entries changed, 1 skipped. Skipped entries stay selected.")
+        expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']}: Riley has linked refunds or paybacks on this purchase")
+        page.click("#confirmOkButton")
+        expect(page.locator("#selectedCount")).to_have_text("Selected: 1")
+
+        # Archiving hides an entry from the ledger but it still counts in the month's totals.
+        page.click("#bulkActions .split-primary")
+        page.click("#confirmOkButton")
+        expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_have_count(0)
+        expect(page.locator("#archivedNote")).to_contain_text("1 archived entry hidden")
+        expect(page.locator("#monthCards")).to_contain_text("Spent$600.01")
+        page.click("#viewMenuButton")
+        page.locator("#viewMenu button", has_text="Show Archived").click()
+        expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("(archived)")
+        self.shot(page, "bulk-selection")
+        page.click("#viewMenuButton")
+        page.locator("#viewMenu button", has_text="Show Archived").click()
+
+        page.keyboard.press("Escape")
+        expect(page.locator("#bulkControls")).to_be_hidden()
+        expect(page.locator("#transactionsTable .selection-check")).to_have_count(0)
+
+        # The editor shows per-scope numbers, and searching #ID finds that entry.
+        page.fill("#searchInput", f"#{first['id']}")
+        page.click("#searchForm button[type=submit]")
+        expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
+        page.locator("#transactionsTable tbody tr").first.click()
+        expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
+        page.click("#txCancelButton")
+
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
-        api = self.server.logged_in_client()
+        api = self.api_client()
         snapshot = api.get("/api/snapshot")
         me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
         cash, card = snapshot["paymentMethods"][0]["id"], snapshot["paymentMethods"][1]["id"]

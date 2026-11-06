@@ -255,6 +255,14 @@ api.MapDelete("/tags/{id:long}", (long id) =>
     return Results.NoContent();
 });
 
+api.MapPost("/merchants", (NameRequest request) => Results.Ok(store.CreateMerchant(request)));
+api.MapPatch("/merchants/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateMerchant(id, request)));
+api.MapDelete("/merchants/{id:long}", (long id) =>
+{
+    store.DeleteMerchant(id);
+    return Results.NoContent();
+});
+
 api.MapPost("/events", (EventRequest request) => Results.Ok(store.SaveEvent(null, request)));
 api.MapPut("/events/{id:long}", (long id, EventRequest request) => Results.Ok(store.SaveEvent(id, request)));
 api.MapDelete("/events/{id:long}", (long id) =>

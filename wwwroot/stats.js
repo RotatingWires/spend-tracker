@@ -144,16 +144,14 @@ function computeStats(range) {
     for (const bucket of buckets) addToBucket(bucket, tx);
   }
 
+  // Grouped by merchant ID, so a renamed merchant keeps its whole history under its current name.
   result.merchants = new Map();
   for (const tx of [...purchases, ...refunds]) {
     const source = tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId) ?? tx : tx;
-    const name = source.merchant.trim() || '(no merchant)';
-    const key = name.toLowerCase();
+    const key = source.merchantId ?? 'none';
+    const name = source.merchantId == null ? '(no merchant)' : state.model.merchants.get(source.merchantId)?.name ?? source.merchant;
     const entry = result.merchants.get(key) ?? { name, purchases: 0, spent: 0, refunded: 0, last: null };
-    if (tx.kind === 'Purchase') {
-      entry.name = name;
-      entry.last = tx.date;
-    }
+    if (tx.kind === 'Purchase') entry.last = tx.date;
     addToBucket(entry, tx);
     result.merchants.set(key, entry);
   }

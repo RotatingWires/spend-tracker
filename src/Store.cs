@@ -14,10 +14,10 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed class Store
 {
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
 
     /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
-    public static readonly string[] Tables = ["payment_methods", "people", "tags", "events", "transactions", "transaction_shares", "transaction_tags", "history"];
+    public static readonly string[] Tables = ["payment_methods", "people", "tags", "merchants", "events", "transactions", "transaction_shares", "transaction_tags", "scope_counters", "scope_numbers", "history"];
 
     const long MaxAmountCents = 1_000_000_000; // $10,000,000.00 — far above any real purchase, small enough to stay exact in JavaScript.
     const int MaxNameLength = 60;
@@ -41,7 +41,7 @@ sealed class Store
 
     // ---------------------------------------------------------------- schema
 
-    /// <summary>Creates or upgrades the schema and returns the journal mode in use.</summary>
+    /// <summary>Creates the schema on first run and returns the journal mode in use.</summary>
     public string Initialize()
     {
         using var connection = Open();
@@ -54,7 +54,7 @@ sealed class Store
             throw new InvalidOperationException($"spend-tracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
         if (version == SchemaVersion) return journalMode;
         if (version != 0)
-            throw new InvalidOperationException($"spend-tracker.db was created by SpendTracker 0.2 (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
+            throw new InvalidOperationException($"spend-tracker.db was created by an earlier SpendTracker (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
 
         using var transaction = connection.BeginTransaction();
         Execute(connection, transaction, """
@@ -79,6 +79,12 @@ sealed class Store
                 archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE merchants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 kind TEXT NOT NULL CHECK(kind IN ('Purchase', 'Refund', 'Payback')),
@@ -89,9 +95,11 @@ sealed class Store
                 -- Purchase: NULL; who it was for, and how much each, is in transaction_shares.
                 person_id INTEGER NULL REFERENCES people(id),
                 linked_id INTEGER NULL REFERENCES transactions(id),
-                merchant TEXT NOT NULL DEFAULT '',
+                merchant_id INTEGER NULL REFERENCES merchants(id),
                 description TEXT NOT NULL DEFAULT '',
                 note TEXT NOT NULL DEFAULT '',
+                -- Archived entries are hidden from the ledger and calendar but still count everywhere else.
+                archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NULL,
                 CHECK((kind = 'Purchase') = (person_id IS NULL)),
@@ -100,6 +108,7 @@ sealed class Store
             );
             CREATE INDEX idx_transactions_date ON transactions(date, id);
             CREATE INDEX idx_transactions_linked ON transactions(linked_id);
+            CREATE INDEX idx_transactions_merchant ON transactions(merchant_id);
             CREATE TABLE transaction_shares (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 person_id INTEGER NOT NULL REFERENCES people(id),
@@ -111,6 +120,22 @@ sealed class Store
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
                 PRIMARY KEY (transaction_id, tag_id)
             );
+            -- Per-scope numbers (see NumberedScopes). Counters remember the last number given out so numbers are never reused.
+            CREATE TABLE scope_counters (
+                scope TEXT NOT NULL,
+                scope_id INTEGER NOT NULL,
+                last_number INTEGER NOT NULL CHECK(last_number > 0),
+                PRIMARY KEY (scope, scope_id)
+            );
+            CREATE TABLE scope_numbers (
+                scope TEXT NOT NULL,
+                scope_id INTEGER NOT NULL,
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                number INTEGER NOT NULL CHECK(number > 0),
+                PRIMARY KEY (scope, scope_id, transaction_id),
+                UNIQUE (scope, scope_id, number)
+            );
+            CREATE INDEX idx_scope_numbers_transaction ON scope_numbers(transaction_id);
             CREATE TABLE events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -125,7 +150,7 @@ sealed class Store
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 at TEXT NOT NULL,
                 action TEXT NOT NULL CHECK(action IN ('Created', 'Edited', 'Deleted', 'Restored')),
-                entity TEXT NOT NULL CHECK(entity IN ('Transaction', 'PaymentMethod', 'Person', 'Tag', 'Event', 'Backup')),
+                entity TEXT NOT NULL CHECK(entity IN ('Transaction', 'PaymentMethod', 'Person', 'Tag', 'Merchant', 'Event', 'Backup')),
                 entity_id INTEGER NULL,
                 before_json TEXT NULL,
                 after_json TEXT NULL
@@ -163,6 +188,64 @@ sealed class Store
         }
     }
 
+    // ---------------------------------------------------------------- per-scope numbers
+
+    /// <summary>
+    /// Besides its permanent global ID, a transaction gets a number inside each scope it belongs to: Alex's 3rd entry,
+    /// the 12th "food" purchase, the 5th visit to a merchant. A new kind of scope only needs a row here: its name and a
+    /// query listing (scope_id, transaction_id) memberships. Numbers follow the order entries join a scope and are never
+    /// reused, so "Alex #3" keeps meaning the same entry even after others are deleted.
+    /// </summary>
+    static readonly (string Scope, string Members)[] NumberedScopes =
+    [
+        ("person", """
+            SELECT person_id AS scope_id, transaction_id FROM transaction_shares
+            UNION SELECT person_id, id FROM transactions WHERE person_id IS NOT NULL
+            """),
+        ("tag", "SELECT tag_id AS scope_id, transaction_id FROM transaction_tags"),
+        ("merchant", "SELECT merchant_id AS scope_id, id AS transaction_id FROM transactions WHERE merchant_id IS NOT NULL"),
+    ];
+
+    /// <summary>Brings the numbers of one transaction (or all, when null) in line with the scopes it now belongs to.</summary>
+    static void Renumber(SqliteConnection connection, SqliteTransaction transaction, long? transactionId)
+    {
+        foreach (var (scope, members) in NumberedScopes)
+        {
+            var current = $"SELECT scope_id, transaction_id FROM ({members}) WHERE $id IS NULL OR transaction_id = $id";
+            Execute(connection, transaction, $"""
+                DELETE FROM scope_numbers
+                WHERE scope = $scope AND ($id IS NULL OR transaction_id = $id) AND (scope_id, transaction_id) NOT IN ({current});
+                """, ("$scope", scope), ("$id", transactionId));
+
+            var joined = new List<(long ScopeId, long TransactionId)>();
+            using (var command = Sql(connection, transaction, $"""
+                SELECT m.scope_id, m.transaction_id FROM ({current}) m JOIN transactions t ON t.id = m.transaction_id
+                WHERE NOT EXISTS (SELECT 1 FROM scope_numbers n WHERE n.scope = $scope AND n.scope_id = m.scope_id AND n.transaction_id = m.transaction_id)
+                ORDER BY t.date, t.id, m.scope_id;
+                """, ("$scope", scope), ("$id", transactionId)))
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read()) joined.Add((reader.GetInt64(0), reader.GetInt64(1)));
+            }
+
+            foreach (var (scopeId, memberId) in joined)
+            {
+                var number = Scalar(connection, transaction, """
+                    INSERT INTO scope_counters (scope, scope_id, last_number) VALUES ($scope, $scopeId, 1)
+                    ON CONFLICT (scope, scope_id) DO UPDATE SET last_number = last_number + 1
+                    RETURNING last_number;
+                    """, ("$scope", scope), ("$scopeId", scopeId));
+                Execute(connection, transaction, "INSERT INTO scope_numbers (scope, scope_id, transaction_id, number) VALUES ($scope, $scopeId, $tx, $number);",
+                    ("$scope", scope), ("$scopeId", scopeId), ("$tx", memberId), ("$number", number));
+            }
+        }
+    }
+
+    /// <summary>Drops the numbers and counter of a scope whose person, tag, or merchant was deleted.</summary>
+    static void ForgetScope(SqliteConnection connection, SqliteTransaction transaction, string scope, long scopeId) =>
+        Execute(connection, transaction, "DELETE FROM scope_numbers WHERE scope = $scope AND scope_id = $id; DELETE FROM scope_counters WHERE scope = $scope AND scope_id = $id;",
+            ("$scope", scope), ("$id", scopeId));
+
     // ---------------------------------------------------------------- reads
 
     public Snapshot ReadSnapshot(string version)
@@ -177,6 +260,7 @@ sealed class Store
         ReadPaymentMethods(connection, transaction),
         ReadPeople(connection, transaction),
         ReadTags(connection, transaction),
+        ReadMerchants(connection, transaction),
         ReadEvents(connection, transaction),
         ReadTransactions(connection, transaction, null));
 
@@ -218,6 +302,16 @@ sealed class Store
         while (reader.Read())
             tags.Add(new Tag(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2) != 0, reader.GetString(3)));
         return tags;
+    }
+
+    static List<Merchant> ReadMerchants(SqliteConnection connection, SqliteTransaction? transaction)
+    {
+        var merchants = new List<Merchant>();
+        using var command = Sql(connection, transaction, "SELECT id, name, archived, created_at FROM merchants ORDER BY name COLLATE NOCASE, id;");
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            merchants.Add(new Merchant(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2) != 0, reader.GetString(3)));
+        return merchants;
     }
 
     static List<SpendEvent> ReadEvents(SqliteConnection connection, SqliteTransaction? transaction)
@@ -266,13 +360,28 @@ sealed class Store
             }
         }
 
+        var numbersByTransaction = new Dictionary<long, List<ScopeNumber>>();
+        using (var numberCommand = Sql(connection, transaction,
+            "SELECT transaction_id, scope, scope_id, number FROM scope_numbers WHERE $id IS NULL OR transaction_id = $id ORDER BY transaction_id, scope, scope_id;",
+            ("$id", onlyId)))
+        using (var reader = numberCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var transactionId = reader.GetInt64(0);
+                if (!numbersByTransaction.TryGetValue(transactionId, out var numbers))
+                    numbersByTransaction[transactionId] = numbers = [];
+                numbers.Add(new ScopeNumber(reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3)));
+            }
+        }
+
         var transactions = new List<SpendTransaction>();
         using var command = Sql(connection, transaction, """
-            SELECT id, kind, date, amount_cents, payment_method_id, person_id, linked_id,
-                   merchant, description, note, created_at, updated_at
-            FROM transactions
-            WHERE $id IS NULL OR id = $id
-            ORDER BY date, id;
+            SELECT t.id, t.kind, t.date, t.amount_cents, t.payment_method_id, t.person_id, t.linked_id,
+                   t.merchant_id, COALESCE(m.name, ''), t.description, t.note, t.archived, t.created_at, t.updated_at
+            FROM transactions t LEFT JOIN merchants m ON m.id = t.merchant_id
+            WHERE $id IS NULL OR t.id = $id
+            ORDER BY t.date, t.id;
             """, ("$id", onlyId));
         using var rows = command.ExecuteReader();
         while (rows.Read())
@@ -286,13 +395,16 @@ sealed class Store
                 rows.GetInt64(4),
                 rows.IsDBNull(5) ? null : rows.GetInt64(5),
                 rows.IsDBNull(6) ? null : rows.GetInt64(6),
-                rows.GetString(7),
+                rows.IsDBNull(7) ? null : rows.GetInt64(7),
                 rows.GetString(8),
                 rows.GetString(9),
+                rows.GetString(10),
+                rows.GetInt64(11) != 0,
                 tagsByTransaction.TryGetValue(id, out var tagIds) ? tagIds : [],
                 sharesByTransaction.TryGetValue(id, out var shares) ? shares : [],
-                rows.GetString(10),
-                NullableString(rows, 11)));
+                numbersByTransaction.TryGetValue(id, out var numbers) ? numbers : [],
+                rows.GetString(12),
+                NullableString(rows, 13)));
         }
         return transactions;
     }
@@ -339,14 +451,16 @@ sealed class Store
         if (before is not null && Unchanged(before, values)) return before; // Keeps the original updated_at and adds no history.
 
         var now = Now();
+        if (values.MerchantId is null && values.Merchant.Length > 0)
+            values = values with { MerchantId = CreateMerchant(connection, transaction, values.Merchant) };
         long savedId;
         if (before is null)
         {
             savedId = Convert.ToInt64(Scalar(connection, transaction, """
                 INSERT INTO transactions
-                    (kind, date, amount_cents, payment_method_id, person_id, linked_id, merchant, description, note, created_at)
+                    (kind, date, amount_cents, payment_method_id, person_id, linked_id, merchant_id, description, note, archived, created_at)
                 VALUES
-                    ($kind, $date, $amount, $method, $person, $linked, $merchant, $description, $note, $now);
+                    ($kind, $date, $amount, $method, $person, $linked, $merchant, $description, $note, $archived, $now);
                 SELECT last_insert_rowid();
                 """, TransactionParameters(values, now)), CultureInfo.InvariantCulture);
         }
@@ -356,8 +470,8 @@ sealed class Store
             Execute(connection, transaction, """
                 UPDATE transactions SET
                     kind = $kind, date = $date, amount_cents = $amount, payment_method_id = $method,
-                    person_id = $person, linked_id = $linked, merchant = $merchant,
-                    description = $description, note = $note, updated_at = $now
+                    person_id = $person, linked_id = $linked, merchant_id = $merchant,
+                    description = $description, note = $note, archived = $archived, updated_at = $now
                 WHERE id = $id;
                 """, [.. TransactionParameters(values, now), ("$id", savedId)]);
             Execute(connection, transaction, "DELETE FROM transaction_tags WHERE transaction_id = $id; DELETE FROM transaction_shares WHERE transaction_id = $id;", ("$id", savedId));
@@ -367,6 +481,7 @@ sealed class Store
         foreach (var share in values.Shares)
             Execute(connection, transaction, "INSERT INTO transaction_shares (transaction_id, person_id, amount_cents) VALUES ($id, $person, $amount);",
                 ("$id", savedId), ("$person", share.PersonId), ("$amount", share.AmountCents));
+        Renumber(connection, transaction, savedId);
 
         var after = ReadTransactions(connection, transaction, savedId).Single();
         RecordHistory(connection, transaction, before is null ? "Created" : "Edited", "Transaction", savedId, before, after);
@@ -377,14 +492,15 @@ sealed class Store
     static bool Unchanged(SpendTransaction before, TransactionValues values) =>
         before.Kind == values.Kind && before.Date == values.Date && before.AmountCents == values.AmountCents &&
         before.PaymentMethodId == values.PaymentMethodId && before.PersonId == values.PersonId && before.LinkedId == values.LinkedId &&
-        before.Merchant == values.Merchant && before.Description == values.Description && before.Note == values.Note &&
+        before.MerchantId == values.MerchantId && before.Merchant == values.Merchant && before.Description == values.Description &&
+        before.Note == values.Note && before.Archived == values.Archived &&
         before.TagIds.SequenceEqual(values.TagIds) && before.Shares.SequenceEqual(values.Shares);
 
     static (string Name, object? Value)[] TransactionParameters(TransactionValues values, string now) =>
     [
         ("$kind", values.Kind), ("$date", values.Date), ("$amount", values.AmountCents), ("$method", values.PaymentMethodId),
-        ("$person", values.PersonId), ("$linked", values.LinkedId), ("$merchant", values.Merchant),
-        ("$description", values.Description), ("$note", values.Note), ("$now", now)
+        ("$person", values.PersonId), ("$linked", values.LinkedId), ("$merchant", values.MerchantId),
+        ("$description", values.Description), ("$note", values.Note), ("$archived", values.Archived ? 1 : 0), ("$now", now)
     ];
 
     static TransactionValues ValidateTransaction(SqliteConnection connection, SqliteTransaction transaction, long? id, SpendTransaction? before, TransactionRequest request)
@@ -403,6 +519,20 @@ sealed class Store
             throw RequestException.Invalid("That payment method is archived. Restore it under Manage to use it again.");
 
         var merchant = OptionalText(request.Merchant, MaxMerchantLength, "Merchant");
+        long? merchantId = null;
+        if (merchant.Length > 0)
+        {
+            // Merchants are matched by name, ignoring case; a name never seen before becomes a new merchant on save.
+            using var lookup = Sql(connection, transaction, "SELECT id, name, archived FROM merchants WHERE name = $name;", ("$name", merchant));
+            using var found = lookup.ExecuteReader();
+            if (found.Read())
+            {
+                merchantId = found.GetInt64(0);
+                merchant = found.GetString(1);
+                if (found.GetInt64(2) != 0 && before?.MerchantId != merchantId)
+                    throw RequestException.Invalid($"{merchant} is an archived merchant. Restore it under Manage to use it again.");
+            }
+        }
         var description = OptionalText(request.Description, MaxDescriptionLength, "Description");
         var note = OptionalText(request.Note, MaxNoteLength, "Note");
         if (merchant.Length == 0 && description.Length == 0)
@@ -460,7 +590,8 @@ sealed class Store
         if (before?.Kind == "Purchase" && id is not null)
             ValidatePurchaseDependents(connection, transaction, id.Value, kind, date, shares);
 
-        return new TransactionValues(kind, date, amount, methodId, personId, linkedId, merchant, description, note, tagIds, shares);
+        var archived = request.Archived ?? before?.Archived ?? false;
+        return new TransactionValues(kind, date, amount, methodId, personId, linkedId, merchantId, merchant, description, note, archived, tagIds, shares);
     }
 
     /// <summary>Who a purchase was for: each person once, each share at least a cent, adding up exactly to the amount.</summary>
@@ -664,6 +795,7 @@ sealed class Store
             """, ("$id", id)), CultureInfo.InvariantCulture);
         if (uses > 0) throw RequestException.Invalid($"{before.Name} is on {uses} transaction{(uses == 1 ? "" : "s")}. Archive them instead to hide them from new entries.");
         Execute(connection, transaction, "DELETE FROM people WHERE id = $id;", ("$id", id));
+        ForgetScope(connection, transaction, "person", id);
         RecordHistory(connection, transaction, "Deleted", "Person", id, before, null);
         transaction.Commit();
     }
@@ -708,7 +840,58 @@ sealed class Store
         var before = ReadTags(connection, transaction).SingleOrDefault(t => t.Id == id) ?? throw RequestException.NotFound("Tag not found.");
         var uses = Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM transaction_tags WHERE tag_id = $id;", ("$id", id)), CultureInfo.InvariantCulture);
         Execute(connection, transaction, "DELETE FROM tags WHERE id = $id;", ("$id", id));
+        ForgetScope(connection, transaction, "tag", id);
         RecordHistory(connection, transaction, "Deleted", "Tag", id, new { before.Id, before.Name, before.Archived, before.CreatedAt, RemovedFromTransactions = uses }, null);
+        transaction.Commit();
+    }
+
+    static long CreateMerchant(SqliteConnection connection, SqliteTransaction transaction, string name)
+    {
+        var id = Convert.ToInt64(Scalar(connection, transaction,
+            "INSERT INTO merchants (name, created_at) VALUES ($name, $now); SELECT last_insert_rowid();",
+            ("$name", name), ("$now", Now())), CultureInfo.InvariantCulture);
+        RecordHistory(connection, transaction, "Created", "Merchant", id, null, ReadMerchants(connection, transaction).Single(m => m.Id == id));
+        return id;
+    }
+
+    public Merchant CreateMerchant(NameRequest request)
+    {
+        var name = RequireName(request.Name, "Merchant name", MaxMerchantLength);
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        EnsureNameFree(connection, transaction, "merchants", name, null, "A merchant with that name already exists.");
+        var id = CreateMerchant(connection, transaction, name);
+        transaction.Commit();
+        return ReadMerchants(connection, null).Single(m => m.Id == id);
+    }
+
+    public Merchant UpdateMerchant(long id, UpdateNameRequest request)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        var before = ReadMerchants(connection, transaction).SingleOrDefault(m => m.Id == id) ?? throw RequestException.NotFound("Merchant not found.");
+        var name = request.Name is null ? before.Name : RequireName(request.Name, "Merchant name", MaxMerchantLength);
+        var archived = request.Archived ?? before.Archived;
+        EnsureNameFree(connection, transaction, "merchants", name, id, "A merchant with that name already exists.");
+        var after = before with { Name = name, Archived = archived };
+        if (after == before) return before;
+        Execute(connection, transaction, "UPDATE merchants SET name = $name, archived = $archived WHERE id = $id;",
+            ("$name", name), ("$archived", archived ? 1 : 0), ("$id", id));
+        RecordHistory(connection, transaction, "Edited", "Merchant", id, before, after);
+        transaction.Commit();
+        return after;
+    }
+
+    public void DeleteMerchant(long id)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        var before = ReadMerchants(connection, transaction).SingleOrDefault(m => m.Id == id) ?? throw RequestException.NotFound("Merchant not found.");
+        var uses = Convert.ToInt64(Scalar(connection, transaction, "SELECT COUNT(*) FROM transactions WHERE merchant_id = $id;", ("$id", id)), CultureInfo.InvariantCulture);
+        if (uses > 0) throw RequestException.Invalid($"{before.Name} is on {uses} transaction{(uses == 1 ? "" : "s")}. Archive it instead to hide it from new entries.");
+        Execute(connection, transaction, "DELETE FROM merchants WHERE id = $id;", ("$id", id));
+        ForgetScope(connection, transaction, "merchant", id);
+        RecordHistory(connection, transaction, "Deleted", "Merchant", id, before, null);
         transaction.Commit();
     }
 
@@ -856,14 +1039,19 @@ sealed class Store
             if (bad is not null) throw RequestException.Invalid($"The backup has an invalid {label} name (#{bad}).");
         }
 
+        var badMerchant = Scalar(connection, transaction,
+            $"SELECT id FROM merchants WHERE typeof(name) <> 'text' OR length(trim(name)) = 0 OR length(name) > {MaxMerchantLength} OR name <> trim(name) LIMIT 1;");
+        if (badMerchant is not null) throw RequestException.Invalid($"The backup has an invalid merchant name (#{badMerchant}).");
+
         var badTransaction = Scalar(connection, transaction, $"""
             SELECT id FROM transactions
             WHERE typeof(amount_cents) <> 'integer' OR amount_cents > {MaxAmountCents}
                OR typeof(payment_method_id) <> 'integer'
                OR typeof(person_id) NOT IN ('integer', 'null') OR typeof(linked_id) NOT IN ('integer', 'null')
-               OR typeof(merchant) <> 'text' OR typeof(description) <> 'text' OR typeof(note) <> 'text'
-               OR length(merchant) > {MaxMerchantLength} OR length(description) > {MaxDescriptionLength} OR length(note) > {MaxNoteLength}
-               OR (trim(merchant) = '' AND trim(description) = '')
+               OR typeof(merchant_id) NOT IN ('integer', 'null')
+               OR typeof(description) <> 'text' OR typeof(note) <> 'text'
+               OR length(description) > {MaxDescriptionLength} OR length(note) > {MaxNoteLength}
+               OR (merchant_id IS NULL AND trim(description) = '')
             LIMIT 1;
             """);
         if (badTransaction is not null) throw RequestException.Invalid($"Transaction #{badTransaction} in the backup has an invalid value.");
@@ -875,6 +1063,8 @@ sealed class Store
         var taggedNonPurchase = Scalar(connection, transaction,
             "SELECT t.transaction_id FROM transaction_tags t JOIN transactions x ON x.id = t.transaction_id WHERE x.kind <> 'Purchase' LIMIT 1;");
         if (taggedNonPurchase is not null) throw RequestException.Invalid($"Transaction #{taggedNonPurchase} in the backup has tags, but only purchases can.");
+
+        ValidateRestoredNumbers(connection, transaction);
 
         if (Scalar(connection, transaction, $"SELECT id FROM events WHERE typeof(note) <> 'text' OR length(note) > {MaxNoteLength} LIMIT 1;") is { } badEvent)
             throw RequestException.Invalid($"Event #{badEvent} in the backup has an invalid note.");
@@ -898,6 +1088,34 @@ sealed class Store
         using var reader = dates.ExecuteReader();
         while (reader.Read())
             RequireDate(reader.GetString(0), "Every date in the backup");
+    }
+
+    /// <summary>Restored numbers must be exactly the scopes each transaction belongs to, within each scope's counter.</summary>
+    static void ValidateRestoredNumbers(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var scopes = string.Join(", ", NumberedScopes.Select(s => $"'{s.Scope}'"));
+        var bad = Scalar(connection, transaction, $"""
+            SELECT n.transaction_id FROM scope_numbers n LEFT JOIN scope_counters c ON c.scope = n.scope AND c.scope_id = n.scope_id
+            WHERE n.scope NOT IN ({scopes}) OR typeof(n.scope_id) <> 'integer' OR typeof(n.number) <> 'integer'
+               OR c.last_number IS NULL OR typeof(c.last_number) <> 'integer' OR n.number > c.last_number
+            LIMIT 1;
+            """);
+        if (bad is not null) throw RequestException.Invalid($"Transaction #{bad} in the backup has an invalid number.");
+        if (Scalar(connection, transaction, $"SELECT 1 FROM scope_counters WHERE scope NOT IN ({scopes}) OR typeof(scope_id) <> 'integer' LIMIT 1;") is not null)
+            throw RequestException.Invalid("The backup has a number counter for an unknown scope.");
+
+        foreach (var (scope, members) in NumberedScopes)
+        {
+            var missing = Scalar(connection, transaction, $"""
+                SELECT m.transaction_id FROM ({members}) m
+                WHERE NOT EXISTS (SELECT 1 FROM scope_numbers n WHERE n.scope = $scope AND n.scope_id = m.scope_id AND n.transaction_id = m.transaction_id)
+                UNION ALL
+                SELECT n.transaction_id FROM scope_numbers n
+                WHERE n.scope = $scope AND (n.scope_id, n.transaction_id) NOT IN (SELECT scope_id, transaction_id FROM ({members}))
+                LIMIT 1;
+                """, ("$scope", scope));
+            if (missing is not null) throw RequestException.Invalid($"Transaction #{missing} in the backup has {scope} numbers that do not match its {scope}s.");
+        }
     }
 
     /// <summary>Checks relationships that SQLite constraints cannot express. Throws instead of letting inconsistent data commit.</summary>
@@ -976,11 +1194,11 @@ sealed class Store
         if (taken is not null) throw RequestException.Invalid(message);
     }
 
-    static string RequireName(string? value, string label)
+    static string RequireName(string? value, string label, int maxLength = MaxNameLength)
     {
         var name = value?.Trim() ?? "";
         if (name.Length == 0) throw RequestException.Invalid($"{label} is required.");
-        if (name.Length > MaxNameLength) throw RequestException.Invalid($"{label} must be {MaxNameLength} characters or fewer.");
+        if (name.Length > maxLength) throw RequestException.Invalid($"{label} must be {maxLength} characters or fewer.");
         return name;
     }
 
@@ -1039,19 +1257,24 @@ sealed class Store
 record PaymentMethod(long Id, string Name, bool Archived, string CreatedAt);
 record Person(long Id, string Name, bool IsSelf, bool Archived, string CreatedAt);
 record Tag(long Id, string Name, bool Archived, string CreatedAt);
+record Merchant(long Id, string Name, bool Archived, string CreatedAt);
+/// <summary>A transaction's number inside one scope, such as ("person", 3, 12): the 12th entry for person #3.</summary>
+record ScopeNumber(string Scope, long ScopeId, long Number);
 record Share(long PersonId, long AmountCents);
 record SpendEvent(long Id, string Name, string StartDate, string EndDate, string Note, string CreatedAt, string? UpdatedAt);
 record SpendTransaction(long Id, string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
-    string Merchant, string Description, string Note, List<long> TagIds, List<Share> Shares, string CreatedAt, string? UpdatedAt);
+    long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<Share> Shares,
+    List<ScopeNumber> Numbers, string CreatedAt, string? UpdatedAt);
 record HistoryEntry(long Id, string At, string Action, string Entity, long? EntityId, JsonElement? Before, JsonElement? After);
 record HistoryPage(List<HistoryEntry> Entries, bool HasMore);
-record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person> People, List<Tag> Tags, List<SpendEvent> Events, List<SpendTransaction> Transactions);
+record Snapshot(string Version, List<PaymentMethod> PaymentMethods, List<Person> People, List<Tag> Tags, List<Merchant> Merchants,
+    List<SpendEvent> Events, List<SpendTransaction> Transactions);
 
 record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? PaymentMethodId, long? PersonId, long? LinkedId,
-    string? Merchant, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares);
+    string? Merchant, string? Description, string? Note, List<long>? TagIds, List<ShareRequest>? Shares, bool? Archived = null);
 record ShareRequest(long? PersonId, long? AmountCents);
 record TransactionValues(string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
-    string Merchant, string Description, string Note, List<long> TagIds, List<Share> Shares);
+    long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<Share> Shares);
 record NameRequest(string? Name);
 record UpdateNameRequest(string? Name, bool? Archived);
 record EventRequest(string? Name, string? StartDate, string? EndDate, string? Note);

@@ -21,6 +21,7 @@ function monthTotals(transactions) {
 }
 
 function renderTransactions() {
+  // The cards count every entry, archived or not; only the table hides archived entries.
   const monthRows = transactionsInRange(monthStart(state.month), monthEnd(state.month));
   const totals = monthTotals(monthRows);
   $('#monthCards').replaceChildren(
@@ -31,11 +32,15 @@ function renderTransactions() {
     statCard('Entries', numberFormat.format(monthRows.length))
   );
 
-  const rows = monthRows.filter(tx => matchesSearch(tx, state.search));
+  const listed = listedTransactions(monthStart(state.month), monthEnd(state.month));
+  const rows = listed.filter(tx => matchesSearch(tx, state.search));
+  visibleLedgerIds = rows.map(tx => tx.id);
+  pruneSelection();
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
   const methods = state.snapshot.paymentMethods.filter(method => !method.archived || usedMethodIds.has(method.id));
 
   const columns = [
+    { label: 'ID', title: 'The permanent ID of each entry. Search #12 to find entry #12.' },
     { label: 'When' },
     { label: 'For Who' },
     { label: 'What' },
@@ -52,6 +57,12 @@ function renderTransactions() {
       what.append(badge);
     }
     what.append(describeTransaction(tx) || '(no description)');
+    if (tx.archived) {
+      const badge = document.createElement('span');
+      badge.className = 'archived-badge';
+      badge.textContent = '(archived)';
+      what.append(' ', badge);
+    }
     if (tx.note) {
       const note = document.createElement('span');
       note.className = 'cell-sub';
@@ -59,9 +70,14 @@ function renderTransactions() {
       what.append(note);
     }
     const direction = tx.kind === 'Purchase' ? 'out' : tx.kind === 'Refund' ? 'refund' : 'in';
+    const selected = selectionMode && selectedIds.has(tx.id);
     return {
-      onClick: () => openTransactionEditor(tx),
+      id: tx.id,
+      className: [tx.archived ? 'archived-row' : '', selected ? 'tx-selected' : ''].filter(Boolean).join(' '),
+      selected: selectionMode ? selected : undefined,
+      onClick: event => selectionMode ? toggleSelection(tx.id, event.shiftKey) : openTransactionEditor(tx),
       cells: [
+        selectionMode ? selectionCell(tx) : `#${tx.id}`,
         formatDate(tx.date),
         whoLabel(tx),
         what,
@@ -75,6 +91,7 @@ function renderTransactions() {
     cells: [
       '',
       '',
+      '',
       { text: 'Net spent (purchases − refunds)', title: 'Paybacks are listed in the table but not included in these totals.' },
       '',
       ...methods.map(method => {
@@ -86,20 +103,25 @@ function renderTransactions() {
     ]
   };
 
+  const hidden = monthRows.length - listed.length;
   const empty = monthRows.length === 0
     ? `No entries in ${formatMonth(state.month)}. Use New Transaction to add one.`
-    : 'No entries match the search.';
+    : listed.length === 0 ? `Every entry in ${formatMonth(state.month)} is archived. Turn on View → Show Archived to list them.` : 'No entries match the search.';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
+  $('#archivedNote').hidden = hidden === 0 || listed.length === 0;
+  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden this month; they still count in the totals above and in Stats. View → Show Archived lists them.`;
+  updateBulkControls();
 }
 
 function exportTransactionsCsv() {
-  const header = ['Date', 'Type', 'For Who', 'Merchant', 'Description', 'Tags', 'Payment Method', 'Amount', 'Linked To', 'Note'];
+  const header = ['ID', 'Date', 'Type', 'For Who', 'Merchant', 'Description', 'Tags', 'Payment Method', 'Amount', 'Linked To', 'Note', 'Archived'];
   const lines = [header];
   for (const tx of state.model.transactions) {
     const forWho = tx.kind === 'Purchase' && tx.shares.length > 1
       ? tx.shares.map(share => `${personName(share.personId)} ${centsToInput(share.amountCents)}`).join('; ')
       : whoLabel(tx);
     lines.push([
+      `#${tx.id}`,
       tx.date,
       tx.kind,
       forWho,
@@ -109,7 +131,8 @@ function exportTransactionsCsv() {
       methodName(tx.paymentMethodId),
       centsToInput(tx.amountCents),
       tx.linkedId == null ? '' : `#${tx.linkedId}`,
-      tx.note
+      tx.note,
+      tx.archived ? 'Yes' : ''
     ]);
   }
   const csv = lines.map(line => line.map(csvField).join(',')).join('\r\n');
@@ -166,6 +189,7 @@ function initializeTransactionEditor() {
   });
   $('#txCancelButton').addEventListener('click', () => $('#transactionDialog').close());
   $('#txDeleteButton').addEventListener('click', () => deleteTransaction());
+  $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());
 }
 
@@ -184,6 +208,13 @@ function openTransactionEditor(tx = null, defaults = {}) {
   $('#txNote').value = tx?.note ?? '';
   $('#txError').textContent = '';
   $('#txDeleteButton').hidden = !tx;
+  $('#txArchiveButton').hidden = !tx;
+  $('#txArchiveButton').textContent = tx?.archived ? 'Unarchive' : 'Archive';
+  $('#txArchiveButton').title = tx?.archived
+    ? 'Save and list this entry in the ledger and calendar again.'
+    : 'Save and hide this entry from the ledger and calendar. It still counts in Stats and balances.';
+  $('#txNumbers').hidden = !tx;
+  $('#txNumbers').textContent = tx ? [tx.archived ? 'Archived.' : '', scopeNumbersLabel(tx)].filter(Boolean).join(' ') : '';
 
   // New entries start on the method of the latest purchase; the user sees and can change it before saving.
   const lastPurchase = state.model.transactions.findLast(entry => entry.kind === 'Purchase');
@@ -323,7 +354,6 @@ function updateShareTotal() {
     : `Assigned ${formatMoney(assigned)} of ${formatMoney(amount)}${assigned === amount ? '' : ` (${formatMoney(Math.abs(amount - assigned))} ${assigned < amount ? 'left' : 'over'})`}`;
 }
 
-/** Divides the amount into equal cents; the first people listed get any leftover cent. */
 function splitEvenly() {
   const amount = parseMoney($('#txAmount').value);
   if (amount == null) {
@@ -332,12 +362,8 @@ function splitEvenly() {
     return;
   }
   const inputs = shareInputs();
-  const base = Math.floor(amount / inputs.length);
-  let leftover = amount - base * inputs.length;
-  for (const input of inputs) {
-    input.value = centsToInput(base + (leftover > 0 ? 1 : 0));
-    leftover--;
-  }
+  evenShares(amount, inputs.map(input => input.dataset.person))
+    .forEach((share, index) => { inputs[index].value = centsToInput(share.amountCents); });
   $('#txError').textContent = '';
   updateShareTotal();
 }
@@ -444,28 +470,25 @@ function prefillFromLinkedPurchase() {
   }
 }
 
+/** Suggests active merchants, most used first. Typing a new name adds a merchant when the entry is saved. */
 function renderMerchantSuggestions() {
   const counts = new Map();
   for (const tx of state.model.transactions) {
-    const name = tx.merchant.trim();
-    if (!name) continue;
-    const key = name.toLowerCase();
-    const entry = counts.get(key) ?? { name, count: 0 };
-    entry.name = name; // Transactions are date-ordered, so the latest spelling wins.
-    entry.count++;
-    counts.set(key, entry);
+    if (tx.merchantId != null) counts.set(tx.merchantId, (counts.get(tx.merchantId) ?? 0) + 1);
   }
-  const options = [...counts.values()]
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .map(entry => {
+  const options = state.snapshot.merchants
+    .filter(merchant => !merchant.archived)
+    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.name.localeCompare(b.name))
+    .map(merchant => {
       const option = document.createElement('option');
-      option.value = entry.name;
+      option.value = merchant.name;
       return option;
     });
   $('#merchantList').replaceChildren(...options);
 }
 
-async function saveTransaction() {
+/** Saves the editor. changes overrides fields, such as { archived: true } from the Archive button. */
+async function saveTransaction(changes = {}) {
   const kind = editorKind();
   const error = $('#txError');
   error.textContent = '';
@@ -495,7 +518,9 @@ async function saveTransaction() {
     description: $('#txDescription').value,
     note: $('#txNote').value,
     tagIds: kind === 'Purchase' ? editor.tags.values.map(Number) : [],
-    shares
+    shares,
+    archived: editor.transaction?.archived ?? false,
+    ...changes
   };
 
   $('#txSaveButton').disabled = true;
@@ -506,7 +531,8 @@ async function saveTransaction() {
       : await api('/transactions', { method: 'POST', body });
     $('#transactionDialog').close();
     await loadSnapshot();
-    setStatus(`${existing ? 'Saved' : 'Added'} ${KIND_LABELS[saved.kind].toLowerCase()} ${formatMoney(saved.amountCents)} on ${formatDate(saved.date)}.`);
+    const verb = existing && saved.archived !== existing.archived ? (saved.archived ? 'Archived' : 'Unarchived') : existing ? 'Saved' : 'Added';
+    setStatus(`${verb} ${KIND_LABELS[saved.kind].toLowerCase()} #${saved.id}, ${formatMoney(saved.amountCents)} on ${formatDate(saved.date)}.`);
   } catch (saveError) {
     error.textContent = saveError.message;
   } finally {

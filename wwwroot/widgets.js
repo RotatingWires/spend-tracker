@@ -163,7 +163,8 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {} } = {}) {
 }
 
 /**
- * Renders a table. columns: [{ label, num, title }]. rows: [{ cells: [string | Node | { text, num, className, title }], onClick, className }].
+ * Renders a table. columns: [{ label, num, title }].
+ * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), className, id, selected }].
  */
 function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer = null } = {}) {
   const head = document.createElement('thead');
@@ -204,6 +205,8 @@ function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer
 function tableRow(columns, row) {
   const tr = document.createElement('tr');
   if (row.className) tr.className = row.className;
+  if (row.id != null) tr.dataset.id = String(row.id);
+  if (row.selected !== undefined) tr.setAttribute('aria-selected', String(row.selected));
   row.cells.forEach((cell, index) => {
     const td = document.createElement('td');
     const spec = cell instanceof Node || typeof cell !== 'object' || cell === null ? { content: cell } : cell;
@@ -219,12 +222,12 @@ function tableRow(columns, row) {
     tr.classList.add('clickable');
     tr.tabIndex = 0;
     tr.addEventListener('click', event => {
-      if (!event.target.closest('button')) row.onClick();
+      if (!event.target.closest('button')) row.onClick(event);
     });
     tr.addEventListener('keydown', event => {
-      if ((event.key === 'Enter' || event.key === ' ') && event.target === tr) {
+      if ((event.key === 'Enter' || event.key === ' ') && event.target === tr && !event.repeat) {
         event.preventDefault();
-        row.onClick();
+        row.onClick(event);
       }
     });
   }
@@ -296,10 +299,14 @@ function rowActionButtons(actions) {
   return wrap;
 }
 
-function confirmAction(title, message, okLabel = 'OK') {
+/** Asks before an action. detail adds a scrollable list, such as the selected entries; notice: true shows only OK. */
+function confirmAction(title, message, okLabel = 'OK', { detail = '', notice = false } = {}) {
   const dialog = $('#confirmDialog');
   $('#confirmTitle').textContent = title;
   $('#confirmMessage').textContent = message;
+  $('#confirmDetail').textContent = detail;
+  $('#confirmDetail').hidden = !detail;
+  $('#confirmCancelButton').hidden = notice;
   $('#confirmOkButton').textContent = okLabel;
   dialog.returnValue = '';
   dialog.showModal();
@@ -308,17 +315,37 @@ function confirmAction(title, message, okLabel = 'OK') {
   });
 }
 
-function promptText(title, label, value = '') {
+/** Asks for a line of text. suggestions names a <datalist>; maxLength matches the server's limit for that field. */
+function promptText(title, label, value = '', { maxLength = 60, suggestions = null } = {}) {
   const dialog = $('#promptDialog');
   const input = $('#promptInput');
   $('#promptTitle').textContent = title;
   $('#promptLabel').textContent = label;
+  input.maxLength = maxLength;
+  if (suggestions) input.setAttribute('list', suggestions);
+  else input.removeAttribute('list');
   input.value = value;
   dialog.returnValue = '';
   dialog.showModal();
   input.select();
   return new Promise(resolve => {
     dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok' ? input.value.trim() : null), { once: true });
+  });
+}
+
+/** Asks the user to pick one option from a Win95 dropdown. Resolves to the chosen value, or null if cancelled. */
+let choiceSelect = null;
+function chooseOption(title, label, options, okLabel = 'OK') {
+  const dialog = $('#chooseDialog');
+  choiceSelect ??= createSingleSelect($('#chooseSelect'));
+  $('#chooseTitle').textContent = title;
+  $('#chooseLabel').textContent = label;
+  $('#chooseOkButton').textContent = okLabel;
+  choiceSelect.setOptions(options, options[0]?.value ?? null);
+  dialog.returnValue = '';
+  dialog.showModal();
+  return new Promise(resolve => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok' && choiceSelect.value !== '' ? choiceSelect.value : null), { once: true });
   });
 }
 

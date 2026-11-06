@@ -46,6 +46,7 @@ function renderAll() {
     ? formatMonth(state.month)
     : $(`.tabs [data-tab="${state.activeTab}"]`).textContent;
   TAB_RENDERERS[state.activeTab]();
+  updateBulkControls();
   if ($('#personDialog').open) renderPersonDialog();
   if ($('#dayDialog').open) renderDayDialog();
 
@@ -93,13 +94,21 @@ function populateViewMenu() {
       onClick: () => switchTab(tab.dataset.tab)
     }));
   }
-  const separator = document.createElement('div');
-  separator.className = 'menu-separator';
-  separator.setAttribute('role', 'separator');
+  menu.append(menuSeparator(), menuButton('Show Archived', {
+    role: 'menuitemcheckbox',
+    checked: state.showArchived,
+    onClick: () => {
+      state.showArchived = !state.showArchived;
+      writeSetting('spend-tracker-show-archived', String(state.showArchived));
+      closeMenus();
+      renderAll();
+      setStatus(state.showArchived ? 'Showing archived entries in the ledger and calendar.' : 'Archived entries are hidden from the ledger and calendar.');
+    }
+  }));
   const heading = document.createElement('div');
   heading.className = 'menu-heading';
   heading.textContent = 'Theme';
-  menu.append(separator, heading);
+  menu.append(menuSeparator(), heading);
   const preference = window.SpendTheme.getPreference();
   for (const [value, label] of [['light', 'Light'], ['dark', 'Dark']]) {
     menu.append(menuButton(label, {
@@ -111,6 +120,13 @@ function populateViewMenu() {
       }
     }));
   }
+}
+
+function menuSeparator() {
+  const separator = document.createElement('div');
+  separator.className = 'menu-separator';
+  separator.setAttribute('role', 'separator');
+  return separator;
 }
 
 function applyReleaseLabel(version) {
@@ -257,6 +273,7 @@ function startApp() {
   initializeEvents();
   initializeHistory();
   initializeManage();
+  initializeBulk();
   initializeRowHover();
   initializeTooltips();
 

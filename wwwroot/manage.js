@@ -1,6 +1,6 @@
 'use strict';
 
-/* Manage tab: payment methods, people, and tags. */
+/* Manage tab: payment methods, people, tags, and merchants. */
 
 const MANAGED = {
   'payment-methods': {
@@ -23,6 +23,14 @@ const MANAGED = {
     items: () => state.snapshot.tags,
     uses: id => state.model.transactions.filter(tx => tx.tagIds.includes(id)).length,
     archivable: () => true
+  },
+  merchants: {
+    table: '#merchantsTable',
+    singular: 'merchant',
+    maxLength: 120,
+    items: () => state.snapshot.merchants,
+    uses: id => state.model.transactions.filter(tx => tx.merchantId === id).length,
+    archivable: () => true
   }
 };
 
@@ -36,9 +44,10 @@ function renderManage() {
       if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
 
       const name = item.isSelf ? `${item.name} (you)` : item.name;
-      return { cells: [name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
+      return { cells: [`#${item.id}`, name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
     });
     renderTable($(config.table), [
+      { label: 'ID', title: 'Permanent ID, never reused. Entries are also numbered within each person, tag, and merchant.' },
       { label: 'Name' },
       { label: 'Used By', num: true, title: 'Number of transactions that use it.' },
       { label: 'Status', title: 'Archived items stay on old transactions and in search and stats, but are not offered for new ones.' },
@@ -62,7 +71,7 @@ async function addManaged(path, form) {
 }
 
 async function renameManaged(path, item) {
-  const name = await promptText(`Rename ${MANAGED[path].singular}`, 'New name', item.name);
+  const name = await promptText(`Rename ${MANAGED[path].singular}`, 'New name', item.name, { maxLength: MANAGED[path].maxLength ?? 60 });
   if (name == null || name === item.name) return;
   try {
     await api(`/${path}/${item.id}`, { method: 'PATCH', body: { name } });

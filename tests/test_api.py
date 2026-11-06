@@ -281,6 +281,75 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.api.upload_zip("/api/restore", recovery)
         self.assertIn("Added after backup", json.dumps(self.api.get("/api/snapshot")))
 
+    def test_numbers_per_person_tag_and_merchant(self):
+        food = self.api.post("/api/tags", {"name": "food"})["id"]
+        first = self.purchase(shares=[(self.me, 600), (self.alex, 400)], tagIds=[food], merchant="Diner")
+        second = self.purchase(person=self.alex, merchant="diner")
+        payback = self.payback(400, linked=first["id"])
+
+        def numbers(tx):
+            return {(n["scope"], n["scopeId"]): n["number"] for n in tx["numbers"]}
+
+        self.assertEqual(second["merchantId"], first["merchantId"], "merchant names match ignoring case")
+        self.assertEqual(second["merchant"], "Diner", "the first spelling is kept")
+        self.assertEqual(numbers(first), {("person", self.me): 1, ("person", self.alex): 1, ("tag", food): 1, ("merchant", first["merchantId"]): 1})
+        self.assertEqual(numbers(second), {("person", self.alex): 2, ("merchant", first["merchantId"]): 2})
+        self.assertEqual(numbers(payback), {("person", self.alex): 3})
+
+        # Numbers are never reused: deleting #2 and adding another entry gives it #4, and leaving a scope drops its number.
+        self.api.delete(f"/api/transactions/{second['id']}")
+        third = self.purchase(person=self.alex, merchant="Diner")
+        self.assertEqual(numbers(third)[("person", self.alex)], 4)
+        self.assertEqual(numbers(third)[("merchant", first["merchantId"])], 3)
+        untagged = self.api.put(f"/api/transactions/{first['id']}", {**self.editable(first), "tagIds": []})
+        self.assertNotIn(("tag", food), numbers(untagged))
+        retagged = self.api.put(f"/api/transactions/{first['id']}", {**self.editable(first), "tagIds": [food]})
+        self.assertEqual(numbers(retagged)[("tag", food)], 2)
+        self.assertEqual(numbers(retagged)[("person", self.alex)], 1, "unrelated numbers stay put")
+
+        # Deleting a tag forgets its numbers, so a new tag that reuses nothing starts again at #1.
+        self.api.delete(f"/api/tags/{food}")
+        self.assertEqual(numbers(self.api.get("/api/snapshot")["transactions"][0]).get(("tag", food)), None)
+
+    def test_merchants(self):
+        bought = self.purchase(merchant="  Corner Shop ")
+        merchant = bought["merchantId"]
+        self.assertEqual(bought["merchant"], "Corner Shop")
+        self.assertEqual([m["name"] for m in self.api.get("/api/snapshot")["merchants"]], ["Corner Shop"])
+        self.assertEqual(self.history()[1]["entity"], "Merchant", "typing a new merchant records it before the transaction")
+
+        renamed = self.api.patch(f"/api/merchants/{merchant}", {"name": "Corner Store"})
+        self.assertEqual(renamed["name"], "Corner Store")
+        self.assertEqual(self.api.get("/api/snapshot")["transactions"][0]["merchant"], "Corner Store")
+        self.assertRejected(lambda: self.api.post("/api/merchants", {"name": "corner store"}), contains="already exists")
+        self.assertRejected(lambda: self.api.delete(f"/api/merchants/{merchant}"), contains="Archive it instead")
+
+        self.api.patch(f"/api/merchants/{merchant}", {"archived": True})
+        self.assertRejected(lambda: self.purchase(merchant="Corner Store"), contains="archived merchant")
+        kept = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "merchant": "Corner Store", "note": "still fine"})
+        self.assertEqual(kept["merchantId"], merchant, "an archived merchant stays on entries that already had it")
+
+        cleared = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "merchant": "", "description": "Snacks"})
+        self.assertIsNone(cleared["merchantId"])
+        self.api.delete(f"/api/merchants/{merchant}")
+        self.assertEqual(self.api.get("/api/snapshot")["merchants"], [])
+        unused = self.api.post("/api/merchants", {"name": "x" * 120})
+        self.assertEqual(len(unused["name"]), 120)
+        self.assertRejected(lambda: self.api.post("/api/merchants", {"name": "x" * 121}))
+
+    def test_archived_transactions_still_count(self):
+        bought = self.purchase(person=self.alex)
+        archived = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(bought), "archived": True})
+        self.assertTrue(archived["archived"])
+        # Leaving archived out of an edit keeps the current value, and refunds can still link to it.
+        edited = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(archived), "note": "edited"})
+        self.assertTrue(edited["archived"])
+        self.refund(bought["id"], 100, person=self.alex)
+        entry = self.history()[1]
+        self.assertEqual((entry["before"]["archived"], entry["after"]["archived"]), (True, True))
+        restored = self.api.put(f"/api/transactions/{bought['id']}", {**self.editable(edited), "archived": False})
+        self.assertFalse(restored["archived"])
+
     def test_invalid_restore_changes_nothing(self):
         bought = self.purchase(amount=1000, person=self.alex)
         self.refund(bought["id"], 100, person=self.alex)
@@ -289,7 +358,7 @@ class SpendTrackerApiTests(unittest.TestCase):
 
         # Data problems, re-signed so they pass the archive checks and must be caught by the data rules.
         data_cases = {
-            "over-refunded": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, linked_id, merchant, created_at) VALUES ('Refund', '2026-10-05', 950, 1, {self.alex}, {bought['id']}, 'x', 'x')",
+            "over-refunded": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, linked_id, description, created_at) VALUES ('Refund', '2026-10-05', 950, 1, {self.alex}, {bought['id']}, 'x', 'x')",
             "shares off by a cent": "UPDATE transaction_shares SET amount_cents = amount_cents + 1",
             "share on a refund": f"INSERT INTO transaction_shares VALUES ({bought['id'] + 1}, {self.alex}, 100)",
             "refund for someone without a share": f"UPDATE transactions SET person_id = {self.me} WHERE kind = 'Refund'",
@@ -300,7 +369,13 @@ class SpendTrackerApiTests(unittest.TestCase):
             "tag on a refund": f"INSERT INTO tags (id, name, created_at) VALUES (9, 'x', 'x'); INSERT INTO transaction_tags VALUES ({bought['id'] + 1}, 9)",
             "blank name": "UPDATE tags SET name = ' '; INSERT INTO tags (name, created_at) VALUES ('  ', 'x')",
             "damaged history": "UPDATE history SET after_json = '{not json'",
-            "payback from me": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, merchant, created_at) VALUES ('Payback', '2026-10-05', 5, 1, {self.me}, 'x', 'x')",
+            "payback from me": f"INSERT INTO transactions (kind, date, amount_cents, payment_method_id, person_id, description, created_at) VALUES ('Payback', '2026-10-05', 5, 1, {self.me}, 'x', 'x')",
+            "missing merchant": "UPDATE transactions SET merchant_id = 99",
+            "blank merchant name": "UPDATE merchants SET name = ''",
+            "number missing": "DELETE FROM scope_numbers WHERE scope = 'person'",
+            "number for a scope it left": f"INSERT INTO scope_numbers VALUES ('tag', 5, {bought['id']}, 1); INSERT INTO scope_counters VALUES ('tag', 5, 1)",
+            "number past its counter": "UPDATE scope_numbers SET number = number + 10 WHERE scope = 'merchant'",
+            "unknown scope": "INSERT INTO scope_counters VALUES ('color', 1, 1)",
             "trigger": "CREATE TRIGGER evil AFTER INSERT ON tags BEGIN DELETE FROM people; END",
             "view": "CREATE VIEW extra AS SELECT 1",
             "extra table": "CREATE TABLE extra (id INTEGER)",
@@ -316,8 +391,8 @@ class SpendTrackerApiTests(unittest.TestCase):
             "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
             "wrong format": rebuild(archive, manifest={"format": "something-else"}),
             "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
-            "newer schema": rebuild(archive, manifest={"schemaVersion": 3}),
-            "schema 1 from v0.2": rebuild(archive, manifest={"schemaVersion": 1}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 4}),
+            "schema 2 from v0.3": rebuild(archive, manifest={"schemaVersion": 2}),
             "extra member": rebuild(archive, extra={"notes.txt": b"hi"}),
             "missing database": rebuild(archive, drop="spend-tracker.db"),
             "old JSON backup": json.dumps({"format": "spendtracker-backup", "formatVersion": 1}).encode(),

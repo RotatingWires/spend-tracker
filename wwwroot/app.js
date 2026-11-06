@@ -9,8 +9,18 @@ const state = {
   month: null,
   search: '',
   statsPeriod: 'all',
+  showArchived: readSetting('spend-tracker-show-archived') === 'true',
   loading: null
 };
+
+/** Per-browser view preferences. Storage can be unavailable (private windows), so they fall back to defaults. */
+function readSetting(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function writeSetting(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -160,6 +170,7 @@ function buildModel(snapshot) {
   const methods = new Map(snapshot.paymentMethods.map(method => [method.id, method]));
   const people = new Map(snapshot.people.map(person => [person.id, person]));
   const tags = new Map(snapshot.tags.map(tag => [tag.id, tag]));
+  const merchants = new Map(snapshot.merchants.map(merchant => [merchant.id, merchant]));
   const byId = new Map(snapshot.transactions.map(tx => [tx.id, tx]));
   const self = snapshot.people.find(person => person.isSelf);
   const linked = new Map();
@@ -168,7 +179,7 @@ function buildModel(snapshot) {
     if (!linked.has(tx.linkedId)) linked.set(tx.linkedId, []);
     linked.get(tx.linkedId).push(tx);
   }
-  return { methods, people, tags, byId, self, linked, transactions: snapshot.transactions, events: snapshot.events };
+  return { methods, people, tags, merchants, byId, self, linked, transactions: snapshot.transactions, events: snapshot.events };
 }
 
 /** Everyone a purchase was for (its shares), or the one person a refund or payback is about. */
@@ -233,10 +244,47 @@ function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
 }
 
+/** What the ledger and calendar list: archived entries stay hidden unless View → Show Archived is on. */
+function listedTransactions(start, end) {
+  return transactionsInRange(start, end).filter(tx => state.showArchived || !tx.archived);
+}
+
+/** A transaction's number inside a scope ("person", "tag", "merchant"), such as 3 for Alex's third entry. */
+function numberIn(tx, scope, scopeId) {
+  return tx.numbers.find(entry => entry.scope === scope && entry.scopeId === scopeId)?.number ?? null;
+}
+
+const SCOPE_NAMES = { person: personName, tag: tagName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}` };
+
+/** "Alex #3 · food #12 · Diner #5": every per-scope number of a transaction, people first. */
+function scopeNumbersLabel(tx) {
+  return Object.keys(SCOPE_NAMES)
+    .flatMap(scope => tx.numbers.filter(entry => entry.scope === scope).map(entry => `${SCOPE_NAMES[scope](entry.scopeId)} #${entry.number}`))
+    .join(' · ');
+}
+
+/** A saved transaction as a request body, with any fields replaced by changes. */
+function transactionRequest(tx, changes = {}) {
+  return {
+    kind: tx.kind, date: tx.date, amountCents: tx.amountCents, paymentMethodId: tx.paymentMethodId, personId: tx.personId,
+    linkedId: tx.linkedId, merchant: tx.merchant, description: tx.description, note: tx.note, tagIds: tx.tagIds,
+    shares: tx.shares.map(share => ({ personId: share.personId, amountCents: share.amountCents })), archived: tx.archived,
+    ...changes
+  };
+}
+
+/** Divides an amount into equal cents for each person; the first people listed get any leftover cent. */
+function evenShares(amountCents, personIds) {
+  const base = Math.floor(amountCents / personIds.length);
+  const leftover = amountCents - base * personIds.length;
+  return personIds.map((personId, index) => ({ personId, amountCents: base + (index < leftover ? 1 : 0) }));
+}
+
 /**
  * Searches only what the user typed or tagged: merchant, description, note, tags, and the amount (as 12.17 or
  * $12.17). Each searched word can appear anywhere, as in TaskList and NewsReview. The type, payment method, and
- * people are left out so a search like "h" does not match every "Purchase" or "Cash" row.
+ * people are left out so a search like "h" does not match every "Purchase" or "Cash" row. A word like "#12" finds
+ * transaction #12 exactly.
  */
 function matchesSearch(tx, query) {
   const wanted = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -245,7 +293,7 @@ function matchesSearch(tx, query) {
     tx.merchant, tx.description, tx.note, centsToInput(tx.amountCents), formatMoney(tx.amountCents),
     ...tagIdsOf(tx).map(tagName)
   ].join(' ').toLowerCase();
-  return wanted.every(part => text.includes(part));
+  return wanted.every(part => /^#\d+$/.test(part) ? tx.id === Number(part.slice(1)) : text.includes(part));
 }
 
 function eventsOn(key) {

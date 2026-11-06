@@ -27,7 +27,7 @@ function heatLevel(net, max) {
 
 function renderCalendar() {
   const month = state.month;
-  const days = dailyNet(transactionsInRange(monthStart(month), monthEnd(month)));
+  const days = dailyNet(listedTransactions(monthStart(month), monthEnd(month)));
   const max = Math.max(0, ...[...days.values()].map(day => day.net));
   const today = todayKey();
   $('#calendarLegend').textContent = formatMonth(month);
@@ -96,14 +96,14 @@ function openDayDialog(key) {
 function renderDayDialog() {
   const key = calendarDialogDay;
   if (!key) return;
-  const rows = transactionsInRange(key, key);
+  const rows = listedTransactions(key, key);
   const totals = monthTotals(rows);
   $('#dayDialogTitle').textContent = `${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`;
   const events = eventsOn(key);
   $('#dayDialogEvents').textContent = events.length ? `Events: ${events.map(event => event.name).join(', ')}` : '';
   $('#dayDialogEvents').hidden = events.length === 0;
 
-  renderTable($('#dayTable'), [{ label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],
+  renderTable($('#dayTable'), [{ label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],
     rows.map(tx => {
       const direction = tx.kind === 'Purchase' ? 'out' : tx.kind === 'Refund' ? 'refund' : 'in';
       return {
@@ -111,12 +111,12 @@ function renderDayDialog() {
           $('#dayDialog').close();
           openTransactionEditor(tx);
         },
-        cells: [KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', whoLabel(tx), methodName(tx.paymentMethodId), moneyCell(tx.amountCents, { direction })]
+        cells: [`#${tx.id}`, KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', whoLabel(tx), methodName(tx.paymentMethodId), moneyCell(tx.amountCents, { direction })]
       };
     }),
     {
       empty: 'No entries on this day.',
-      footer: rows.length ? { cells: ['', 'Net spent', '', '', { text: formatMoney(totals.net), num: true }] } : null
+      footer: rows.length ? { cells: ['', '', 'Net spent', '', '', { text: formatMoney(totals.net), num: true }] } : null
     });
 }
 

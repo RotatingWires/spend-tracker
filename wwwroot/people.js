@@ -97,10 +97,10 @@ function renderPersonDialog() {
         $('#personDialog').close();
         openTransactionEditor(tx);
       },
-      cells: [formatDate(tx.date), `#${tx.id} ${KIND_LABELS[tx.kind]}`, describeTransaction(tx) || '(no description)', moneyCell(amount, { direction }), status]
+      cells: [formatDate(tx.date), `#${numberIn(tx, 'person', personId)}`, `#${tx.id} ${KIND_LABELS[tx.kind]}`, describeTransaction(tx) || '(no description)', moneyCell(amount, { direction }), status]
     };
   });
-  renderTable($('#personTable'), [{ label: 'When' }, { label: 'Entry' }, { label: 'What' }, { label: 'Amount', num: true }, { label: 'Status', title: 'For a purchase, Amount is this person\'s share. Unpaid amounts count refunds and paybacks linked to their share. Unlinked paybacks reduce the overall balance only.' }], rows, { empty: 'No purchases or paybacks for this person yet.' });
+  renderTable($('#personTable'), [{ label: 'When' }, { label: 'No.', title: 'This person\'s own numbering: their 1st, 2nd, 3rd entry, and so on. Numbers are never reused.' }, { label: 'Entry' }, { label: 'What' }, { label: 'Amount', num: true }, { label: 'Status', title: 'For a purchase, Amount is this person\'s share. Unpaid amounts count refunds and paybacks linked to their share. Unlinked paybacks reduce the overall balance only.' }], rows, { empty: 'No purchases or paybacks for this person yet.' });
   $('#personPaybackButton').disabled = state.model.people.get(personId).archived;
 }
 
