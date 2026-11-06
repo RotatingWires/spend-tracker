@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.12.0 Manual
+# SpendTracker v0.12.1 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -228,7 +228,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 
 ### Menus
 
-- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Fresh Start..., Highlight rows on hover, Log Out.
+- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
 - **View:** switch tabs, **Show Archived**, and choose the Light or Dark theme. Show Archived and the theme are saved in this browser.
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
@@ -320,7 +320,7 @@ Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0
 
 ### Fresh Start
 
-**File → Fresh Start...**, after Restore Backup, clears only what you choose and then compacts the database so the space goes back to the disk, like Fresh start in NewsReview and TaskList. Tick the items to clear, type `RESET SELECTED`, and choose **Clear Selected**. Each choice shows how much it holds, and the dialog shows the current database size. Change history and pre-restore recovery backups are ticked to start with; nothing that removes an entry is.
+**File → Fresh Start...**, at the bottom of the File menu below Log Out so it is kept apart from everyday commands, clears only what you choose and then compacts the database so the space goes back to the disk, like Fresh start in NewsReview and TaskList. Its dialog uses NewsReview's Fresh start size, frame, title bar with a close button, and footer. Tick the items to clear, type `RESET SELECTED`, and choose **Reset selected data**. Each choice shows how much it holds, and the dialog shows the current database size. Change history and pre-restore recovery backups are ticked to start with; nothing that removes an entry is.
 
 | Choice | What is cleared |
 | --- | --- |
@@ -485,6 +485,11 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.12.1
+
+- **Fresh Start...** moves to the bottom of the File menu, below Log Out.
+- The Fresh Start dialog matches NewsReview's Fresh start dialog: size, frame, title bar with ×, footer, and a **Reset selected data** button.
 
 ### v0.12.0
 

@@ -145,14 +145,21 @@ class BrowserTests(unittest.TestCase):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
         page.click("#fileMenuButton")
+        labels = [text.strip() for text in page.locator("#fileMenu button").all_inner_texts()]
+        self.assertEqual(labels[-2:], ["Log Out", "Fresh Start..."])  # kept apart from everyday commands
         page.click("#freshStartMenuItem")
         dialog = page.locator("#freshStartDialog")
+        self.assertEqual(dialog.bounding_box()["width"], 620)  # NewsReview's Fresh start dialog width
+        self.assertEqual(dialog.locator('[data-fresh-start="history"]').evaluate("e => getComputedStyle(e).appearance"), "none")
         expect(dialog.locator('[data-fresh-count="history"]')).to_have_text(re.compile(r"^\(\d+ changes?\)$"))
         expect(dialog.locator('[data-fresh-start="history"]')).to_be_checked()
         expect(dialog.locator('[data-fresh-start="recoveryBackups"]')).to_be_checked()
         for option in ("archivedEntries", "allEntries", "unusedLabels"):
             expect(dialog.locator(f'[data-fresh-start="{option}"]')).not_to_be_checked()
         self.shot(page, "fresh-start-dialog")
+        page.evaluate("document.documentElement.dataset.themeEffective = 'dark'")
+        self.shot(page, "fresh-start-dialog-dark")
+        page.evaluate("document.documentElement.dataset.themeEffective = 'light'")
         page.click("#freshStartButton")
         expect(page.locator("#freshStartError")).to_have_text("Type RESET SELECTED to confirm.")
         expect(dialog).to_be_visible()

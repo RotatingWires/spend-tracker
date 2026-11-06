@@ -699,12 +699,36 @@ button.calendar-day:active {
 .share-footer { grid-column: 1 / -1; margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .form-hint { font-size: 12px; color: var(--muted); }
 .form-error { min-height: 18px; margin-top: 8px; }
-.fresh-start-body > p { margin: 0 0 10px; }
-.fresh-start-options { display: grid; gap: 8px; margin: 0 0 10px; padding: 8px 10px 10px; border: 1px solid var(--muted); }
-.fresh-start-options legend { padding: 0 4px; }
-.fresh-start-options label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; align-items: start; line-height: 1.4; }
-.fresh-start-options input { margin: 3px 0 0; }
-.fresh-start-body .retro-input { width: 100%; box-sizing: border-box; margin-top: 4px; }
+/* Fresh Start copies NewsReview's Fresh start dialog: size, frame, title bar, footer, and Win95 check boxes. */
+.fresh-start-dialog {
+  width: min(620px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 3px;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--face);
+  border: 3px solid;
+  border-color: var(--light-edge) var(--dark-edge) var(--dark-edge) var(--light-edge);
+  border-radius: 0;
+  box-shadow: 2px 2px var(--black);
+}
+.fresh-start-dialog::backdrop { background: var(--backdrop); }
+.fresh-start-layout { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: calc(100dvh - 36px); }
+.fresh-start-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; background: var(--title); padding: 3px; }
+.fresh-start-heading h2 { margin: 0; padding: 2px 4px; font-size: 15px; color: var(--title-text); }
+.fresh-start-heading button { min-height: 24px; padding: 0 6px; font-size: 17px; }
+.fresh-start-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px; display: grid; gap: 12px; line-height: 1.4; }
+.fresh-start-body p { margin: 0; }
+.fresh-start-options { display: grid; gap: 10px; min-width: 0; margin: 0; border: 1px solid var(--shadow); }
+.fresh-start-options label { display: flex; align-items: flex-start; gap: 6px; }
+.fresh-start-options .retro-check { margin-top: 3px; }
+.fresh-start-note { color: var(--muted); }
+.fresh-start-confirm { display: flex; flex-direction: column; gap: 4px; }
+.fresh-start-confirm input { width: 100%; box-sizing: border-box; }
+.fresh-start-error { color: var(--error); font-size: 13px; }
+.fresh-start-error:empty { display: none; }
+.fresh-start-actions { display: flex; flex-shrink: 0; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--shadow); }
+.fresh-start-actions .danger, .fresh-start-actions .danger:disabled { color: var(--error); font-weight: 700; }
 .prompt-input { display: block; width: 100%; margin-top: 6px; }
 
 /* ---------- focus ---------- */
