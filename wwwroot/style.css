@@ -85,10 +85,17 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
   border: 1px solid transparent;
   padding: 4px 10px;
 }
-.menubar-menus > button:active,
-.menubar-menus > .menu-wrap > button:active,
+/* Menu bar buttons highlight like NewsReview's top bar: on mouse hover, and while their menu is open. */
 .menubar-menus > .menu-wrap > button[aria-expanded="true"] {
-  border: 1px dotted var(--ink);
+  background: var(--title);
+  color: var(--title-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .menubar-menus > button:hover,
+  .menubar-menus > .menu-wrap > button:hover {
+    background: var(--title);
+    color: var(--title-text);
+  }
 }
 
 .menu-wrap { position: relative; }

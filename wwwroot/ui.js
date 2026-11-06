@@ -7,7 +7,9 @@ const TAB_RENDERERS = {
   calendar: renderCalendar,
   stats: renderStats,
   people: renderPeople,
+  tags: renderTagsTab,
   events: renderEvents,
+  merchants: renderMerchantsTab,
   history: () => loadHistory(),
   manage: renderManage
 };
@@ -50,6 +52,7 @@ function renderAll() {
   if ($('#personDialog').open) renderPersonDialog();
   if ($('#dayDialog').open) renderDayDialog();
   if ($('#scopeDialog').open) renderScopeList();
+  if ($('#searchDialog').open) renderSearchResults();
 
   const count = state.model.transactions.length;
   // Messages go on the left and totals on the right, as in TaskList.
@@ -287,6 +290,7 @@ function startApp() {
   initializeHistory();
   initializeManage();
   initializeBulk();
+  initializeSearch();
   initializeRowHover();
   initializeTooltips();
 
@@ -329,20 +333,6 @@ function startApp() {
   $('#logoutButton').addEventListener('click', logout);
   $('#previousMonthButton').addEventListener('click', () => shiftTimeFrame(-1));
   $('#nextMonthButton').addEventListener('click', () => shiftTimeFrame(1));
-  // Search runs on the Search button or Enter, as in TaskList and NewsReview, not on every keystroke.
-  // Emptying the box is already a complete search, so it shows every row again right away.
-  // The bar sits in the toolbar on every tab; searching shows the results in the Transactions ledger.
-  $('#searchForm').addEventListener('submit', event => {
-    event.preventDefault();
-    state.search = $('#searchInput').value.trim();
-    if (state.activeTab === 'transactions') renderTransactions();
-    else switchTab('transactions');
-  });
-  $('#searchInput').addEventListener('input', event => {
-    if (event.target.value.trim() || !state.search) return;
-    state.search = '';
-    if (state.activeTab === 'transactions') renderTransactions();
-  });
   $$('.tabs [role="tab"]').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   document.addEventListener('click', closeMenus);
   // Escape closes an open dropdown first, without also closing the dialog it sits in.

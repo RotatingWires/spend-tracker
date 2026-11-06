@@ -4,7 +4,7 @@ const STATIC = [
   '/', '/index.html', '/login.html', '/login.js', '/version.json', '/manifest.webmanifest', '/icons/spend.svg',
   '/theme.css', '/style.css', '/auth.css', '/theme.js',
   '/app.js', '/widgets.js', '/charts.js', '/transactions.js', '/calendar.js', '/stats.js',
-  '/people.js', '/events.js', '/history.js', '/manage.js', '/bulk.js', '/scopes.js', '/ui.js'
+  '/people.js', '/summaries.js', '/history.js', '/manage.js', '/bulk.js', '/scopes.js', '/search.js', '/ui.js'
 ];
 
 self.addEventListener('install', event => {

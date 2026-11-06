@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.6.0 Manual
+# SpendTracker v0.7.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, events you put on purchases, an edit history, and statistics.
 
@@ -66,7 +66,8 @@ wwwroot/
   calendar.js           month calendar and day detail
   stats.js              statistics calculations and Stats tab
   people.js             people balances and person detail
-  events.js             events tab: totals per event
+  summaries.js          Tags, Events, and Merchants tabs: totals per tag, event, and merchant
+  search.js             File → Search... dialog
   history.js            history log rendering
   manage.js             payment methods, people, tags, events, and merchants
   bulk.js               selection mode and bulk actions in the ledger
@@ -169,9 +170,9 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The cards above the table show the time frame's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method, and an **Events** column once you have created an event; refunds show as −$ and paybacks as +$ in green. The footer row shows net spent per payment method for the listed rows (purchases minus refunds; paybacks are excluded). Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden, and the cards still include them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
-The **search bar** fills the toolbar, like the new-task bar in TaskList, and is there on every tab; searching from another tab opens the Transactions ledger with the results. It filters the month's rows by what you typed or tagged: merchant, description, note, tags, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview; emptying the box shows every row again. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
+**File → Search...** opens a search dialog, as in TaskList, from any tab. It searches every transaction, in any time frame and archived or not, by what you typed or tagged: merchant, description, note, tags, events, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
-Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button above the ledger, framed like a Windows 95 default button, or the File menu from any tab) opens an empty editor. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button in the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
 
@@ -186,16 +187,16 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 
 ### Selecting several entries
 
-**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current month and search.
+**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame.
 
 The split button's main action is **Archive** (or **Restore** when every selected entry is archived). Its ▼ menu has:
 
 | Action | What it does | Skipped when |
 |---|---|---|
 | **Archive** / **Restore** | hides or lists the entries | already archived / not archived |
-| **Add Tag...** / **Remove Tag...** | adds or removes one tag | not a purchase, or already has / lacks the tag |
-| **Add Person...** / **Remove Person...** | adds or removes one person, then **splits the purchase evenly** between everyone left on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
-| **Set Merchant...** | sets one merchant, chosen from a dropdown of your active merchants like tags and people (**No merchant** clears it; merchants are added under Manage) | already has that merchant |
+| **Tags...** / **Events...** | **Change** chooses *Add to the selected entries* or *Remove from the selected entries*, then which tag or event | adding to a refund or payback, or the entry already has / lacks it |
+| **People...** | the same Add / Remove choice for one person, then **splits the purchase evenly** between everyone on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
+| **Merchant...** | sets one merchant, chosen from a dropdown of your active merchants (**No merchant** clears it; merchants are added under Manage) | already has that merchant |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
 
 Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Skipped entries stay selected.
@@ -212,9 +213,9 @@ Choose a **Period**: all time, a year, a month, or an event. An event's period r
 
 One row per other person: purchases made for them, refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries.
 
-### Events
+### Tags, Events, and Merchants
 
-One row per event: purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. Select a row for the event's numbered list of entries; **Stats** opens the Stats tab with that event as the period. Events are added, renamed, archived, and deleted under **Manage → Events**.
+Three tabs with the same layout, one row per tag, event, or merchant: purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. Refunds count under their purchase's tags, events, and merchant; a purchase with two tags (or events) counts toward both. Select a row for its numbered list of entries. On the Events tab, **Stats** opens the Stats tab with that event as the period. Tags, events, and merchants are added, renamed, archived, and deleted under **Manage**.
 
 ### History
 
@@ -226,8 +227,9 @@ Add, rename, archive/restore, and delete payment methods, people, tags, and merc
 
 ### Menus
 
-- **File:** New Transaction, Refresh, Select..., Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out.
+- **File:** New Transaction..., Refresh, Search..., Select..., Export Transactions CSV, Download Backup, Restore Backup, Highlight rows on hover, Log Out.
 - **View:** switch tabs, **Show Archived**, and choose the Light or Dark theme. Show Archived and the theme are saved in this browser.
+- **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
 Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, …). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
 - **Status bar:** messages such as "Added purchase …" appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList.
@@ -276,7 +278,7 @@ Breakdown tables:
 Refunds count under the tags, events, and merchant of their purchase.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
-The chart shows net spent per day for periods of 62 counted days or fewer, otherwise net spent per month. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
+The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** chooses what the bars measure: net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, or running net spent (the total so far through the period). The choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
 
 ## Data and backups
 
@@ -464,6 +466,14 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.7.0
+
+- **Search** moved to **File → Search...**, a dialog like TaskList's that searches every transaction in any time frame, archived or not. **New Transaction...** is back in the toolbar so it is there on every tab.
+- **Tags** and **Merchants** tabs join People and Events, totaling each tag and merchant the way the Events tab totals events.
+- **Bulk actions** are one per kind: **Tags...**, **Events...**, and **People...** ask whether to add or remove, and **Merchant...** sets one, instead of separate Add and Remove items.
+- The Stats chart's **Show** dropdown picks net spent, spent, refunds, paybacks, purchases, entries, average purchase, or running net spent.
+- File, View, and Help highlight on hover and while open, like NewsReview's top bar.
 
 ### v0.6.0
 

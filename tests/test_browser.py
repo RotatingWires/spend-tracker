@@ -15,7 +15,7 @@ try:
 except ImportError:  # Playwright is a development-only tool.
     sync_playwright = None
 
-TABS = ["Transactions", "Calendar", "Stats", "People", "Events", "History", "Manage"]
+TABS = ["Transactions", "Calendar", "Stats", "People", "Tags", "Events", "Merchants", "History", "Manage"]
 
 
 @unittest.skipIf(sync_playwright is None, "Playwright is not installed")
@@ -168,20 +168,23 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#monthCards")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
         expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")
 
-        # Search looks anywhere in merchant, description, note, tags, and amount, but not type, method, or people.
-        rows = page.locator("#transactionsTable tbody tr:not(.empty-row)")
+        # File → Search..., as in TaskList, looks anywhere in merchant, description, note, tags, events, and amount,
+        # but not type, method, or people.
+        page.click("#fileMenuButton")
+        page.click("#searchMenuItem")
+        rows = page.locator("#searchResults tbody tr:not(.empty-row)")
         for query, expected in (("h", 0), ("inn", 2), ("DINER dinner", 2), ("enm", 1), ("12.17", 1), ("$40", 2), ("foo", 1),
                                 ("cash", 0), ("purchase", 0), ("alex", 0), ("zzz", 0)):
-            page.fill("#searchInput", query)
-            page.click("#searchForm button[type=submit]")
+            page.fill("#searchKeyword", query)
+            page.click("#searchRunButton")
             expect(rows).to_have_count(expected)
-        page.fill("#searchInput", "inn")
+        page.fill("#searchKeyword", "inn")
         page.wait_for_timeout(200)
         expect(rows).to_have_count(0)  # still showing the last search ("zzz") until Search or Enter
         page.keyboard.press("Enter")
         expect(rows).to_have_count(2)
-        page.fill("#searchInput", "")  # emptying the box shows every row without pressing Search
-        expect(rows).to_have_count(4)
+        expect(page.locator("#searchDialog")).to_be_visible()  # Enter searches; it does not close the dialog
+        page.locator("#searchDialog button", has_text="Close").click()
 
         # Invalid input shows the server's message and keeps the dialog open.
         page.click("#newTransactionButton")
@@ -342,6 +345,18 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsEventsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
         expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
         self.shot(page, "stats-event")
+        # The chart can show other measures than net spent, per day here because the event spans 17 days.
+        self.pick(page, "#statsChartMetric", "Purchases")
+        expect(page.locator("#statsChartLegend")).to_have_text("Purchases per Day")
+        self.pick(page, "#statsChartMetric", "Running net spent")
+        expect(page.locator("#statsChartLegend")).to_have_text("Running net spent per Day")
+        self.pick(page, "#statsChartMetric", "Net spent")
+        # Merchants and Tags tabs total each one like the Events tab.
+        page.click('.tabs [data-tab="merchants"]')
+        expect(page.locator("#merchantsSummaryTable tbody tr", has_text="Hotel")).to_contain_text("Hotel1$600.00$100.00$500.00")
+        page.click('.tabs [data-tab="tags"]')
+        expect(page.locator("#tagsSummaryTable")).to_be_visible()
+        page.click('.tabs [data-tab="stats"]')
         page.locator("#statsMerchantsTable tbody tr", has_text="Hotel").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -389,12 +404,14 @@ class BrowserTests(unittest.TestCase):
 
         # Adding a person splits each purchase evenly again; the first person listed keeps the leftover cent.
         page.click("#bulkActions .split-arrow")
-        page.locator("#bulkActions .split-dropdown button", has_text="Add Person...").click()
+        page.locator("#bulkActions .split-dropdown button", has_text="People...").click()
+        expect(page.locator("#chooseMode .retro-select")).to_have_text("Add to the selected entries▼")  # one action per kind: add or remove
         self.pick(page, "#chooseSelect", "Riley")
         page.click("#chooseOkButton")
+        expect(page.locator("#confirmMessage")).to_have_text("Add “Riley” for 3 selected entries?")
         expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']} — 06/03/2024 — Garage — $300.01")
         page.click("#confirmOkButton")
-        expect(page.locator("#statusLeft")).to_have_text("Add Person: 3 entries changed.")
+        expect(page.locator("#statusLeft")).to_have_text("People: 3 entries changed.")
         shares = {tx["id"]: tx["shares"] for tx in api.get("/api/snapshot")["transactions"]}
         self.assertEqual(shares[third["id"]], [{"personId": me, "amountCents": 15001}, {"personId": riley, "amountCents": 15000}])
 
@@ -407,18 +424,19 @@ class BrowserTests(unittest.TestCase):
         for tx in (first, second, third):
             page.click(f'#transactionsTable tr[data-id="{tx["id"]}"] .selection-check')
         page.click("#bulkActions .split-arrow")
-        page.locator("#bulkActions .split-dropdown button", has_text="Remove Person...").click()
+        page.locator("#bulkActions .split-dropdown button", has_text="People...").click()
+        self.pick(page, "#chooseMode", "Remove from the selected entries")
         self.pick(page, "#chooseSelect", "Riley")
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
-        expect(page.locator("#confirmMessage")).to_have_text("Remove Person: 2 entries changed, 1 skipped. Skipped entries stay selected.")
+        expect(page.locator("#confirmMessage")).to_have_text("People: 2 entries changed, 1 skipped. Skipped entries stay selected.")
         expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']}: Riley has linked refunds or paybacks on this purchase")
         page.click("#confirmOkButton")
         expect(page.locator("#selectedCount")).to_have_text("Selected: 1")
 
-        # Set Merchant chooses from a dropdown of merchants, like tags and people; the list fits without scrolling the dialog.
+        # Merchant... chooses from a dropdown of merchants, like tags and people; the list fits without scrolling the dialog.
         page.click("#bulkActions .split-arrow")
-        page.locator("#bulkActions .split-dropdown button", has_text="Set Merchant...").click()
+        page.locator("#bulkActions .split-dropdown button", has_text="Merchant...").click()
         page.click("#chooseSelect .retro-select")
         expect(page.locator("#chooseSelect .menu-dropdown")).to_be_in_viewport(ratio=1)  # shown whole, not clipped by the dialog
         self.assertEqual(page.locator("#chooseDialog .dialog-body").evaluate("b => getComputedStyle(b).overflowY"), "visible")
@@ -447,10 +465,12 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable .selection-check")).to_have_count(0)
 
         # The editor shows per-scope numbers, and searching #ID finds that entry.
-        page.fill("#searchInput", f"#{first['id']}")
-        page.click("#searchForm button[type=submit]")
-        expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
-        page.locator("#transactionsTable tbody tr").first.click()
+        page.click("#fileMenuButton")
+        page.click("#searchMenuItem")
+        page.fill("#searchKeyword", f"#{first['id']}")
+        page.keyboard.press("Enter")
+        expect(page.locator("#searchResults tbody tr")).to_have_count(1)
+        page.locator("#searchResults tbody tr").first.click()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
 
         # Each number opens that scope's numbered list; Manage rows open the same list.
@@ -472,7 +492,7 @@ class BrowserTests(unittest.TestCase):
         page.locator("#scopeDialog button", has_text="Close").click()
         page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
-        expect(page.locator("#scopeTable tbody tr")).to_have_count(2)  # #2 is the purchase moved here by Set Merchant
+        expect(page.locator("#scopeTable tbody tr")).to_have_count(2)  # #2 is the purchase moved here by Merchant...
         page.locator("#scopeTable tbody tr").last.click()
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")

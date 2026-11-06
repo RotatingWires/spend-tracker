@@ -37,8 +37,11 @@ const Charts = (() => {
     return Math.max(1, Math.round(factor * magnitude));
   }
 
-  /** bars: [{ label, value (cents), tooltip }]. Negative values (more refunds than purchases) draw below the zero line. */
-  function bar(canvas, bars) {
+  /**
+   * bars: [{ label, value, tooltip }]. Values are cents unless format says otherwise (counts pass a plain number
+   * format). Negative values (more refunds than purchases) draw below the zero line.
+   */
+  function bar(canvas, bars, { format = value => formatMoney(Math.round(value)) } = {}) {
     const ratio = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -68,7 +71,7 @@ const Charts = (() => {
       context.lineTo(width - padding.right, lineY);
       context.stroke();
       context.textAlign = 'right';
-      context.fillText(formatMoney(Math.round(value)), padding.left - 6, lineY);
+      context.fillText(format(value), padding.left - 6, lineY);
     }
 
     const slot = bars.length ? plotWidth / bars.length : plotWidth;

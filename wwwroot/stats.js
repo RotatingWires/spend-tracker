@@ -143,10 +143,7 @@ function computeStats(range) {
   result.byTag = groupByIds(spending, tagIdsOf);
   result.byEvent = groupByIds(spending, eventIdsOf);
   // Grouped by merchant ID, so a renamed merchant keeps its whole history under its current name.
-  result.byMerchant = groupByIds(spending, tx => {
-    const source = tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId) ?? tx : tx;
-    return source.merchantId == null ? [] : [source.merchantId];
-  });
+  result.byMerchant = groupByIds(spending, merchantIdsOf);
 
   result.weekdays = WEEKDAYS.map(() => ({ purchases: 0, net: 0, occurrences: 0 }));
   for (let number = dayNumber(range.start); countedDays > 0 && number <= dayNumber(countedEnd); number++)
@@ -283,25 +280,44 @@ function renderStats() {
   renderStatsTables(stats);
 }
 
+/** What the chart can show for each day (or month). Money is in cents; counts are plain numbers. */
+const CHART_METRICS = [
+  { value: 'net', label: 'Net spent', of: bucket => bucket.net },
+  { value: 'spent', label: 'Spent', of: bucket => bucket.spent },
+  { value: 'refunded', label: 'Refunds', of: bucket => bucket.refunded },
+  { value: 'paidBack', label: 'Paid back to you', of: bucket => bucket.paidBack },
+  { value: 'purchases', label: 'Purchases', count: true, of: bucket => bucket.purchases },
+  { value: 'entries', label: 'Entries', count: true, of: bucket => bucket.entries },
+  { value: 'average', label: 'Average purchase', of: bucket => (bucket.purchases ? Math.round(bucket.spent / bucket.purchases) : 0) },
+  { value: 'running', label: 'Running net spent', running: true, of: bucket => bucket.net }
+];
+let statsChartSelect = null;
+
 function renderStatsChart(stats) {
-  let bars;
-  if (stats.countedDays <= 62) {
-    $('#statsChartLegend').textContent = 'Net Spent per Day';
-    bars = [];
-    for (let number = dayNumber(stats.range.start); number <= dayNumber(stats.countedEnd); number++) {
-      const key = keyFromDayNumber(number);
-      const net = stats.days.get(key)?.net ?? 0;
-      bars.push({ label: key.slice(8), value: net, tooltip: `${formatDate(key)}\n${formatMoney(net)} net spent` });
-    }
-  } else {
-    $('#statsChartLegend').textContent = 'Net Spent per Month';
-    bars = stats.months.map(month => ({
+  const metric = CHART_METRICS.find(option => option.value === state.statsChart) ?? CHART_METRICS[0];
+  const format = metric.count ? value => numberFormat.format(Math.round(value)) : value => formatMoney(Math.round(value));
+  const empty = { net: 0, spent: 0, refunded: 0, paidBack: 0, purchases: 0, entries: 0 };
+  const byDay = stats.countedDays <= 62;
+  const points = byDay
+    ? Array.from({ length: Math.max(0, dayNumber(stats.countedEnd) - dayNumber(stats.range.start) + 1) }, (_, index) => {
+      const key = keyFromDayNumber(dayNumber(stats.range.start) + index);
+      return { label: key.slice(8), title: formatDate(key), bucket: stats.days.get(key) ?? empty };
+    })
+    : stats.months.map(month => ({
       label: `${MONTH_NAMES[Number(month.month.slice(5)) - 1].slice(0, 3)} ${month.month.slice(2, 4)}`,
-      value: month.net,
-      tooltip: `${formatMonth(month.month)}\n${formatMoney(month.net)} net spent\n${plural(month.purchases, 'purchase')}`
+      title: formatMonth(month.month),
+      bucket: month
     }));
-  }
-  Charts.bar($('#statsChart'), bars);
+  $('#statsChartLegend').textContent = `${metric.label} per ${byDay ? 'Day' : 'Month'}`;
+  let total = 0;
+  const bars = points.map(point => {
+    const own = metric.of(point.bucket);
+    total += own;
+    const value = metric.running ? total : own;
+    const detail = metric.running ? `${format(value)} running net spent (${format(own)} that ${byDay ? 'day' : 'month'})` : `${format(value)} ${metric.label.toLowerCase()}`;
+    return { label: point.label, value, tooltip: `${point.title}\n${detail}\n${plural(point.bucket.purchases, 'purchase')}` };
+  });
+  Charts.bar($('#statsChart'), bars, { format });
 }
 
 function renderStatsTables(stats) {
@@ -368,6 +384,14 @@ function renderBreakdown(table, label, scope, groups, { none = null, countLabel 
 }
 
 function initializeStats() {
+  statsChartSelect = createSingleSelect($('#statsChartMetric'), {
+    onChange: value => {
+      state.statsChart = value;
+      writeSetting('spend-tracker-stats-chart', value);
+      renderStats();
+    }
+  });
+  statsChartSelect.setOptions(CHART_METRICS, state.statsChart);
   statsPeriodSelect = createSingleSelect($('#statsPeriodSelect'), {
     onChange: value => {
       state.statsPeriod = value;

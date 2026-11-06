@@ -8,8 +8,8 @@ const state = {
   activeTab: 'transactions',
   // What the ledger and calendar show: every month (all), or the chosen months ("YYYY-MM").
   timeFrame: { all: false, months: [] },
-  search: '',
   statsPeriod: 'all',
+  statsChart: readSetting('spend-tracker-stats-chart') ?? 'net',
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
   loading: null
 };

@@ -331,19 +331,30 @@ function promptText(title, label, value = '', { maxLength = 60 } = {}) {
   });
 }
 
-/** Asks the user to pick one option from a Win95 dropdown. Resolves to the chosen value, or null if cancelled. */
+/**
+ * Asks the user to pick one option from a Win95 dropdown. With modes (such as Add / Remove), a "Change" dropdown comes
+ * first. Resolves to the chosen value, or { value, mode } when modes are given, or null if cancelled.
+ */
 let choiceSelect = null;
-function chooseOption(title, label, options, okLabel = 'OK') {
+let modeSelect = null;
+function chooseOption(title, label, options, okLabel = 'OK', { modes = null } = {}) {
   const dialog = $('#chooseDialog');
   choiceSelect ??= createSingleSelect($('#chooseSelect'));
+  modeSelect ??= createSingleSelect($('#chooseMode'));
   $('#chooseTitle').textContent = title;
   $('#chooseLabel').textContent = label;
   $('#chooseOkButton').textContent = okLabel;
+  $('#chooseModeLabel').hidden = !modes;
+  $('#chooseMode').hidden = !modes;
+  modeSelect.setOptions(modes ?? [], modes?.[0]?.value ?? null);
   choiceSelect.setOptions(options, options[0]?.value ?? null);
   dialog.returnValue = '';
   dialog.showModal();
   return new Promise(resolve => {
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'ok' && choiceSelect.value !== '' ? choiceSelect.value : null), { once: true });
+    dialog.addEventListener('close', () => {
+      if (dialog.returnValue !== 'ok' || choiceSelect.value === '') resolve(null);
+      else resolve(modes ? { value: choiceSelect.value, mode: modeSelect.value } : choiceSelect.value);
+    }, { once: true });
   });
 }
 

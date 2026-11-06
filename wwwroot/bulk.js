@@ -86,35 +86,30 @@ const BULK_ACTIONS = {
     alreadyDone: 'not archived',
     request: tx => ({ body: transactionRequest(tx, { archived: false }) })
   },
-  addTag: labelAction('tag', 'tags', 'tagIds', true),
-  removeTag: labelAction('tag', 'tags', 'tagIds', false),
-  addEvent: labelAction('event', 'events', 'eventIds', true),
-  removeEvent: labelAction('event', 'events', 'eventIds', false),
-  addPerson: {
-    label: 'Add Person',
+  tags: labelAction('tag', 'tags', 'tagIds'),
+  events: labelAction('event', 'events', 'eventIds'),
+  people: {
+    label: 'People',
     detail: 'Each changed purchase is split evenly again between everyone on it.',
-    choose: () => chooseFrom('Add Person', 'Person to add', state.snapshot.people.filter(person => !person.archived), 'Add'),
-    request: (tx, personId) => tx.kind !== 'Purchase' ? { skip: 'only purchases are split between people' }
-      : tx.shares.some(share => share.personId === personId) ? { skip: `${personName(personId)} is already on it` }
-      : { body: transactionRequest(tx, { shares: evenShares(tx.amountCents, [...tx.shares.map(share => share.personId), personId]) }) }
-  },
-  removePerson: {
-    label: 'Remove Person',
-    detail: 'Each changed purchase is split evenly again between the people left on it.',
-    choose: items => chooseFrom('Remove Person', 'Person to remove',
-      state.snapshot.people.filter(person => items.some(tx => tx.kind === 'Purchase' && tx.shares.some(share => share.personId === person.id))), 'Remove'),
-    request: (tx, personId) => {
-      if (tx.kind !== 'Purchase' || !tx.shares.some(share => share.personId === personId)) return { skip: `${personName(personId)} is not on it` };
-      const remaining = tx.shares.map(share => share.personId).filter(id => id !== personId);
-      if (remaining.length === 0) return { skip: `${personName(personId)} is the only person on it` };
-      return { body: transactionRequest(tx, { shares: evenShares(tx.amountCents, remaining) }) };
+    choose: items => chooseWithMode('People', 'Person',
+      state.snapshot.people.filter(person => !person.archived || items.some(tx => tx.shares.some(share => share.personId === person.id)))),
+    request: (tx, { id: personId, mode }) => {
+      if (tx.kind !== 'Purchase') return { skip: 'only purchases are split between people' };
+      const onIt = tx.shares.some(share => share.personId === personId);
+      if (mode === 'add' && onIt) return { skip: `${personName(personId)} is already on it` };
+      if (mode === 'remove' && !onIt) return { skip: `${personName(personId)} is not on it` };
+      const people = mode === 'add'
+        ? [...tx.shares.map(share => share.personId), personId]
+        : tx.shares.map(share => share.personId).filter(id => id !== personId);
+      if (people.length === 0) return { skip: `${personName(personId)} is the only person on it` };
+      return { body: transactionRequest(tx, { shares: evenShares(tx.amountCents, people) }) };
     }
   },
-  setMerchant: {
-    label: 'Set Merchant',
+  merchant: {
+    label: 'Merchant',
     // Like tags and people, merchants are chosen from a list; they are added under Manage.
-    choose: () => chooseFrom('Set Merchant', 'Merchant', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
-      .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: choice.label }),
+    choose: () => chooseFrom('Merchant', 'Set merchant to', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
+      .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: `Set merchant to “${choice.label}”` }),
     request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
       : { body: transactionRequest(tx, { merchantId }) }
   },
@@ -127,14 +122,29 @@ const BULK_ACTIONS = {
   }
 };
 
+const ADD_REMOVE = [{ value: 'add', label: 'Add to the selected entries' }, { value: 'remove', label: 'Remove from the selected entries' }];
+
+/** One action per kind: the dialog asks whether to add or remove, then which one. */
+async function chooseWithMode(title, label, items) {
+  if (items.length === 0) {
+    await confirmAction(title, `There are no ${title.toLowerCase()} to choose from. Add them under Manage.`, 'OK', { notice: true });
+    return null;
+  }
+  const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE });
+  if (choice == null) return null;
+  const item = items.find(other => other.id === Number(choice.value));
+  return { value: { id: item.id, mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} “${item.name}”` };
+}
+
 /** Add or remove one tag or event. Tags and events work the same way: only purchases have them. */
-function labelAction(noun, list, field, adding) {
-  const title = `${adding ? 'Add' : 'Remove'} ${noun[0].toUpperCase()}${noun.slice(1)}`;
+function labelAction(noun, list, field) {
+  const title = `${noun[0].toUpperCase()}${noun.slice(1)}s`;
   return {
     label: title,
-    choose: items => chooseFrom(title, `${noun[0].toUpperCase()}${noun.slice(1)} to ${adding ? 'add' : 'remove'}`,
-      state.snapshot[list].filter(item => adding ? !item.archived : items.some(tx => tx[field].includes(item.id))), adding ? 'Add' : 'Remove'),
-    request: (tx, id) => {
+    choose: items => chooseWithMode(title, `${noun[0].toUpperCase()}${noun.slice(1)}`,
+      state.snapshot[list].filter(item => !item.archived || items.some(tx => tx[field].includes(item.id)))),
+    request: (tx, { id, mode }) => {
+      const adding = mode === 'add';
       if (adding && tx.kind !== 'Purchase') return { skip: `only purchases have ${noun}s` };
       if (adding === tx[field].includes(id)) return { skip: adding ? `already has that ${noun}` : `does not have that ${noun}` };
       return { body: transactionRequest(tx, { [field]: adding ? [...tx[field], id] : tx[field].filter(other => other !== id) }) };
@@ -164,9 +174,9 @@ async function runBulkAction(name) {
 
   const choice = action.choose ? await action.choose(selected) : { value: null, label: '' };
   if (choice == null) return;
-  const what = choice.label ? `${action.label} "${choice.label}"` : action.label;
+  const what = choice.label || action.label;
   const detail = [selectionSummary(selected), action.detail ?? ''].filter(Boolean).join('\n\n');
-  const confirmed = await confirmAction(`${action.label} Selected`, `${what} for ${plural(selected.length, 'selected entry', 'selected entries')}?`, action.label, { detail });
+  const confirmed = await confirmAction(`${action.label} Selected`, `${what} for ${plural(selected.length, 'selected entry', 'selected entries')}?`, action.choose ? 'OK' : action.label, { detail });
   if (!confirmed) return;
 
   bulkBusy = true;
@@ -250,7 +260,7 @@ function updateBulkControls() {
   menu.className = 'menu-dropdown split-dropdown';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  const items = ['archive', 'restore', null, 'addTag', 'removeTag', 'addEvent', 'removeEvent', 'addPerson', 'removePerson', 'setMerchant', null, 'delete'];
+  const items = ['archive', 'restore', null, 'tags', 'events', 'people', 'merchant', null, 'delete'];
   menu.append(...items.map(name => {
     if (name == null) return menuSeparator();
     const action = BULK_ACTIONS[name];

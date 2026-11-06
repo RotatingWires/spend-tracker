@@ -7,12 +7,16 @@ let calendarDialogDay = null;
 function dailyNet(transactions) {
   const days = new Map();
   for (const tx of transactions) {
-    const day = days.get(tx.date) ?? { net: 0, entries: 0, purchases: 0 };
+    const day = days.get(tx.date) ?? { net: 0, entries: 0, purchases: 0, spent: 0, refunded: 0, paidBack: 0 };
     if (tx.kind === 'Purchase') {
       day.net += tx.amountCents;
+      day.spent += tx.amountCents;
       day.purchases++;
     } else if (tx.kind === 'Refund') {
       day.net -= tx.amountCents;
+      day.refunded += tx.amountCents;
+    } else {
+      day.paidBack += tx.amountCents;
     }
     day.entries++;
     days.set(tx.date, day);

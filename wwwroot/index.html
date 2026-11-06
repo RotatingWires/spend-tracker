@@ -24,6 +24,7 @@
           <div id="fileMenu" class="menu-dropdown" role="menu" hidden>
             <button type="button" id="newTransactionMenuItem" role="menuitem"><span></span><span class="menu-label">New Transaction...</span></button>
             <button type="button" id="refreshButton" role="menuitem"><span></span><span class="menu-label">Refresh</span></button>
+            <button type="button" id="searchMenuItem" role="menuitem"><span></span><span class="menu-label">Search...</span></button>
             <button type="button" id="selectModeButton" role="menuitemcheckbox" aria-checked="false"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Select...</span></button>
             <div class="menu-separator" role="separator"></div>
             <button type="button" id="exportCsvButton" role="menuitem"><span></span><span class="menu-label">Export Transactions CSV...</span></button>
@@ -56,14 +57,11 @@
         <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month">▶</button>
         <span class="toolbar-separator" aria-hidden="true"></span>
       </div>
-      <form id="searchForm" role="search">
-        <input id="searchInput" class="retro-input" type="search" aria-label="Search transactions" placeholder="Search transactions: merchant, description, note, tag, amount, #ID" autocomplete="off">
-        <button type="submit">Search</button>
-      </form>
+      <button type="button" id="newTransactionButton" class="default-button">New Transaction...</button>
     </section>
 
     <section class="tabs" role="tablist" aria-label="Sections">
-      <button type="button" role="tab" aria-selected="true" data-tab="transactions">Transactions</button><button type="button" role="tab" aria-selected="false" data-tab="calendar">Calendar</button><button type="button" role="tab" aria-selected="false" data-tab="stats">Stats</button><button type="button" role="tab" aria-selected="false" data-tab="people">People</button><button type="button" role="tab" aria-selected="false" data-tab="events">Events</button><button type="button" role="tab" aria-selected="false" data-tab="history">History</button><button type="button" role="tab" aria-selected="false" data-tab="manage">Manage</button>
+      <button type="button" role="tab" aria-selected="true" data-tab="transactions">Transactions</button><button type="button" role="tab" aria-selected="false" data-tab="calendar">Calendar</button><button type="button" role="tab" aria-selected="false" data-tab="stats">Stats</button><button type="button" role="tab" aria-selected="false" data-tab="people">People</button><button type="button" role="tab" aria-selected="false" data-tab="tags">Tags</button><button type="button" role="tab" aria-selected="false" data-tab="events">Events</button><button type="button" role="tab" aria-selected="false" data-tab="merchants">Merchants</button><button type="button" role="tab" aria-selected="false" data-tab="history">History</button><button type="button" role="tab" aria-selected="false" data-tab="manage">Manage</button>
     </section>
 
     <section class="workspace" id="workspace">
@@ -72,7 +70,6 @@
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
         <div id="monthCards" class="stat-grid"></div>
-        <div class="panel-actions"><button type="button" id="newTransactionButton" class="default-button">New Transaction...</button></div>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="archivedNote" class="note" hidden></div>
       </section>
@@ -94,7 +91,7 @@
             <fieldset class="groupbox"><legend>Daily</legend><div id="statsDaily" class="metric-list"></div></fieldset>
             <fieldset class="groupbox"><legend>Records</legend><div id="statsRecords" class="metric-list"></div></fieldset>
           </div>
-          <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
+          <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="control-row"><span class="control-label" id="statsChartMetricLabel">Show:</span><div id="statsChartMetric" aria-labelledby="statsChartMetricLabel"></div></div><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
           <div class="two-column">
             <fieldset class="groupbox"><legend>By Payment Method</legend><div class="table-wrap"><table id="statsMethodsTable"></table></div></fieldset>
             <fieldset class="groupbox"><legend>Day of Week</legend><div class="table-wrap"><table id="statsWeekdayTable"></table></div></fieldset>
@@ -113,9 +110,19 @@
         <div class="table-wrap"><table id="peopleTable"></table></div>
       </section>
 
+      <section class="tab-panel" data-panel="tags" role="tabpanel" hidden>
+        <div class="note">Spending per tag. Tags are added under Manage → Tags and chosen on purchases; refunds count under their purchase's tags, and a purchase with two tags counts toward both. Select a tag to list its entries.</div>
+        <div class="table-wrap"><table id="tagsSummaryTable"></table></div>
+      </section>
+
       <section class="tab-panel" data-panel="events" role="tabpanel" hidden>
         <div class="note">Events work like tags: add them under Manage → Events (a trip, a move, a wedding) and choose them on purchases in the editor. Totals include those purchases and any refunds on them. Select an event to list its entries; Stats shows the event as a period.</div>
         <div class="table-wrap"><table id="eventsTable"></table></div>
+      </section>
+
+      <section class="tab-panel" data-panel="merchants" role="tabpanel" hidden>
+        <div class="note">Spending per merchant. Merchants are added under Manage → Merchants and chosen in the editor; refunds count under their purchase's merchant. Select a merchant to list its entries.</div>
+        <div class="table-wrap"><table id="merchantsSummaryTable"></table></div>
       </section>
 
       <section class="tab-panel" data-panel="history" role="tabpanel" hidden>
@@ -246,10 +253,23 @@
     </form>
   </dialog>
 
+  <dialog id="searchDialog" class="retro-dialog wide" aria-labelledby="searchTitle">
+    <form method="dialog" class="dialog-window">
+      <div class="dialog-title" id="searchTitle">Search</div>
+      <div class="dialog-body search-body">
+        <label for="searchKeyword" class="form-label">Keyword</label>
+        <div class="search-inline-row"><input id="searchKeyword" class="retro-input" type="search" autocomplete="off" maxlength="200" placeholder="Merchant, description, note, tag, event, amount, #ID"><button type="button" id="searchRunButton">Search</button></div>
+        <div id="searchSummary" class="note">Searches every transaction, in any time frame, archived or not.</div>
+        <div class="table-wrap"><table id="searchResults"></table></div>
+      </div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="submit">Close</button></div>
+    </form>
+  </dialog>
+
   <dialog id="chooseDialog" class="retro-dialog" aria-labelledby="chooseTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="chooseTitle">Choose</div>
-      <div class="dialog-body choose-body"><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div></div>
+      <div class="dialog-body choose-body"><span class="form-label" id="chooseModeLabel" hidden>Change</span><div id="chooseMode" aria-labelledby="chooseModeLabel" hidden></div><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div></div>
       <div class="dialog-buttons"><button type="submit" value="ok" id="chooseOkButton">OK</button><button type="submit" value="cancel">Cancel</button></div>
     </form>
   </dialog>
@@ -275,7 +295,7 @@
         <p><strong>Net spent</strong> is purchases minus refunds in the selected period. <strong>Average per day</strong> divides by every calendar day in the period up to today; <strong>average per spending day</strong> divides only by days with at least one purchase.</p>
         <p><strong>Backups</strong> (File → Download Backup) are ZIP files holding a copy of the database: every entry, setting, and the full history, but never your password. Restoring replaces all current data after saving a recovery copy on the server.</p>
         <p><strong>Archiving</strong> a payment method, person, tag, event, or merchant under Manage only stops it being offered for new entries; it stays on existing transactions and in search and Stats. Archiving a <strong>transaction</strong> hides it from the ledger and calendar (View → Show Archived lists it again); it still counts in Stats, People balances, and refund limits.</p>
-        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; search #12 to find it. Each entry is also numbered inside every person, tag, event, merchant, and payment method it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or any row under Manage, to see its whole numbered list.</p>
+        <p><strong>IDs:</strong> every entry has a permanent ID (#12) that is never reused; File → Search... finds #12, or any merchant, description, note, tag, event, or amount, in every transaction. Each entry is also numbered inside every person, tag, event, merchant, and payment method it belongs to, such as Alex #3 or food #12, shown at the top of the editor. Select a number there, or any row under Manage, to see its whole numbered list.</p>
         <p><strong>File → Select...</strong> picks several entries in the ledger (Shift-click selects a range; Escape or Select... again stops) to archive, tag, add to an event, split with people, set the merchant of, or delete them together. Entries an action cannot apply to are skipped and listed with the reason.</p>
         <p>Amounts are shown in US dollars.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
@@ -291,11 +311,12 @@
   <script src="/calendar.js"></script>
   <script src="/stats.js"></script>
   <script src="/people.js"></script>
-  <script src="/events.js"></script>
+  <script src="/summaries.js"></script>
   <script src="/history.js"></script>
   <script src="/manage.js"></script>
   <script src="/bulk.js"></script>
   <script src="/scopes.js"></script>
+  <script src="/search.js"></script>
   <script src="/ui.js"></script>
 </body>
 </html>

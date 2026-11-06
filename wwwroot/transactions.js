@@ -32,10 +32,9 @@ function renderTransactions() {
     statCard('Entries', numberFormat.format(monthRows.length))
   );
 
-  const listed = timeFrameTransactions({ listed: true });
+  const rows = timeFrameTransactions({ listed: true });
   // The Events column appears once you have created an event.
   const showEvents = state.snapshot.events.length > 0;
-  const rows = listed.filter(tx => matchesSearch(tx, state.search));
   visibleLedgerIds = rows.map(tx => tx.id);
   pruneSelection();
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
@@ -96,7 +95,7 @@ function renderTransactions() {
       '',
       '',
       '',
-      { text: 'Net spent (purchases − refunds)', title: 'Paybacks are listed in the table but not included in these totals.' },
+      { text: 'Net spent (purchases − refunds)', title: 'Paybacks are rows in the table but not included in these totals.' },
       '',
       ...(showEvents ? [''] : []),
       ...methods.map(method => {
@@ -108,12 +107,12 @@ function renderTransactions() {
     ]
   };
 
-  const hidden = monthRows.length - listed.length;
+  const hidden = monthRows.length - rows.length;
   const empty = monthRows.length === 0
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
-    : listed.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : 'No entries match the search.';
+    : rows.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
-  $('#archivedNote').hidden = hidden === 0 || listed.length === 0;
+  $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
   $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in the totals above and in Stats. View → Show Archived lists them.`;
   updateBulkControls();
 }
