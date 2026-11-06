@@ -22,7 +22,8 @@ function monthTotals(transactions) {
 
 function renderTransactions() {
   const monthRows = timeFrameTransactions();
-  const rows = timeFrameTransactions({ listed: true });
+  // Newest first: the highest ID on top, as in TaskList.
+  const rows = timeFrameTransactions({ listed: true }).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
   visibleLedgerIds = rows.map(tx => tx.id);

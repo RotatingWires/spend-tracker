@@ -12,6 +12,8 @@ const state = {
   statsChart: savedChartMeasures(),
   // The Stats sub-tab, and the choices on the Heatmaps and Compare sub-tabs.
   statsTab: readSetting('spend-tracker-stats-tab') || 'overview',
+  // Bars or lines for charts over time, remembered in this browser.
+  chartStyle: readSetting('spend-tracker-chart-style') === 'lines' ? 'lines' : 'bars',
   heat: { measure: 'net', year: null, rows: 'tags' },
   compare: { a: null, b: null },
   showArchived: readSetting('spend-tracker-show-archived') === 'true',

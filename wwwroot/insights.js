@@ -99,7 +99,7 @@ function renderSeasonChart(stats) {
     totals[index] += month.net;
     counts[index]++;
   }
-  Charts.bars($('#seasonChart'), {
+  drawTimeChart($('#seasonChart'), {
     labels: MONTH_NAMES.map(name => name.slice(0, 3)),
     titles: MONTH_NAMES.map((name, index) => `${name} (${counts[index] ? plural(counts[index], 'year') : 'not in the period'})`),
     series: [{ label: 'Average net spent', color: 1, format: value => formatMoney(Math.round(value)), values: totals.map((total, index) => (counts[index] ? total / counts[index] : 0)) }]

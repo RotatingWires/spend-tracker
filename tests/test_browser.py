@@ -576,7 +576,9 @@ class BrowserTests(unittest.TestCase):
         page.click("#fileMenuButton")
         page.click("#refreshButton")
         self.choose_time_frame(page, ["June 2024"])
-        expect(page.locator("#transactionsTable tbody tr").first).to_contain_text(f"#{first['id']}")
+        # Newest first, as in TaskList: the highest ID is on top.
+        expect(page.locator("#transactionsTable tbody tr").first).to_contain_text(f"#{third['id']}")
+        expect(page.locator("#transactionsTable tbody tr").last).to_contain_text(f"#{first['id']}")
 
         page.click("#fileMenuButton")
         page.click("#selectModeButton")
@@ -777,7 +779,42 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#titleScope")).to_have_text("Stats · March 2025, February 2025")
         expect(page.locator("#statsTotals")).to_contain_text("Spent$36.00")
         expect(page.locator("#statsDaily")).to_contain_text("Days counted59 days")
+        # Ten totals in two rows of five; Entries counts every type.
+        expect(page.locator("#statsTotals .stat-card")).to_have_count(10)
+        expect(page.locator("#statsTotals")).to_contain_text("Entries54 purchases · 1 other")
+        tops = {round(card.bounding_box()["y"]) for card in page.locator("#statsTotals .stat-card").all()}
+        self.assertEqual(len(tops), 2)
+
+        # Counts: how many entries rather than how much money.
+        page.click('[data-stats-tab="counts"]')
+        expect(page.locator("#countSummary")).to_contain_text("Purchases4")
+        expect(page.locator("#countSummary")).to_contain_text("Refunds1")
+        expect(page.locator("#countBusiest")).to_contain_text("Most visited merchantMarket (3)")
+        expect(page.locator("#countTimeLegend")).to_have_text("Entries per Day")
+        expect(page.locator("#countTimeKey .chart-key-item")).to_have_text(["Purchases", "Refunds", "Paybacks"])
+        # Charts over time switch between bars and lines, remembered in this browser.
+        self.pick(page, "#chartStyleSelect", "Lines")
+        page.reload()
+        page.click('.tabs [data-tab="stats"]')
+        expect(page.locator("#chartStyleSelect .retro-select")).to_have_text("Lines▼")
+        expect(page.locator('[data-stats-tab="counts"]')).to_have_attribute("aria-selected", "true")
+        self.shot(page, "stats-counts-lines")
+        self.pick(page, "#chartStyleSelect", "Bars")
+        page.click('[data-stats-tab="overview"]')
         self.shot(page, "stats-march-2025")
+
+        # The ledger scrolls inside its frame, so its headers and Totals row stay in view, as in TaskList.
+        page.set_viewport_size({"width": 1280, "height": 420})
+        page.click('.tabs [data-tab="transactions"]')
+        self.choose_time_frame(page, ["All time"])
+        wrap = page.locator('[data-panel="transactions"] .table-wrap')
+        header = page.locator("#transactionsTable thead th").first
+        before = header.bounding_box()["y"]
+        wrap.evaluate("el => { el.scrollTop = 200; }")
+        self.assertGreater(wrap.evaluate("el => el.scrollTop"), 0)
+        self.assertEqual(round(header.bounding_box()["y"]), round(before))
+        footer = page.locator("#transactionsTable tfoot td").first.bounding_box()
+        self.assertLessEqual(footer["y"] + footer["height"], 420)
 
 
 if __name__ == "__main__":

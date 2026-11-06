@@ -6,6 +6,14 @@
  */
 
 let statsPeriodSelect = null;
+let chartStyleSelect = null;
+const CHART_STYLES = [{ value: 'bars', label: 'Bars' }, { value: 'lines', label: 'Lines' }];
+
+/** Charts over time follow the Charts choice (bars or lines); charts of categories are always bars. */
+function drawTimeChart(canvas, data) {
+  if (state.chartStyle === 'lines') Charts.lines(canvas, data);
+  else Charts.bars(canvas, data);
+}
 
 function statsPeriodOptions() {
   const transactions = state.model.transactions;
@@ -280,6 +288,7 @@ function renderStats() {
   // Only the visible sub-tab is drawn: charts need their real width, and the rest is redrawn when its tab opens.
   if (state.statsTab === 'heatmaps') renderHeatmaps(stats);
   else if (state.statsTab === 'trends') renderTrends(stats);
+  else if (state.statsTab === 'counts') renderCounts(stats);
   else if (state.statsTab === 'compare') renderCompare();
   else if (state.statsTab === 'places') renderPlaces(stats);
   else renderOverview(stats);
@@ -297,6 +306,11 @@ function renderOverview(stats) {
     statCard('Largest purchase', stats.largest ? formatMoney(stats.largest.amountCents) : '—', {
       sub: stats.largest ? `${describeTransaction(stats.largest)} · ${formatDate(stats.largest.date)}` : '',
       title: 'The single biggest purchase in this period.'
+    }),
+    statCard('Average per day', averageMoney(stats.net, stats.countedDays), { sub: plural(stats.countedDays, 'day'), title: 'Net spent divided by every counted day, including days with no purchases.' }),
+    statCard('Entries', numberFormat.format(stats.transactions.length), {
+      sub: `${plural(stats.purchases.length, 'purchase')} · ${numberFormat.format(stats.transactions.length - stats.purchases.length)} other`,
+      title: 'Every entry dated in this period: purchases, refunds, and paybacks, archived ones included.'
     })
   );
 
@@ -408,7 +422,7 @@ function renderStatsChart(stats) {
     item.append(swatch, metric.label);
     return item;
   }));
-  Charts.bars($('#statsChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series });
+  drawTimeChart($('#statsChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series });
 }
 
 function renderStatsTables(stats) {
@@ -506,6 +520,14 @@ function initializeStats() {
     summary: names => (names.length > 3 ? `${names.length} periods` : names.join(', '))
   });
   $$('[data-stats-tab]').forEach(tab => tab.addEventListener('click', () => showStatsTab(tab.dataset.statsTab)));
+  chartStyleSelect = createSingleSelect($('#chartStyleSelect'), {
+    onChange: value => {
+      state.chartStyle = value;
+      writeSetting('spend-tracker-chart-style', value);
+      renderStats();
+    }
+  });
+  chartStyleSelect.setOptions(CHART_STYLES, state.chartStyle);
   initializeHeatmaps();
   initializeCompare();
 }

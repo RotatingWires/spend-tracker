@@ -81,7 +81,7 @@
       </section>
 
       <section class="tab-panel" data-panel="stats" role="tabpanel" hidden>
-        <div class="control-row"><span class="control-label" id="statsPeriodLabel">Period:</span><div id="statsPeriodSelect" aria-labelledby="statsPeriodLabel"></div></div>
+        <div class="control-row wrap-row"><span class="control-label" id="statsPeriodLabel">Period:</span><div id="statsPeriodSelect" aria-labelledby="statsPeriodLabel"></div><span class="control-label" id="chartStyleLabel">Charts:</span><div id="chartStyleSelect" aria-labelledby="chartStyleLabel"></div></div>
         <div class="note">Every number comes only from entries you recorded. Hover or tap underlined labels for exact definitions.</div>
         <div id="statsEmpty" class="message-panel" hidden>No entries in this period yet.</div>
         <div id="statsContent">
@@ -89,6 +89,7 @@
             <button type="button" role="tab" data-stats-tab="overview" aria-selected="true">Overview</button>
             <button type="button" role="tab" data-stats-tab="heatmaps" aria-selected="false">Heatmaps</button>
             <button type="button" role="tab" data-stats-tab="trends" aria-selected="false">Trends</button>
+            <button type="button" role="tab" data-stats-tab="counts" aria-selected="false">Counts</button>
             <button type="button" role="tab" data-stats-tab="compare" aria-selected="false">Compare</button>
             <button type="button" role="tab" data-stats-tab="places" aria-selected="false">People &amp; Places</button>
           </div>
@@ -133,6 +134,21 @@
               <fieldset class="groupbox"><legend>Size Summary</legend><div id="sizeSummary" class="metric-list"></div></fieldset>
             </div>
             <fieldset class="groupbox"><legend>Months</legend><div class="table-wrap"><table id="statsMonthsTable"></table></div></fieldset>
+          </div>
+
+          <div class="stats-panel" data-stats-panel="counts" role="tabpanel" hidden>
+            <div class="note">How many entries, not how much money. Paybacks count here too.</div>
+            <div class="two-column">
+              <fieldset class="groupbox"><legend>Counts</legend><div id="countSummary" class="metric-list"></div></fieldset>
+              <fieldset class="groupbox"><legend>Busiest</legend><div id="countBusiest" class="metric-list"></div></fieldset>
+            </div>
+            <fieldset class="groupbox"><legend id="countTimeLegend">Entries per Day</legend><div id="countTimeKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="countTimeChart"></canvas></div></fieldset>
+            <fieldset class="groupbox"><legend>Entries by Weekday</legend><div id="countWeekdayKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="countWeekdayChart"></canvas></div><div class="note">Entries on each weekday in the period, by type.</div></fieldset>
+            <fieldset class="groupbox"><legend>Purchases by Size</legend><div class="chart-frame"><canvas id="countSizeChart"></canvas></div><div class="note">The number of purchases in each size band, as in Trends → Purchase Sizes.</div></fieldset>
+            <div class="two-column">
+              <fieldset class="groupbox"><legend>Visits per Merchant</legend><div class="chart-frame"><canvas id="countMerchantChart"></canvas></div><div class="note">The twelve merchants with the most purchases.</div></fieldset>
+              <fieldset class="groupbox"><legend>Purchases per Tag</legend><div class="chart-frame"><canvas id="countTagChart"></canvas></div><div class="note">The twelve tags on the most purchases. A purchase with two tags counts for both.</div></fieldset>
+            </div>
           </div>
 
           <div class="stats-panel" data-stats-panel="compare" role="tabpanel" hidden>
@@ -392,6 +408,7 @@
   <script src="/stats.js"></script>
   <script src="/heatmaps.js"></script>
   <script src="/insights.js"></script>
+  <script src="/counts.js"></script>
   <script src="/people.js"></script>
   <script src="/summaries.js"></script>
   <script src="/history.js"></script>

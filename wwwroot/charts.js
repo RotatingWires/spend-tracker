@@ -177,8 +177,9 @@ const Charts = (() => {
   }
 
   /**
-   * labels: one per point. titles: tooltip heading per point. series: [{ label, color (1-8), values, format, dashed }].
+   * labels: one per point. titles: tooltip heading per point. series: [{ label, color (1-8), values, format, dashed, count }].
    * A null value leaves a gap, so a period still in progress stops at today while the one it is compared with goes on.
+   * As in bars, counts shown together with money get their own axis on the right.
    */
   function lines(canvas, { labels, titles, series }) {
     const ratio = window.devicePixelRatio || 1;
@@ -190,22 +191,38 @@ const Charts = (() => {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
 
-    const padding = { top: 14, right: 12, bottom: 34, left: 70 };
+    const money = series.filter(s => !s.count);
+    const counts = series.filter(s => s.count);
+    const rightAxis = money.length > 0 && counts.length > 0;
+    const padding = { top: 14, right: rightAxis ? 56 : 12, bottom: 34, left: 70 };
     const plotWidth = width - padding.left - padding.right;
     const plotHeight = height - padding.top - padding.bottom;
-    const values = series.flatMap(s => s.values.filter(value => value != null));
-    const high = Math.max(0, ...values);
-    const low = Math.min(0, ...values);
-    const step = Math.max(100, niceStep((high - low) / 4));
-    const axis = { max: Math.ceil(high / step) * step || step, min: Math.floor(low / step) * step };
-    const y = value => padding.top + plotHeight * (axis.max - value) / (axis.max - axis.min);
+    const range = (list, minimumStep) => {
+      const values = list.flatMap(s => s.values.filter(value => value != null));
+      const high = Math.max(0, ...values);
+      const low = Math.min(0, ...values);
+      const step = Math.max(minimumStep, niceStep((high - low) / 4));
+      return { step, max: Math.ceil(high / step) * step || step, min: Math.floor(low / step) * step };
+    };
+    const axis = range(money.length ? money : counts, money.length ? 100 : 1);
+    const right = rightAxis ? range(counts, 1) : null;
+    if (right && axis.min < 0) right.min = -Math.ceil((right.max * -axis.min / axis.max) / right.step) * right.step;
+    const step = axis.step;
+    const yOn = (value, scale) => padding.top + plotHeight * (scale.max - value) / (scale.max - scale.min);
+    const y = value => yOn(value, axis);
     const slot = labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
     const x = index => padding.left + (labels.length > 1 ? slot * index : plotWidth / 2);
 
     context.font = '11px Tahoma, Arial, sans-serif';
     context.textBaseline = 'middle';
     context.lineWidth = 1;
-    const format = series[0]?.format ?? String;
+    const format = (money[0] ?? counts[0])?.format ?? String;
+    if (right) {
+      context.fillStyle = themeColor('--chart-text');
+      context.textAlign = 'left';
+      for (let value = right.max; value >= right.min; value -= right.step)
+        context.fillText(counts[0].format(value), width - padding.right + 6, Math.round(yOn(value, right)) + 0.5);
+    }
     for (let value = axis.max; value >= axis.min; value -= step) {
       const lineY = Math.round(y(value)) + 0.5;
       context.strokeStyle = themeColor(value === 0 ? '--chart-axis' : '--chart-grid');
@@ -229,11 +246,18 @@ const Charts = (() => {
           drawing = false;
           return;
         }
-        if (drawing) context.lineTo(x(index), y(value));
-        else context.moveTo(x(index), y(value));
+        const pointY = yOn(value, right && s.count ? right : axis);
+        if (drawing) context.lineTo(x(index), pointY);
+        else context.moveTo(x(index), pointY);
         drawing = true;
       });
       context.stroke();
+      // A point with no neighbor (a single month, say) gets a dot, since it has no line to draw.
+      context.fillStyle = context.strokeStyle;
+      s.values.forEach((value, index) => {
+        if (value != null && s.values[index - 1] == null && s.values[index + 1] == null)
+          context.fillRect(x(index) - 3, yOn(value, right && s.count ? right : axis) - 3, 6, 6);
+      });
     }
     context.setLineDash([]);
     context.lineWidth = 1;
@@ -245,7 +269,9 @@ const Charts = (() => {
     let lastLabelX = -Infinity;
     labels.forEach((label, index) => {
       if (!label || x(index) - lastLabelX < 50) return;
-      context.fillText(label, x(index), height - padding.bottom + 8);
+      // Labels at the ends stay inside the canvas instead of being cut off.
+      const half = context.measureText(label).width / 2;
+      context.fillText(label, Math.min(width - half - 2, Math.max(half + 2, x(index))), height - padding.bottom + 8);
       lastLabelX = x(index);
     });
 
@@ -254,6 +280,7 @@ const Charts = (() => {
     context.moveTo(padding.left + 0.5, padding.top);
     context.lineTo(padding.left + 0.5, height - padding.bottom);
     context.lineTo(width - padding.right, height - padding.bottom);
+    if (right) context.lineTo(width - padding.right + 0.5, padding.top);
     context.stroke();
 
     canvas.onpointermove = event => {

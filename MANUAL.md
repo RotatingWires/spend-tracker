@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.0.0 Manual
+# SpendTracker v1.1.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -33,7 +33,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **People ledger** showing what each person owes you, purchase by purchase.
 - **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the collections of each day's entries.
 - **Collections**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
-- **Stats** for any month, year, collection, or all time, on five sub-tabs: totals, daily averages, streaks, and records (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; the net spent chart, running total against the period before, average by month of year, and purchase sizes (**Trends**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
+- **Stats** for any month, year, collection, or all time, on six sub-tabs: totals, daily averages, streaks, and records (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; the net spent chart, running total against the period before, average by month of year, and purchase sizes (**Trends**); how many entries, by time, weekday, size, merchant, and tag (**Counts**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -67,6 +67,7 @@ wwwroot/
   stats.js              statistics calculations, Stats sub-tabs, and Overview
   heatmaps.js           Stats → Heatmaps
   insights.js           Stats → Trends, Compare, and People & Places
+  counts.js             Stats → Counts
   people.js             people balances and person detail
   summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
   search.js             File → Search... dialog
@@ -173,7 +174,7 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
 **File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
@@ -216,13 +217,16 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 **Period** is a dropdown of check items: all time, or any mix of years, months, and collections. All time and the others exclude each other, and the last choice cannot be unchecked. With several periods checked, an entry counts when it falls in any of them, and day-based numbers (counted days, averages, streaks, day of week, months, and the chart's days) use only the days inside the checked periods; a no-spend streak does not carry across the gap between two of them. A collection's period runs from its first to its last entry and counts only its own purchases and the refunds on them (paybacks are not part of collections). See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
 
-Stats has five sub-tabs, like TaskList Stats' tabs; the one you were last on is remembered in this browser:
+Stats has six sub-tabs, like TaskList Stats' tabs; the one you were last on is remembered in this browser:
 
-- **Overview:** totals, Daily, Records, Streaks, By Payment Method, and Day of Week.
+- **Overview:** ten totals (including **Average per day** and **Entries**, which counts purchases, refunds, and paybacks) in two rows of five, then Daily, Records, Streaks, By Payment Method, and Day of Week.
 - **Heatmaps:** a year of days, months by year, tags or merchants by month, and weekdays by week of the month. See [Heatmaps](#heatmaps).
 - **Trends:** the chart (net spent or other measures per day or month), the running total (against the month or year before), average by month of year, purchase sizes, and the Months table.
+- **Counts:** how many entries rather than how much money: entries, purchases, refunds, and paybacks with purchases per day and per spending day; the busiest day, month, weekday, and merchant; entries per day or month and by weekday (by type); purchases by size; and the twelve merchants with the most visits and tags on the most purchases.
 - **Compare:** two periods of your choice side by side. It has its own **A** and **B** dropdowns (this month and last month to start), and the Period dropdown does not apply.
 - **People & Places:** People, People Over Time, Tags, Collections, Merchants, Merchant Loyalty, and Recurring Purchases.
+
+**Charts** (beside Period) switches charts over time between **Bars** and **Lines**: the Trends chart, Average by Month of Year, and Entries per Day/Month on Counts. Charts of categories (weekdays, sizes, merchants, tags) stay bars, and the running total and People Over Time are always lines. The choice is saved in this browser. In a line chart, counts shown together with money get their own axis on the right, as in the bar chart.
 
 ### People
 
@@ -516,6 +520,13 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.1.0
+
+- The ledger lists entries newest first (highest ID on top), like TaskList, and scrolls inside its frame so its headers and Totals row stay in view.
+- Stats → Overview has ten totals in two even rows of five, adding **Average per day** and **Entries**.
+- **Charts: Bars / Lines** beside Period switches charts over time between bars and lines; line charts give counts their own axis.
+- New **Counts** sub-tab: how many entries rather than how much money, with busiest day, month, weekday, and merchant, and charts of entries over time and by weekday, purchases by size, visits per merchant, and purchases per tag.
 
 ### v1.0.0
 

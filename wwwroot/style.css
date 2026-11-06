@@ -459,6 +459,7 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
   overflow-y: hidden;
 }
 .chart-frame canvas { display: block; width: 100%; min-width: 600px; height: 220px; }
+.two-column .chart-frame canvas { min-width: 320px; }
 /* Chart key and tooltip color squares, one theme color per measure. */
 .chart-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 6px; font-size: 12px; }
 .chart-key-item { display: inline-flex; align-items: center; gap: 5px; }
@@ -491,6 +492,15 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
 .subtabs button { white-space: nowrap; padding: 5px 11px 6px; position: relative; top: 1px; }
 .subtabs button[aria-selected="true"] { padding-top: 7px; margin-top: -2px; border-bottom-color: var(--face); font-weight: 700; z-index: 2; }
 .small-row { margin-bottom: 5px; }
+/* Ten totals: two even rows of five, or rows of two on narrow screens, never one tile alone. */
+#statsTotals { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 780px) { #statsTotals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* The ledger fills the window and scrolls inside its frame, so the column headers and the Totals row stay in view,
+   as TaskList's task table does. */
+.tab-panel[data-panel="transactions"] { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tab-panel[data-panel="transactions"] > .table-wrap { flex: 0 1 auto; min-height: 0; }
+#transactionsTable tfoot td { position: sticky; bottom: 0; z-index: 1; }
 /* A note under a chart or heatmap gets room to breathe; a note right under a box's title stays close. */
 .stats-panel .groupbox > :not(legend) + .note { margin-top: 10px; }
 .wrap-row { flex-wrap: wrap; }
