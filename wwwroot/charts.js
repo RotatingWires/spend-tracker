@@ -238,12 +238,15 @@ const Charts = (() => {
     context.setLineDash([]);
     context.lineWidth = 1;
 
-    const labelEvery = Math.max(1, Math.ceil(labels.length / Math.max(1, Math.floor(plotWidth / 50))));
+    // Empty labels are skipped, and a label too close to the last one drawn is left out.
     context.fillStyle = themeColor('--chart-text');
     context.textAlign = 'center';
     context.textBaseline = 'top';
+    let lastLabelX = -Infinity;
     labels.forEach((label, index) => {
-      if (index % labelEvery === 0) context.fillText(label, x(index), height - padding.bottom + 8);
+      if (!label || x(index) - lastLabelX < 50) return;
+      context.fillText(label, x(index), height - padding.bottom + 8);
+      lastLabelX = x(index);
     });
 
     context.strokeStyle = themeColor('--chart-axis');

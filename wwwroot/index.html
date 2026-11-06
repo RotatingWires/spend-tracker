@@ -70,7 +70,6 @@
       <div id="errorPanel" class="message-panel error-panel" role="alert" hidden></div>
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
-        <div id="monthCards" class="stat-grid"></div>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="archivedNote" class="note" hidden></div>
       </section>
@@ -102,7 +101,6 @@
               <fieldset class="groupbox"><legend>Records</legend><div id="statsRecords" class="metric-list"></div></fieldset>
             </div>
             <fieldset class="groupbox"><legend>Streaks</legend><div id="statsStreaks" class="metric-list"></div></fieldset>
-            <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="control-row"><span class="control-label" id="statsChartMetricLabel">Show:</span><div id="statsChartMetric" aria-labelledby="statsChartMetricLabel"></div></div><div id="statsChartKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
             <div class="two-column">
               <fieldset class="groupbox"><legend>By Payment Method</legend><div class="table-wrap"><table id="statsMethodsTable"></table></div></fieldset>
               <fieldset class="groupbox"><legend>Day of Week</legend><div class="table-wrap"><table id="statsWeekdayTable"></table></div></fieldset>
@@ -127,6 +125,7 @@
           </div>
 
           <div class="stats-panel" data-stats-panel="trends" role="tabpanel" hidden>
+            <fieldset class="groupbox"><legend id="statsChartLegend">Net Spent</legend><div class="control-row"><span class="control-label" id="statsChartMetricLabel">Show:</span><div id="statsChartMetric" aria-labelledby="statsChartMetricLabel"></div></div><div id="statsChartKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="statsChart"></canvas></div></fieldset>
             <fieldset class="groupbox"><legend>Running Total</legend><div id="runningKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="runningChart"></canvas></div><div id="runningNote" class="note"></div></fieldset>
             <fieldset class="groupbox"><legend>Average by Month of Year</legend><div class="chart-frame"><canvas id="seasonChart"></canvas></div><div class="note">Net spent in each calendar month, averaged over the years that month appears in the period.</div></fieldset>
             <div class="two-column">

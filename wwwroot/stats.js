@@ -329,7 +329,6 @@ function renderOverview(stats) {
     ['Largest refund', stats.largestRefund ? `${formatMoney(stats.largestRefund.amountCents)} on ${formatDate(stats.largestRefund.date)}` : '—', 'The single biggest refund in this period.']
   ]);
 
-  renderStatsChart(stats);
   renderStatsTables(stats);
 }
 

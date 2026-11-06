@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.14.0 Manual
+# SpendTracker v1.0.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -33,7 +33,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **People ledger** showing what each person owes you, purchase by purchase.
 - **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the collections of each day's entries.
 - **Collections**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
-- **Stats** for any month, year, collection, or all time, on five sub-tabs: totals, daily averages, streaks, records, and a chart (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; running total against the period before, average by month of year, and purchase sizes (**Trends**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
+- **Stats** for any month, year, collection, or all time, on five sub-tabs: totals, daily averages, streaks, and records (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; the net spent chart, running total against the period before, average by month of year, and purchase sizes (**Trends**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -125,7 +125,7 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, collection, and merchant has its own permanent ID too, shown in the ID column of its tab. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags and collections, its merchant, and its payment method. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner, *Cash #40* the fortieth cash entry. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a row on the Payment Methods, Tags, Collections, or Merchants tab opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line. When one is added, SpendTracker numbers existing entries in it at the next start (in date order), and restoring an older backup does the same.
 
-**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: the month cards, Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
+**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
 **Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
@@ -173,7 +173,7 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The cards above the table show the time frame's spent, refunds, net spent, paybacks, and entry count. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden, and the cards still include them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
 **File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
@@ -218,9 +218,9 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 Stats has five sub-tabs, like TaskList Stats' tabs; the one you were last on is remembered in this browser:
 
-- **Overview:** totals, Daily, Records, Streaks, the chart, By Payment Method, and Day of Week.
+- **Overview:** totals, Daily, Records, Streaks, By Payment Method, and Day of Week.
 - **Heatmaps:** a year of days, months by year, tags or merchants by month, and weekdays by week of the month. See [Heatmaps](#heatmaps).
-- **Trends:** the running total (against the month or year before), average by month of year, purchase sizes, and the Months table.
+- **Trends:** the chart (net spent or other measures per day or month), the running total (against the month or year before), average by month of year, purchase sizes, and the Months table.
 - **Compare:** two periods of your choice side by side. It has its own **A** and **B** dropdowns (this month and last month to start), and the Period dropdown does not apply.
 - **People & Places:** People, People Over Time, Tags, Collections, Merchants, Merchant Loyalty, and Recurring Purchases.
 
@@ -516,6 +516,15 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.0.0
+
+SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with heatmaps and trends, and Import/Export are complete.
+
+- The Transactions tab no longer has summary cards above the ledger; the same totals are on Stats → Overview, and the ledger keeps its **Totals** row.
+- The net spent chart moves from Stats → Overview to the top of Stats → Trends.
+- Notes under charts and heatmaps on Stats have more room above them.
+- Running totals across several years label each month once, on its first day.
 
 ### v0.14.0
 

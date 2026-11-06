@@ -491,6 +491,8 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
 .subtabs button { white-space: nowrap; padding: 5px 11px 6px; position: relative; top: 1px; }
 .subtabs button[aria-selected="true"] { padding-top: 7px; margin-top: -2px; border-bottom-color: var(--face); font-weight: 700; z-index: 2; }
 .small-row { margin-bottom: 5px; }
+/* A note under a chart or heatmap gets room to breathe; a note right under a box's title stays close. */
+.stats-panel .groupbox > :not(legend) + .note { margin-top: 10px; }
 .wrap-row { flex-wrap: wrap; }
 
 .year-heatmap,

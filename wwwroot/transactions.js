@@ -21,17 +21,7 @@ function monthTotals(transactions) {
 }
 
 function renderTransactions() {
-  // The cards count every entry, archived or not; only the table hides archived entries.
   const monthRows = timeFrameTransactions();
-  const totals = monthTotals(monthRows);
-  $('#monthCards').replaceChildren(
-    statCard('Spent', formatMoney(totals.spent), { sub: plural(totals.purchases, 'purchase'), title: 'Total of every purchase dated in the time frame.' }),
-    statCard('Refunds', formatMoney(totals.refunded), { title: 'Total of every refund dated in the time frame.' }),
-    statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }),
-    statCard('Paid back to you', formatMoney(totals.paidBack), { title: 'Paybacks from other people dated in the time frame. These do not change net spent.' }),
-    statCard('Entries', numberFormat.format(monthRows.length))
-  );
-
   const rows = timeFrameTransactions({ listed: true });
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
@@ -111,7 +101,7 @@ function renderTransactions() {
     : rows.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
-  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in the totals above and in Stats. View → Show Archived lists them.`;
+  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in Stats. View → Show Archived lists them.`;
   updateBulkControls();
 }
 

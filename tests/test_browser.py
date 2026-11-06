@@ -228,8 +228,8 @@ class BrowserTests(unittest.TestCase):
         self.add_transaction(page, kind="Refund", linked="Diner")
         page.locator("#transactionsTable tbody tr", has_text="Refund:").first.wait_for()
         self.add_transaction(page, kind="Payback", amount="10", description="Venmo", person="Alex")
-        expect(page.locator("#monthCards")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
-        expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")
+        expect(page.locator("#monthCards")).to_have_count(0)  # Stats has the totals; the ledger has its Totals row
+        expect(page.locator("#transactionsTable tfoot")).to_contain_text("$12.17")  # net: 12.17 + 40 - 40 refund
         # Net Spent is its own column: each row's effect on net spent, with the total in the footer.
         expect(page.locator("#transactionsTable thead th").last).to_have_text("Net Spent")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
@@ -468,7 +468,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#titleScope")).to_have_text("Jan 2024, Feb 2024")
         expect(page.locator("#timeFrameSelect .retro-select")).to_have_text("February 2024, January 2024▼")
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(3)
-        expect(page.locator("#monthCards")).to_contain_text("Spent$1,300.00")
+        expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$1,200.00")  # $600 + $700 − $100 refund
         expect(page.locator("#transactionsTable tbody tr", has_text="Hotel").first).to_contain_text("Beach trip")
         page.click("#nextMonthButton")
         expect(page.locator("#titleScope")).to_have_text("Feb 2024, Mar 2024")
@@ -518,7 +518,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsCollectionsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
         expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
         self.shot(page, "stats-collection")
-        page.click('[data-stats-tab="overview"]')
+        page.click('[data-stats-tab="trends"]')
         # The chart can show other measures than net spent, per day here because the collection spans 17 days.
         # Measures are check items; each gets a color in the key, whose definition shows on hover.
         self.choose_checks(page, "#statsChartMetric", ["Spent", "Refunds", "Purchases"])
@@ -630,12 +630,11 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("Bakery")
         page.click(f'#transactionsTable tr[data-id="{third["id"]}"] .selection-check')
 
-        # Archiving hides an entry from the ledger but it still counts in the month's totals.
+        # Archiving hides an entry from the ledger but it still counts in Stats.
         page.click("#bulkActions .split-primary")
         page.click("#confirmOkButton")
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_have_count(0)
         expect(page.locator("#archivedNote")).to_contain_text("1 archived entry hidden")
-        expect(page.locator("#monthCards")).to_contain_text("Spent$600.01")
         page.click("#viewMenuButton")
         page.locator("#viewMenu button", has_text="Show Archived").click()
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("(archived)")

@@ -37,6 +37,7 @@ function runningTotals(keys, days, stopAfter = null) {
 }
 
 function renderTrends(stats) {
+  renderStatsChart(stats);
   renderRunningTotal(stats);
   renderSeasonChart(stats);
   renderSizes(stats);
@@ -47,8 +48,10 @@ function renderRunningTotal(stats) {
   const keys = periodDays(stats.range.start, stats.range.end, stats.included);
   const span = keys.length;
   const spansYears = keys.length && keys[0].slice(0, 4) !== keys.at(-1).slice(0, 4);
+  // Day numbers for a month, "Mar 5" within a year, and month names on the 1st across years.
   const label = key => (span <= 62 ? String(Number(key.slice(8)))
-    : `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} ${spansYears ? key.slice(2, 4) : Number(key.slice(8))}`);
+    : spansYears ? (key.endsWith('-01') ? `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} ${key.slice(2, 4)}` : '')
+      : `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} ${Number(key.slice(8))}`);
   const money = value => formatMoney(Math.round(value));
   const series = [{ label: stats.range.label, color: 1, format: money, values: runningTotals(keys, stats.days, stats.countedEnd) }];
 
@@ -80,7 +83,7 @@ function renderRunningTotal(stats) {
     const then = series[1].values[index] ?? series[1].values.findLast(value => value != null);
     if (now != null && then != null) {
       const difference = now - then;
-      note = `By ${span <= 62 ? `day ${index + 1}` : label(keys[index])}: ${money(now)}, ${difference === 0 ? 'the same as' : `${money(Math.abs(difference))} ${difference > 0 ? 'more than' : 'less than'}`} ${series[1].label} at the same point (${money(then)}). The dashed line is ${series[1].label}.`;
+      note = `By ${span <= 62 ? `day ${index + 1}` : formatDate(keys[index])}: ${money(now)}, ${difference === 0 ? 'the same as' : `${money(Math.abs(difference))} ${difference > 0 ? 'more than' : 'less than'}`} ${series[1].label} at the same point (${money(then)}). The dashed line is ${series[1].label}.`;
     }
   } else {
     note += ' Choose a single month or year as the period to compare it with the one before.';
