@@ -91,23 +91,20 @@ const BULK_ACTIONS = {
   people: {
     label: 'People',
     detail: 'Each changed purchase is split evenly again between everyone on it.',
-    choose: items => chooseWithMode('People', 'Person',
+    choose: items => chooseWithMode('People', 'People',
       state.snapshot.people.filter(person => !person.archived || items.some(tx => tx.shares.some(share => share.personId === person.id)))),
-    request: (tx, { id: personId, mode }) => {
+    request: (tx, choice) => {
       if (tx.kind !== 'Purchase') return { skip: 'only purchases are split between people' };
-      const onIt = tx.shares.some(share => share.personId === personId);
-      if (mode === 'add' && onIt) return { skip: `${personName(personId)} is already on it` };
-      if (mode === 'remove' && !onIt) return { skip: `${personName(personId)} is not on it` };
-      const people = mode === 'add'
-        ? [...tx.shares.map(share => share.personId), personId]
-        : tx.shares.map(share => share.personId).filter(id => id !== personId);
-      if (people.length === 0) return { skip: `${personName(personId)} is the only person on it` };
+      const names = choice.ids.map(personName).join(', ');
+      const people = changedIds(tx.shares.map(share => share.personId), choice);
+      if (!people) return { skip: choice.mode === 'add' ? `${names} ${choice.ids.length === 1 ? 'is' : 'are'} already on it` : `${names} ${choice.ids.length === 1 ? 'is' : 'are'} not on it` };
+      if (people.length === 0) return { skip: 'it would leave nobody on it' };
       return { body: transactionRequest(tx, { shares: evenShares(tx.amountCents, people) }) };
     }
   },
   merchant: {
     label: 'Merchant',
-    // Like tags and people, merchants are chosen from a list; they are added under Manage.
+    // Like tags and people, merchants are chosen from a list; they are added on the Merchants tab.
     choose: () => chooseFrom('Merchant', 'Set merchant to', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
       .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: `Set merchant to “${choice.label}”` }),
     request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
@@ -124,30 +121,36 @@ const BULK_ACTIONS = {
 
 const ADD_REMOVE = [{ value: 'add', label: 'Add to the selected entries' }, { value: 'remove', label: 'Remove from the selected entries' }];
 
-/** One action per kind: the dialog asks whether to add or remove, then which one. */
+/** One action per kind: the dialog asks whether to add or remove, then which ones, as check items. */
 async function chooseWithMode(title, label, items) {
   if (items.length === 0) {
-    await confirmAction(title, `There are no ${title.toLowerCase()} to choose from. Add them under Manage.`, 'OK', { notice: true });
+    await confirmAction(title, `There are no ${title.toLowerCase()} to choose from. Add them on the ${title} tab.`, 'OK', { notice: true });
     return null;
   }
-  const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE });
+  const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE, multiple: true });
   if (choice == null) return null;
-  const item = items.find(other => other.id === Number(choice.value));
-  return { value: { id: item.id, mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} “${item.name}”` };
+  const chosen = items.filter(item => choice.value.includes(String(item.id)));
+  return { value: { ids: chosen.map(item => item.id), mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} ${chosen.map(item => `“${item.name}”`).join(', ')}` };
 }
 
-/** Add or remove one tag or event. Tags and events work the same way: only purchases have them. */
+/** The IDs after adding or removing the chosen ones, or null when nothing would change. */
+function changedIds(current, { ids, mode }) {
+  const next = mode === 'add' ? [...current, ...ids.filter(id => !current.includes(id))] : current.filter(id => !ids.includes(id));
+  return next.length === current.length && next.every(id => current.includes(id)) ? null : next;
+}
+
+/** Add or remove tags or events. Tags and events work the same way: only purchases have them. */
 function labelAction(noun, list, field) {
   const title = `${noun[0].toUpperCase()}${noun.slice(1)}s`;
   return {
     label: title,
-    choose: items => chooseWithMode(title, `${noun[0].toUpperCase()}${noun.slice(1)}`,
+    choose: items => chooseWithMode(title, title,
       state.snapshot[list].filter(item => !item.archived || items.some(tx => tx[field].includes(item.id)))),
-    request: (tx, { id, mode }) => {
-      const adding = mode === 'add';
-      if (adding && tx.kind !== 'Purchase') return { skip: `only purchases have ${noun}s` };
-      if (adding === tx[field].includes(id)) return { skip: adding ? `already has that ${noun}` : `does not have that ${noun}` };
-      return { body: transactionRequest(tx, { [field]: adding ? [...tx[field], id] : tx[field].filter(other => other !== id) }) };
+    request: (tx, choice) => {
+      if (choice.mode === 'add' && tx.kind !== 'Purchase') return { skip: `only purchases have ${noun}s` };
+      const next = changedIds(tx[field], choice);
+      if (!next) return { skip: choice.mode === 'add' ? `already has ${choice.ids.length === 1 ? `that ${noun}` : `those ${noun}s`}` : `has none of those ${noun}s` };
+      return { body: transactionRequest(tx, { [field]: next }) };
     }
   };
 }

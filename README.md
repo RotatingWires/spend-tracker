@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.7.0
+# SpendTracker v0.8.0
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -21,7 +21,7 @@ dotnet run
 
 SpendTracker listens on **http://127.0.0.1:8715** unless `--urls` (or `ASPNETCORE_URLS`) chooses another address. Open it in a browser. Enter the setup token printed in the server console, choose and confirm a password of at least 8 characters, then start adding transactions.
 
-A new database starts with you ("Me") and three payment methods: Cash, Credit Card, and Debit Card. Rename, add, or archive them under **Manage**.
+A new database starts with you ("Me") and three payment methods: Cash, Credit Card, and Debit Card. Rename, add, or archive them on the **People** and **Payment Methods** tabs.
 
 All data lives in the `data/` folder next to the project (`data/spend-tracker.db`); logs go to `logs/console.log`. Use **File → Download Backup** regularly. See [Data and backups](MANUAL.md#data-and-backups).
 

@@ -4,6 +4,7 @@ Run: python3 -m unittest tests/test_browser.py   (set SPEND_TRACKER_SCREENSHOTS=
 """
 
 import os
+from datetime import date
 import re
 import unittest
 from pathlib import Path
@@ -15,7 +16,7 @@ try:
 except ImportError:  # Playwright is a development-only tool.
     sync_playwright = None
 
-TABS = ["Transactions", "Calendar", "Stats", "People", "Tags", "Events", "Merchants", "History", "Manage"]
+TABS = ["Transactions", "Calendar", "Stats", "People", "Payment Methods", "Tags", "Events", "Merchants", "History"]
 
 
 @unittest.skipIf(sync_playwright is None, "Playwright is not installed")
@@ -91,9 +92,13 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Escape")
 
     def choose_time_frame(self, page, labels):
-        """Checks exactly these Time frame entries. The menu re-renders after each click, so items are found again each time."""
-        page.click("#timeFrameSelect .retro-select")
-        items = page.locator("#timeFrameSelect .menu-dropdown button")
+        self.choose_checks(page, "#timeFrameSelect", labels)
+
+    def choose_checks(self, page, host, labels):
+        """Checks exactly these entries of a dropdown that keeps at least one checked, checking the wanted ones first.
+        The menu re-renders after each click, so items are found again each time."""
+        page.click(f"{host} .retro-select")
+        items = page.locator(f"{host} .menu-dropdown button")
         for label in labels:
             item = items.filter(has_text=re.compile(f"^{re.escape(label)}$"))
             if item.get_attribute("aria-checked") != "true":
@@ -135,15 +140,19 @@ class BrowserTests(unittest.TestCase):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
 
-        # Manage: add a person and a tag.
-        page.click('.tabs [data-tab="manage"]')
+        # Each kind of item is added on its own tab: a person, a tag, and merchants.
+        expect(page.locator('.tabs [data-tab="manage"]')).to_have_count(0)
+        page.click('.tabs [data-tab="people"]')
         page.fill('form[data-add="people"] input', "Alex")
         page.click('form[data-add="people"] button')
-        expect(page.locator("#peopleManageTable")).to_contain_text("Alex")
+        expect(page.locator("#peopleTable")).to_contain_text("Alex")
+        expect(page.locator("#peopleTable tbody tr").first).to_contain_text("Me (you)")
+        page.click('.tabs [data-tab="tags"]')
         page.fill('form[data-add="tags"] input', "food")
         page.click('form[data-add="tags"] button')
         expect(page.locator("#tagsTable")).to_contain_text("food")
-        # Merchants are added here too; the editor only chooses from them.
+        # The editor only chooses merchants from the ones added on the Merchants tab.
+        page.click('.tabs [data-tab="merchants"]')
         for name in ("BK", "Diner", "After backup"):
             page.fill('form[data-add="merchants"] input', name)
             page.click('form[data-add="merchants"] button')
@@ -155,7 +164,7 @@ class BrowserTests(unittest.TestCase):
         page.fill("#txAmount", "12.17")
         self.pick(page, "#txMerchant", "BK")
         page.fill("#txDescription", "food")
-        expect(page.locator("#txNewTag")).to_have_count(0)  # tags are only created under Manage
+        expect(page.locator("#txNewTag")).to_have_count(0)  # tags are only created on the Tags tab
         self.set_checks(page, "#txTags", ["food"])
         expect(page.locator("#txTags .retro-select")).to_have_text("food▼")
         page.click("#txSaveButton")
@@ -184,6 +193,20 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Enter")
         expect(rows).to_have_count(2)
         expect(page.locator("#searchDialog")).to_be_visible()  # Enter searches; it does not close the dialog
+        # The Date tab finds entries by date or date range, as in TaskList.
+        page.click("#dateSearchTab")
+        today = date.today()
+        page.fill("#searchDates", f"{today.month}/{today.day}/{today.year % 100:02d}")
+        page.keyboard.press("Enter")
+        expect(rows).to_have_count(4)
+        page.fill("#searchDates", f"1/1/20 - {today.month}/{today.day}/{today.year}")
+        page.click("#searchDatesButton")
+        expect(rows).to_have_count(4)
+        page.fill("#searchDates", "2/30")
+        page.keyboard.press("Enter")
+        expect(page.locator("#searchSummary")).to_contain_text("Enter dates as month/day")
+        self.shot(page, "search-dates")
+        page.click("#keywordSearchTab")
         page.locator("#searchDialog button", has_text="Close").click()
 
         # Invalid input shows the server's message and keeps the dialog open.
@@ -201,7 +224,8 @@ class BrowserTests(unittest.TestCase):
                 expect(page.locator("html")).to_have_attribute("data-theme-effective", "dark")
             for tab in TABS:
                 page.click(f'.tabs button:text-is("{tab}")')
-                expect(page.locator(f'.tab-panel[data-panel="{tab.lower()}"]')).to_be_visible()
+                panel = page.locator(".tabs button", has_text=re.compile(f"^{tab}$")).get_attribute("data-tab")
+                expect(page.locator(f'.tab-panel[data-panel="{panel}"]')).to_be_visible()
                 if tab == "History":
                     expect(page.locator("#historyTable")).to_contain_text("Created")
                 self.shot(page, f"{tab.lower()}-{theme}")
@@ -346,16 +370,24 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
         self.shot(page, "stats-event")
         # The chart can show other measures than net spent, per day here because the event spans 17 days.
-        self.pick(page, "#statsChartMetric", "Purchases")
-        expect(page.locator("#statsChartLegend")).to_have_text("Purchases per Day")
-        self.pick(page, "#statsChartMetric", "Running net spent")
-        expect(page.locator("#statsChartLegend")).to_have_text("Running net spent per Day")
-        self.pick(page, "#statsChartMetric", "Net spent")
+        # Measures are check items; each gets a color in the key, whose definition shows on hover.
+        self.choose_checks(page, "#statsChartMetric", ["Spent", "Refunds", "Purchases"])
+        expect(page.locator("#statsChartLegend")).to_have_text("Activity per Day")
+        expect(page.locator("#statsChartKey .chart-key-item")).to_have_text(["Spent", "Refunds", "Purchases"])
+        expect(page.locator("#statsChartKey .chart-key-item").first).to_have_attribute("title", "Total of purchases.")
+        box = page.locator("#statsChart").bounding_box()
+        page.mouse.move(box["x"] + 75, box["y"] + 120)  # the first day's bars
+        expect(page.locator(".chart-tooltip")).to_contain_text("01/20/2024Spent: $600.00Refunds: $0.00Purchases: 1")
+        self.shot(page, "stats-chart-measures")
+        self.choose_checks(page, "#statsChartMetric", ["Net spent"])
+        self.set_checks(page, "#statsChartMetric", [])  # the last measure cannot be unchecked
+        expect(page.locator("#statsChartKey .chart-key-item")).to_have_count(1)
+        expect(page.locator("#statsChartLegend")).to_have_text("Net spent per Day")
         # Merchants and Tags tabs total each one like the Events tab.
         page.click('.tabs [data-tab="merchants"]')
-        expect(page.locator("#merchantsSummaryTable tbody tr", has_text="Hotel")).to_contain_text("Hotel1$600.00$100.00$500.00")
+        expect(page.locator("#merchantsTable tbody tr", has_text="Hotel")).to_contain_text("Hotel1$600.00$100.00$500.00")
         page.click('.tabs [data-tab="tags"]')
-        expect(page.locator("#tagsSummaryTable")).to_be_visible()
+        expect(page.locator("#tagsTable")).to_be_visible()
         page.click('.tabs [data-tab="stats"]')
         page.locator("#statsMerchantsTable tbody tr", has_text="Hotel").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
@@ -368,8 +400,8 @@ class BrowserTests(unittest.TestCase):
         self.set_checks(page, "#txEvents", ["Beach trip"])
         expect(page.locator("#txEvents .retro-select")).to_have_text("Beach trip▼")
         page.click("#txCancelButton")
-        page.click('.tabs [data-tab="manage"]')
-        page.locator("#eventsManageTable tbody tr", has_text="Beach trip").click()
+        page.click('.tabs [data-tab="events"]')
+        page.locator("#eventsTable tbody tr", has_text="Beach trip").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Event: Beach trip")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -406,7 +438,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#bulkActions .split-arrow")
         page.locator("#bulkActions .split-dropdown button", has_text="People...").click()
         expect(page.locator("#chooseMode .retro-select")).to_have_text("Add to the selected entries▼")  # one action per kind: add or remove
-        self.pick(page, "#chooseSelect", "Riley")
+        self.set_checks(page, "#chooseMulti", ["Riley"])
         page.click("#chooseOkButton")
         expect(page.locator("#confirmMessage")).to_have_text("Add “Riley” for 3 selected entries?")
         expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']} — 06/03/2024 — Garage — $300.01")
@@ -426,7 +458,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#bulkActions .split-arrow")
         page.locator("#bulkActions .split-dropdown button", has_text="People...").click()
         self.pick(page, "#chooseMode", "Remove from the selected entries")
-        self.pick(page, "#chooseSelect", "Riley")
+        self.set_checks(page, "#chooseMulti", ["Riley"])
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
         expect(page.locator("#confirmMessage")).to_have_text("People: 2 entries changed, 1 skipped. Skipped entries stay selected.")
@@ -473,30 +505,29 @@ class BrowserTests(unittest.TestCase):
         page.locator("#searchResults tbody tr").first.click()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
 
-        # Each number opens that scope's numbered list; Manage rows open the same list.
+        # Each number opens that scope's numbered list; rows on each item's tab open the same list.
         page.locator("#txNumbers button", has_text="Hardware #1").click()
         expect(page.locator("#transactionDialog")).not_to_be_visible()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hardware")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
-        page.click('.tabs [data-tab="manage"]')
-        page.locator("#peopleManageTable tbody tr", has_text="Riley").click()
-        expect(page.locator("#scopeDialogTitle")).to_have_text("Person: Riley")
-        # Riley left #1 and #2 (numbers 1 and 2), so the archived Garage purchase (#3) and the payback (#4) remain.
-        rows = page.locator("#scopeTable tbody tr")
+        # A person's row opens their dialog, which numbers their entries the same way.
+        page.click('.tabs [data-tab="people"]')
+        page.locator("#peopleTable tbody tr", has_text="Riley").click()
+        # Riley left #1 and #2 (numbers 1 and 2), so the archived purchase (#3) and the payback (#4) remain.
+        rows = page.locator("#personTable tbody tr")
         expect(rows).to_have_count(2)
-        expect(rows.nth(0)).to_contain_text(f"#4#{third['id'] + 1}")
-        expect(rows.nth(1)).to_contain_text("(archived)")
+        expect(rows.nth(0)).to_contain_text("#4")
         expect(rows.nth(1)).to_contain_text("$150.00")  # her share of the split purchase
-        self.shot(page, "scope-list")
-        page.locator("#scopeDialog button", has_text="Close").click()
+        page.locator("#personDialog button", has_text="Close").click()
+        page.click('.tabs [data-tab="merchants"]')
         page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(2)  # #2 is the purchase moved here by Merchant...
         page.locator("#scopeTable tbody tr").last.click()
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")
-        page.click('.tabs [data-tab="manage"]')
+        page.click('.tabs [data-tab="methods"]')
         page.locator("#methodsTable tbody tr", has_text="Cash").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Payment method: Cash")
         expect(page.locator("#scopeTable tbody tr", has_text="Hardware")).to_contain_text(f"#{first['id']}")  # other tests also pay cash

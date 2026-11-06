@@ -525,9 +525,9 @@ sealed class Store
         var methodArchived = Scalar(connection, transaction, "SELECT archived FROM payment_methods WHERE id = $id;", ("$id", methodId))
             ?? throw RequestException.Invalid("That payment method no longer exists.");
         if (Convert.ToInt64(methodArchived, CultureInfo.InvariantCulture) != 0 && before?.PaymentMethodId != methodId)
-            throw RequestException.Invalid("That payment method is archived. Restore it under Manage to use it again.");
+            throw RequestException.Invalid("That payment method is archived. Restore it on the Payment Methods tab to use it again.");
 
-        // Merchants are chosen by ID, like payment methods; they are created and renamed under Manage.
+        // Merchants are chosen by ID, like payment methods; they are created and renamed on the Merchants tab.
         var merchantId = request.MerchantId;
         var merchant = "";
         if (merchantId is not null)
@@ -537,7 +537,7 @@ sealed class Store
             if (!found.Read()) throw RequestException.Invalid("That merchant no longer exists. Refresh and try again.");
             merchant = found.GetString(0);
             if (found.GetInt64(1) != 0 && before?.MerchantId != merchantId)
-                throw RequestException.Invalid($"{merchant} is an archived merchant. Restore it under Manage to use it again.");
+                throw RequestException.Invalid($"{merchant} is an archived merchant. Restore it on the Merchants tab to use it again.");
         }
         var description = OptionalText(request.Description, MaxDescriptionLength, "Description");
         var note = OptionalText(request.Note, MaxNoteLength, "Note");
@@ -603,7 +603,7 @@ sealed class Store
             var archived = Scalar(connection, transaction, $"SELECT archived FROM {kind.Table} WHERE id = $id;", ("$id", labelId))
                 ?? throw RequestException.Invalid($"One of the selected {kind.Noun}s no longer exists. Refresh and try again.");
             if (Convert.ToInt64(archived, CultureInfo.InvariantCulture) != 0 && before?.Contains(labelId) != true)
-                throw RequestException.Invalid($"That {kind.Noun} is archived. Restore it under Manage to use it again.");
+                throw RequestException.Invalid($"That {kind.Noun} is archived. Restore it on the {kind.Entity}s tab to use it again.");
         }
         return ids;
     }
@@ -707,7 +707,7 @@ sealed class Store
         using var reader = command.ExecuteReader();
         if (!reader.Read()) throw RequestException.Invalid("That person no longer exists.");
         if (reader.GetInt64(1) != 0 && previousPersonId != personId)
-            throw RequestException.Invalid("That person is archived. Restore them under Manage to use them again.");
+            throw RequestException.Invalid("That person is archived. Restore them on the People tab to use them again.");
         return (personId.Value, reader.GetInt64(0) != 0);
     }
 

@@ -7,11 +7,11 @@ const TAB_RENDERERS = {
   calendar: renderCalendar,
   stats: renderStats,
   people: renderPeople,
+  methods: renderMethodsTab,
   tags: renderTagsTab,
   events: renderEvents,
   merchants: renderMerchantsTab,
-  history: () => loadHistory(),
-  manage: renderManage
+  history: () => loadHistory()
 };
 const MONTH_TABS = new Set(['transactions', 'calendar']);
 let timeFrameSelect = null;

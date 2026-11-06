@@ -9,7 +9,7 @@ const state = {
   // What the ledger and calendar show: every month (all), or the chosen months ("YYYY-MM").
   timeFrame: { all: false, months: [] },
   statsPeriod: 'all',
-  statsChart: readSetting('spend-tracker-stats-chart') ?? 'net',
+  statsChart: savedChartMeasures(),
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
   loading: null
 };
@@ -17,6 +17,16 @@ const state = {
 /** Per-browser view preferences. Storage can be unavailable (private windows), so they fall back to defaults. */
 function readSetting(key) {
   try { return localStorage.getItem(key); } catch { return null; }
+}
+
+/** The chart measures chosen last time in this browser, or net spent. */
+function savedChartMeasures() {
+  try {
+    const saved = JSON.parse(readSetting('spend-tracker-stats-chart') ?? '[]');
+    return Array.isArray(saved) && saved.length && saved.every(value => typeof value === 'string') ? saved : ['net'];
+  } catch {
+    return ['net'];
+  }
 }
 
 function writeSetting(key, value) {

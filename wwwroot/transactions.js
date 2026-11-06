@@ -27,9 +27,10 @@ function renderTransactions() {
   $('#monthCards').replaceChildren(
     statCard('Spent', formatMoney(totals.spent), { sub: plural(totals.purchases, 'purchase'), title: 'Total of every purchase dated in the time frame.' }),
     statCard('Refunds', formatMoney(totals.refunded), { title: 'Total of every refund dated in the time frame.' }),
-    statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }),
     statCard('Paid back to you', formatMoney(totals.paidBack), { title: 'Paybacks from other people dated in the time frame. These do not change net spent.' }),
-    statCard('Entries', numberFormat.format(monthRows.length))
+    statCard('Entries', numberFormat.format(monthRows.length)),
+    // The result of the cards above, on its own row at the right like a total line.
+    Object.assign(statCard('Net spent', formatMoney(totals.net), { title: 'Spent minus refunds.' }), { className: 'stat-card net-card' })
   );
 
   const rows = timeFrameTransactions({ listed: true });

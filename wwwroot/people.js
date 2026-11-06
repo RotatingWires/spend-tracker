@@ -30,34 +30,37 @@ function outstandingText(cents) {
   return 'Settled';
 }
 
+/** Everyone, you first: balances for other people, plus Rename/Archive/Delete on each row. */
 function renderPeople() {
-  const others = state.snapshot.people.filter(person => !person.isSelf);
-  const rows = others
+  const rows = state.snapshot.people
     .map(person => ({ person, ledger: personLedger(person.id) }))
-    .filter(({ person, ledger }) => !person.archived || ledger.entries.length > 0)
-    .sort((a, b) => b.ledger.outstanding - a.ledger.outstanding || a.person.name.localeCompare(b.person.name))
+    .sort((a, b) => b.person.isSelf - a.person.isSelf || b.ledger.outstanding - a.ledger.outstanding || a.person.name.localeCompare(b.person.name))
     .map(({ person, ledger }) => ({
       onClick: () => openPersonDialog(person.id),
       cells: [
-        person.archived ? `${person.name} (archived)` : person.name,
+        `#${person.id}`,
+        person.isSelf ? `${person.name} (you)` : archivedLabel(person),
         numberFormat.format(ledger.purchases),
         formatMoney(ledger.fronted),
         formatMoney(ledger.refunded),
         formatMoney(ledger.paidBack),
-        { text: outstandingText(ledger.outstanding), num: true, className: ledger.outstanding > 0 ? '' : 'money-in' },
-        ledger.lastPayback ? formatDate(ledger.lastPayback) : '—'
+        person.isSelf ? { text: '—', num: true } : { text: outstandingText(ledger.outstanding), num: true, className: ledger.outstanding > 0 ? '' : 'money-in' },
+        ledger.lastPayback ? formatDate(ledger.lastPayback) : '—',
+        manageButtons('people', person, ledger.entries.length)
       ]
     }));
 
   renderTable($('#peopleTable'), [
+    { label: 'ID', title: 'Permanent ID, never reused.' },
     { label: 'Person' },
     { label: 'Purchases', num: true },
-    { label: 'Bought for Them', num: true },
+    { label: 'Bought for Them', num: true, title: 'Their shares of purchases. For you, your own shares.' },
     { label: 'Refunded', num: true, title: 'Refunds on purchases made for this person.' },
     { label: 'Paid Back', num: true },
     { label: 'Balance', num: true, title: 'Bought for them, minus refunds on those purchases, minus everything they paid back.' },
-    { label: 'Last Payback' }
-  ], rows, { empty: 'No other people yet. Add people under Manage, then choose them as For Who on a purchase.' });
+    { label: 'Last Payback' },
+    { label: '' }
+  ], rows);
 }
 
 function openPersonDialog(personId) {

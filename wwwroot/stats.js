@@ -280,22 +280,24 @@ function renderStats() {
   renderStatsTables(stats);
 }
 
-/** What the chart can show for each day (or month). Money is in cents; counts are plain numbers. */
+/**
+ * What the chart can show for each day (or month), any number at once. Each has its own color (--chart-series-N) and
+ * a definition shown on its key. Money is in cents; counts are plain numbers on a second axis.
+ */
 const CHART_METRICS = [
-  { value: 'net', label: 'Net spent', of: bucket => bucket.net },
-  { value: 'spent', label: 'Spent', of: bucket => bucket.spent },
-  { value: 'refunded', label: 'Refunds', of: bucket => bucket.refunded },
-  { value: 'paidBack', label: 'Paid back to you', of: bucket => bucket.paidBack },
-  { value: 'purchases', label: 'Purchases', count: true, of: bucket => bucket.purchases },
-  { value: 'entries', label: 'Entries', count: true, of: bucket => bucket.entries },
-  { value: 'average', label: 'Average purchase', of: bucket => (bucket.purchases ? Math.round(bucket.spent / bucket.purchases) : 0) },
-  { value: 'running', label: 'Running net spent', running: true, of: bucket => bucket.net }
+  { value: 'net', label: 'Net spent', color: 1, title: 'Purchases minus refunds.', of: bucket => bucket.net },
+  { value: 'spent', label: 'Spent', color: 2, title: 'Total of purchases.', of: bucket => bucket.spent },
+  { value: 'refunded', label: 'Refunds', color: 3, title: 'Total of refunds, on the day they were refunded.', of: bucket => bucket.refunded },
+  { value: 'paidBack', label: 'Paid back to you', color: 4, title: 'Paybacks other people made to you.', of: bucket => bucket.paidBack },
+  { value: 'purchases', label: 'Purchases', color: 5, count: true, title: 'Number of purchases.', of: bucket => bucket.purchases },
+  { value: 'entries', label: 'Entries', color: 6, count: true, title: 'Number of entries of every type.', of: bucket => bucket.entries },
+  { value: 'average', label: 'Average purchase', color: 7, title: 'Spent divided by the number of purchases.', of: bucket => (bucket.purchases ? Math.round(bucket.spent / bucket.purchases) : 0) },
+  { value: 'running', label: 'Running net spent', color: 8, running: true, title: 'Net spent added up from the start of the period.', of: bucket => bucket.net }
 ];
 let statsChartSelect = null;
 
 function renderStatsChart(stats) {
-  const metric = CHART_METRICS.find(option => option.value === state.statsChart) ?? CHART_METRICS[0];
-  const format = metric.count ? value => numberFormat.format(Math.round(value)) : value => formatMoney(Math.round(value));
+  const metrics = CHART_METRICS.filter(metric => state.statsChart.includes(metric.value));
   const empty = { net: 0, spent: 0, refunded: 0, paidBack: 0, purchases: 0, entries: 0 };
   const byDay = stats.countedDays <= 62;
   const points = byDay
@@ -308,16 +310,28 @@ function renderStatsChart(stats) {
       title: formatMonth(month.month),
       bucket: month
     }));
-  $('#statsChartLegend').textContent = `${metric.label} per ${byDay ? 'Day' : 'Month'}`;
-  let total = 0;
-  const bars = points.map(point => {
-    const own = metric.of(point.bucket);
-    total += own;
-    const value = metric.running ? total : own;
-    const detail = metric.running ? `${format(value)} running net spent (${format(own)} that ${byDay ? 'day' : 'month'})` : `${format(value)} ${metric.label.toLowerCase()}`;
-    return { label: point.label, value, tooltip: `${point.title}\n${detail}\n${plural(point.bucket.purchases, 'purchase')}` };
+  $('#statsChartLegend').textContent = `${metrics.length === 1 ? metrics[0].label : 'Activity'} per ${byDay ? 'Day' : 'Month'}`;
+  const series = metrics.map(metric => {
+    let total = 0;
+    return {
+      label: metric.label,
+      color: metric.color,
+      count: Boolean(metric.count),
+      format: metric.count ? value => numberFormat.format(Math.round(value)) : value => formatMoney(Math.round(value)),
+      values: points.map(point => (metric.running ? (total += metric.of(point.bucket)) : metric.of(point.bucket)))
+    };
   });
-  Charts.bar($('#statsChart'), bars, { format });
+  $('#statsChartKey').replaceChildren(...metrics.map(metric => {
+    const item = document.createElement('span');
+    item.className = 'chart-key-item has-tooltip';
+    item.title = metric.title;
+    item.tabIndex = 0;
+    const swatch = document.createElement('span');
+    swatch.className = `chart-swatch series-${metric.color}`;
+    item.append(swatch, metric.label);
+    return item;
+  }));
+  Charts.bars($('#statsChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series });
 }
 
 function renderStatsTables(stats) {
@@ -384,12 +398,17 @@ function renderBreakdown(table, label, scope, groups, { none = null, countLabel 
 }
 
 function initializeStats() {
-  statsChartSelect = createSingleSelect($('#statsChartMetric'), {
-    onChange: value => {
-      state.statsChart = value;
-      writeSetting('spend-tracker-stats-chart', value);
+  // Check any number of measures; unchecking the last one is ignored so the chart always shows something.
+  statsChartSelect = createMultiSelect($('#statsChartMetric'), {
+    onChange: values => {
+      if (values.length) {
+        state.statsChart = values;
+        writeSetting('spend-tracker-stats-chart', JSON.stringify(values));
+      }
+      statsChartSelect.setOptions(CHART_METRICS, state.statsChart);
       renderStats();
-    }
+    },
+    summary: names => (names.length > 2 ? `${names.length} measures` : names.join(', '))
   });
   statsChartSelect.setOptions(CHART_METRICS, state.statsChart);
   statsPeriodSelect = createSingleSelect($('#statsPeriodSelect'), {

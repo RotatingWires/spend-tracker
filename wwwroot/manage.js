@@ -1,73 +1,26 @@
 'use strict';
 
-/* Manage tab: payment methods, people, tags, events, and merchants. */
+/*
+ * Adding, renaming, archiving, and deleting payment methods, people, tags, events, and merchants. Each has its own
+ * tab with an Add form at the top and these actions on every row.
+ */
 
 const MANAGED = {
-  'payment-methods': {
-    table: '#methodsTable',
-    singular: 'payment method',
-    scope: 'method',
-    items: () => state.snapshot.paymentMethods,
-    uses: id => state.model.transactions.filter(tx => tx.paymentMethodId === id).length,
-    archivable: () => true
-  },
-  people: {
-    table: '#peopleManageTable',
-    singular: 'person',
-    scope: 'person',
-    items: () => state.snapshot.people,
-    uses: id => state.model.transactions.filter(tx => peopleOf(tx).includes(id)).length,
-    archivable: item => !item.isSelf
-  },
-  tags: {
-    table: '#tagsTable',
-    singular: 'tag',
-    scope: 'tag',
-    items: () => state.snapshot.tags,
-    uses: id => state.model.transactions.filter(tx => tx.tagIds.includes(id)).length,
-    archivable: () => true
-  },
-  events: {
-    table: '#eventsManageTable',
-    singular: 'event',
-    scope: 'event',
-    items: () => state.snapshot.events,
-    uses: id => state.model.transactions.filter(tx => tx.eventIds.includes(id)).length,
-    archivable: () => true
-  },
-  merchants: {
-    table: '#merchantsTable',
-    singular: 'merchant',
-    scope: 'merchant',
-    maxLength: 120,
-    items: () => state.snapshot.merchants,
-    uses: id => state.model.transactions.filter(tx => tx.merchantId === id).length,
-    archivable: () => true
-  }
+  'payment-methods': { singular: 'payment method', archivable: () => true },
+  people: { singular: 'person', archivable: item => !item.isSelf },
+  tags: { singular: 'tag', archivable: () => true, removesFromEntries: true },
+  events: { singular: 'event', archivable: () => true, removesFromEntries: true },
+  merchants: { singular: 'merchant', maxLength: 120, archivable: () => true }
 };
 
-function renderManage() {
-  for (const [path, config] of Object.entries(MANAGED)) {
-    const rows = config.items().map(item => {
-      const uses = config.uses(item.id);
-      const actions = [['Rename', () => renameManaged(path, item), `Rename ${item.name}`]];
-      if (config.archivable(item))
-        actions.push([item.archived ? 'Restore' : 'Archive', () => setArchived(path, item, !item.archived), `${item.archived ? 'Restore' : 'Archive'} ${item.name}`]);
-      if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
-
-      const name = item.isSelf ? `${item.name} (you)` : item.name;
-      // Every managed item numbers its entries; selecting the row lists them.
-      const onClick = config.scope ? () => openScopeList(config.scope, item.id) : undefined;
-      return { onClick, cells: [`#${item.id}`, name, { text: numberFormat.format(uses), num: true }, item.archived ? 'Archived' : 'Active', rowActionButtons(actions)] };
-    });
-    renderTable($(config.table), [
-      { label: 'ID', title: 'Permanent ID, never reused. Entries are also numbered within each person, tag, and merchant.' },
-      { label: 'Name' },
-      { label: 'Used By', num: true, title: 'Number of transactions that use it.' },
-      { label: 'Status', title: 'Archived items stay on old transactions and in search and stats, but are not offered for new ones.' },
-      { label: '' }
-    ], rows);
-  }
+/** Rename, Archive or Restore, and Delete buttons for one row, after any leading ones; you can only rename yourself. */
+function manageButtons(path, item, uses, leading = []) {
+  const config = MANAGED[path];
+  const actions = [...leading, ['Rename', () => renameManaged(path, item), `Rename ${item.name}`]];
+  if (config.archivable(item))
+    actions.push([item.archived ? 'Restore' : 'Archive', () => setArchived(path, item, !item.archived), `${item.archived ? 'Restore' : 'Archive'} ${item.name}`]);
+  if (!item.isSelf) actions.push(['Delete', () => deleteManaged(path, config, item, uses), `Delete ${item.name}`]);
+  return rowActionButtons(actions);
 }
 
 async function addManaged(path, form) {
@@ -107,7 +60,7 @@ async function setArchived(path, item, archived) {
 }
 
 async function deleteManaged(path, config, item, uses) {
-  const consequence = (path === 'tags' || path === 'events') && uses > 0
+  const consequence = config.removesFromEntries && uses > 0
     ? ` It will be removed from ${plural(uses, 'transaction')}; the transactions themselves are kept.`
     : '';
   if (!await confirmAction(`Delete ${config.singular}`, `Delete ${item.name}?${consequence}`, 'Delete')) return;

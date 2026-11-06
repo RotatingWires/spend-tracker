@@ -332,28 +332,35 @@ function promptText(title, label, value = '', { maxLength = 60 } = {}) {
 }
 
 /**
- * Asks the user to pick one option from a Win95 dropdown. With modes (such as Add / Remove), a "Change" dropdown comes
- * first. Resolves to the chosen value, or { value, mode } when modes are given, or null if cancelled.
+ * Asks the user to pick from a Win95 dropdown: one option, or with multiple: true any number of check items. With
+ * modes (such as Add / Remove), a "Change" dropdown comes first. Resolves to the chosen value (an array of values
+ * when multiple), or { value, mode } when modes are given; null if cancelled or nothing was checked.
  */
 let choiceSelect = null;
+let choiceChecks = null;
 let modeSelect = null;
-function chooseOption(title, label, options, okLabel = 'OK', { modes = null } = {}) {
+function chooseOption(title, label, options, okLabel = 'OK', { modes = null, multiple = false } = {}) {
   const dialog = $('#chooseDialog');
   choiceSelect ??= createSingleSelect($('#chooseSelect'));
+  choiceChecks ??= createMultiSelect($('#chooseMulti'), { empty: 'Choose one or more' });
   modeSelect ??= createSingleSelect($('#chooseMode'));
   $('#chooseTitle').textContent = title;
   $('#chooseLabel').textContent = label;
   $('#chooseOkButton').textContent = okLabel;
   $('#chooseModeLabel').hidden = !modes;
   $('#chooseMode').hidden = !modes;
+  $('#chooseSelect').hidden = multiple;
+  $('#chooseMulti').hidden = !multiple;
   modeSelect.setOptions(modes ?? [], modes?.[0]?.value ?? null);
-  choiceSelect.setOptions(options, options[0]?.value ?? null);
+  if (multiple) choiceChecks.setOptions(options, []);
+  else choiceSelect.setOptions(options, options[0]?.value ?? null);
   dialog.returnValue = '';
   dialog.showModal();
   return new Promise(resolve => {
     dialog.addEventListener('close', () => {
-      if (dialog.returnValue !== 'ok' || choiceSelect.value === '') resolve(null);
-      else resolve(modes ? { value: choiceSelect.value, mode: modeSelect.value } : choiceSelect.value);
+      const value = multiple ? choiceChecks.values : choiceSelect.value;
+      if (dialog.returnValue !== 'ok' || value.length === 0) resolve(null);
+      else resolve(modes ? { value, mode: modeSelect.value } : value);
     }, { once: true });
   });
 }

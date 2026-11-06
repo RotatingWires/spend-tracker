@@ -2,7 +2,8 @@
 
 /*
  * Numbered lists: every entry in one scope (a person, tag, event, merchant, or payment method) with its number there, such as Alex #1, #2,
- * #3. Opened from Manage rows and from the numbers at the top of the transaction editor.
+ * #3. Opened from rows on the People, Payment Methods, Tags, Events, and Merchants tabs and from the numbers at the
+ * top of the transaction editor.
  */
 
 const SCOPE_TITLES = { person: 'Person', tag: 'Tag', event: 'Event', merchant: 'Merchant', method: 'Payment method' };
