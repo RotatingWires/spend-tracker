@@ -65,6 +65,16 @@ function centsToInput(cents) {
   return (cents / 100).toFixed(2);
 }
 
+const amountFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** "1,234.50": an amount box's value, without the dollar sign. parseMoney reads it back. */
+function formatAmount(cents) {
+  return amountFormat.format(cents / 100);
+}
+
+/** Tags are listed as "food · gifts" in the editor and the ledger. */
+const TAG_SEPARATOR = ' · ';
+
 // ---------------------------------------------------------------- dates
 // Dates are "YYYY-MM-DD" keys. Day arithmetic uses UTC day numbers so daylight-saving changes never shift a day.
 

@@ -544,7 +544,7 @@ button.calendar-day:active {
 .calendar-amount { font-weight: 700; font-size: 14px; }
 .calendar-meta { font-size: 12px; color: var(--muted); }
 .calendar-collection {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--collection);
   overflow: hidden;
@@ -624,13 +624,47 @@ button.calendar-day:active {
 .form-grid .inline-select-menu { min-width: 0; }
 .form-grid .retro-select { min-width: 0; }
 .form-grid .full { grid-column: 1 / -1; }
-.share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 4px 8px; align-items: center; margin-top: 6px; }
-.share-gift { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.share-gift input { margin: 0; accent-color: var(--title); }
+.share-rows { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; column-gap: 8px; align-items: center; margin-top: 6px; }
+.share-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 30px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.share-row:first-child { border-top: 1px solid var(--divider); }
+.share-gift { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: default; }
+/* A Win95 check box: a sunken white square holding a check mark. */
+.retro-check {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface);
+  border-top: 1px solid var(--shadow);
+  border-left: 1px solid var(--shadow);
+  border-right: 1px solid var(--light-edge);
+  border-bottom: 1px solid var(--light-edge);
+  box-shadow: inset 1px 1px 0 var(--dark-edge);
+}
+.retro-check:checked::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+  clip-path: polygon(0 40%, 35% 72%, 100% 0, 100% 28%, 35% 100%, 0 68%);
+}
+.retro-check:focus-visible { outline: 1px dotted var(--ink); outline-offset: 2px; }
+.retro-check:disabled { background: var(--surface-alt); }
 #includeGifts { margin: 0; accent-color: var(--title); }
 .share-rows .retro-input { width: 100%; text-align: right; }
 .share-rows .share-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.share-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.share-footer { grid-column: 1 / -1; margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .form-hint { font-size: 12px; color: var(--muted); }
 .form-error { min-height: 18px; margin-top: 8px; }
 .prompt-input { display: block; width: 100%; margin-top: 6px; }

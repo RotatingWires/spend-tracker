@@ -84,7 +84,7 @@ function renderTransactions() {
         formatDate(tx.date),
         whoLabel(tx),
         what,
-        tagIdsOf(tx).map(tagName).join(', '),
+        tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR),
         ...(showCollections ? [collectionIdsOf(tx).map(collectionName).join(', ')] : []),
         ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true }),
         tx.kind === 'Payback' ? { text: '—', num: true } : moneyCell(tx.amountCents, { direction })
@@ -198,6 +198,7 @@ function initializeTransactionEditor() {
   });
   editor.people = createMultiSelect($('#txPeople'), {
     empty: 'Choose people',
+    deferChange: true,
     onChange: () => renderShareRows(),
     onAdd: () => addFromEditor('people', id => {
       editor.people.setOptions(peopleOptions(editor.transaction), [...editor.people.values, id]);
@@ -214,6 +215,7 @@ function initializeTransactionEditor() {
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), {
     empty: 'No tags',
+    summary: names => names.join(TAG_SEPARATOR),
     onAdd: () => addFromEditor('tags', id => {
       const chosen = [...editor.tags.values.map(Number), id];
       editor.tags.setOptions(labelOptions(state.snapshot.tags, chosen), chosen);
@@ -235,6 +237,13 @@ function initializeTransactionEditor() {
   $('#txDeleteButton').addEventListener('click', () => deleteTransaction());
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());
+  $('#txAmount').addEventListener('change', () => formatAmountInput($('#txAmount')));
+}
+
+/** Rewrites a valid amount box as "1,234.50" once the user leaves it; anything unparseable is left for Save to report. */
+function formatAmountInput(input) {
+  const cents = parseMoney(input.value);
+  if (cents != null) input.value = formatAmount(cents);
 }
 
 /** "Add New..." in an editor dropdown: asks for a name, adds the item, reloads the data, and lets choose() pick it. */
@@ -262,7 +271,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   editor.kind.value = tx?.kind ?? defaults.kind ?? 'Purchase';
   $('#transactionDialogTitle').textContent = tx ? `Edit ${KIND_LABELS[tx.kind]} #${tx.id}` : 'New Transaction';
   $('#txDate').value = tx?.date ?? defaults.date ?? todayKey();
-  $('#txAmount').value = tx ? centsToInput(tx.amountCents) : '';
+  $('#txAmount').value = tx ? formatAmount(tx.amountCents) : '';
   editor.merchant.setOptions(merchantOptions(tx?.merchantId ?? null), tx?.merchantId ?? '');
   $('#txDescription').value = tx?.description ?? '';
   $('#txNote').value = tx?.note ?? '';
@@ -280,7 +289,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   editor.method.setOptions(methodOptions(tx?.paymentMethodId), tx?.paymentMethodId ?? lastPurchase?.paymentMethodId);
   editor.tags.setOptions(labelOptions(state.snapshot.tags, tx?.tagIds ?? []), tx?.tagIds ?? []);
   editor.collections.setOptions(labelOptions(state.snapshot.collections, tx?.collectionIds ?? []), tx?.collectionIds ?? []);
-  editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), centsToInput(share.amountCents)]));
+  editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), formatAmount(share.amountCents)]));
   editor.gifts = new Set((tx?.shares ?? []).filter(share => share.gift).map(share => String(share.personId)));
   editor.people.setOptions(peopleOptions(tx), tx?.shares?.length ? tx.shares.map(share => share.personId) : [state.model.self.id]);
   editor.person.setOptions([], null);
@@ -415,19 +424,25 @@ function renderShareRows() {
       amount.dataset.person = String(personId);
       amount.value = editor.shareInputs.get(String(personId)) ?? '';
       amount.addEventListener('input', () => updateShareTotal());
+      amount.addEventListener('change', () => formatAmountInput(amount));
     }
     const gift = document.createElement('label');
     gift.className = 'share-gift';
     if (personId !== state.model.self.id) {
       const box = document.createElement('input');
       box.type = 'checkbox';
+      box.className = 'retro-check';
       box.id = `txGift${personId}`;
       box.dataset.gift = String(personId);
       box.checked = editor.gifts.has(String(personId));
       gift.title = `A gift: ${personName(personId)} does not owe this back, so it stays off their balance.`;
       gift.append(box, 'Gift');
     }
-    container.append(name, amount, gift);
+    // Each person is a row with a divider under it, like TaskList's task rows.
+    const row = document.createElement('div');
+    row.className = 'share-row';
+    row.append(name, amount, gift);
+    container.append(row);
   }
   if (!split) return;
 
@@ -468,7 +483,7 @@ function splitEvenly() {
   }
   const inputs = shareInputs();
   evenShares(amount, inputs.map(input => input.dataset.person))
-    .forEach((share, index) => { inputs[index].value = centsToInput(share.amountCents); });
+    .forEach((share, index) => { inputs[index].value = formatAmount(share.amountCents); });
   $('#txError').textContent = '';
   updateShareTotal();
 }

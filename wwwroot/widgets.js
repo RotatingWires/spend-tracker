@@ -117,8 +117,10 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
 /**
  * A Win95 dropdown of check items, like the TaskList Stats list filter. The menu stays open while items are
  * toggled. Options are [{ value, label }]; the button summarizes the selection, by default as a list of labels.
+ * With deferChange, onChange runs once when the menu closes instead of on every toggle, so a dialog that rebuilds
+ * itself from the choice does not change size under the pointer.
  */
-function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null } = {}) {
+function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -141,6 +143,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
 
   let options = [];
   let selected = new Set();
+  let changed = false;
 
   function render() {
     const names = options.filter(option => selected.has(option.value)).map(option => option.label);
@@ -157,7 +160,8 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
           else selected.add(option.value);
           render();
           menu.querySelectorAll('button')[options.indexOf(option)]?.focus();
-          onChange(values());
+          if (deferChange) changed = true;
+          else onChange(values());
         }
       });
       return item;
@@ -172,10 +176,19 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
     toggleMenu(button, menu);
   });
   menu.addEventListener('click', event => event.stopPropagation());
+  // Menus close from many places (closeMenus, Escape, clicks elsewhere), so watch the menu itself.
+  if (deferChange) {
+    new MutationObserver(() => {
+      if (!menu.hidden || !changed) return;
+      changed = false;
+      onChange(values());
+    }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+  }
 
   return {
     get values() { return values(); },
     setOptions(nextOptions, chosen = values()) {
+      changed = false;
       options = nextOptions.map(option => ({ value: String(option.value), label: String(option.label) }));
       selected = new Set(chosen.map(String).filter(value => options.some(option => option.value === value)));
       render();

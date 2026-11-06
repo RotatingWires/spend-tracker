@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v0.10.1 Manual
+# SpendTracker v0.11.0 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -126,7 +126,7 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
-**Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts as bought for them (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
+**Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts in their shares (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
 
 **Refunds** never have their own tags; they count under the tags and merchant of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*. Each refund is for one person's share of the purchase: picked automatically when the purchase was for one person, and chosen by you when it was split, so a refund on a friend's share reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
 
@@ -207,7 +207,7 @@ Every action first asks for confirmation, listing up to 12 selected entries and 
 
 ### Calendar
 
-One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Select a day to list its entries, edit one, or add a new entry on that date.
+One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Select a day to list its entries with their **Amount** and **Net Spent** (as in the ledger, a payback shows — there), edit one, or add a new entry with **Add to This Day**.
 
 ### Stats
 
@@ -215,7 +215,7 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 ### People
 
-An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (bought for them − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
+An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
 
 ### Payment Methods, Tags, Collections, and Merchants
 
@@ -466,6 +466,15 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v0.11.0
+
+- The editor's **Amount** and split boxes are formatted as `1,234.50` when you leave them.
+- **For who** lists each person on a row with a divider, like TaskList's task rows, and waits until its dropdown closes before adding or removing rows, so the editor no longer changes size while you check people.
+- **Gift** uses a Windows 95 check box.
+- Tags are separated by a dot (`food · gifts`) in the editor, the ledger, and History.
+- People: **Bought for Them** is now **Their Shares**.
+- Calendar: the day dialog has its own **Net Spent** column like the ledger, **Add on This Day** is now **Add to This Day**, and collection names on days are a little larger.
 
 ### v0.10.1
 

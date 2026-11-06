@@ -18,7 +18,7 @@ const TRANSACTION_FIELDS = [
   ['merchant', 'Merchant', value => value || '—'],
   ['description', 'What', value => value || '—'],
   ['note', 'Note', value => value || '—'],
-  ['tagIds', 'Tags', value => (value.length ? value.map(tagName).join(', ') : '—')],
+  ['tagIds', 'Tags', value => (value.length ? value.map(tagName).join(TAG_SEPARATOR) : '—')],
   ['collectionIds', 'Collections', value => (value?.length ? value.map(collectionName).join(', ') : '—')],
   ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
 ];

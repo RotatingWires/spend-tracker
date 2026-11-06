@@ -124,7 +124,10 @@ function renderDayDialog() {
   $('#dayDialogCollections').textContent = collections.length ? `Collections: ${collections.join(', ')}` : '';
   $('#dayDialogCollections').hidden = collections.length === 0;
 
-  renderTable($('#dayTable'), [{ label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true }],
+  renderTable($('#dayTable'), [
+    { label: 'ID' }, { label: 'Type' }, { label: 'What' }, { label: 'For Who' }, { label: 'Method' }, { label: 'Amount', num: true },
+    { label: 'Net Spent', num: true, title: 'What each entry adds to net spent: purchases add, refunds subtract, and paybacks do not change it.' }
+  ],
     rows.map(tx => {
       const direction = tx.kind === 'Purchase' ? 'out' : tx.kind === 'Refund' ? 'refund' : 'in';
       return {
@@ -132,12 +135,16 @@ function renderDayDialog() {
           $('#dayDialog').close();
           openTransactionEditor(tx);
         },
-        cells: [`#${tx.id}`, KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', whoLabel(tx), methodName(tx.paymentMethodId), moneyCell(tx.amountCents, { direction })]
+        cells: [
+          `#${tx.id}`, KIND_LABELS[tx.kind], describeTransaction(tx) || '(no description)', whoLabel(tx), methodName(tx.paymentMethodId),
+          moneyCell(tx.amountCents, { direction }),
+          tx.kind === 'Payback' ? { text: '—', num: true } : moneyCell(tx.amountCents, { direction })
+        ]
       };
     }),
     {
       empty: 'No entries on this day.',
-      footer: rows.length ? { cells: ['', '', 'Net spent', '', '', { text: formatMoney(totals.net), num: true }] } : null
+      footer: rows.length ? { cells: ['Totals', '', '', '', '', '', { text: formatMoney(totals.net), num: true }] } : null
     });
 }
 

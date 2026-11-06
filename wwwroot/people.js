@@ -62,11 +62,11 @@ function renderPeople() {
     { label: 'ID', title: 'Permanent ID, never reused.' },
     { label: 'Person' },
     { label: 'Purchases', num: true },
-    { label: 'Bought for Them', num: true, title: 'Their shares of purchases, gifts included. For you, your own shares.' },
-    { label: 'Gifts', num: true, title: 'Shares marked as gifts: bought for them but not owed back.' },
+    { label: 'Their Shares', num: true, title: 'Their shares of purchases, gifts included. For you, your own shares.' },
+    { label: 'Gifts', num: true, title: 'Shares marked as gifts: not owed back.' },
     { label: 'Refunded', num: true, title: 'Refunds on purchases made for this person.' },
     { label: 'Paid Back', num: true },
-    { label: 'Balance', num: true, title: 'Bought for them, minus refunds on those purchases, minus everything they paid back. Gifts and refunds on them are left out unless Include gifts is checked.' },
+    { label: 'Balance', num: true, title: 'Their shares, minus refunds on those purchases, minus everything they paid back. Gifts and refunds on them are left out unless Include gifts is checked.' },
     { label: 'Last Payback' },
     { label: '' }
   ], rows);
@@ -84,7 +84,7 @@ function renderPersonDialog() {
   const ledger = personLedger(personId);
   $('#personDialogTitle').textContent = personName(personId);
   renderMetrics($('#personSummary'), [
-    ['Bought for them', formatMoney(ledger.fronted)],
+    ['Their shares', formatMoney(ledger.fronted)],
     ['Gifts', formatMoney(ledger.gifted)],
     ['Refunded', formatMoney(ledger.refunded)],
     ['Paid back', formatMoney(ledger.paidBack)],
