@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.4 Manual
+# SpendTracker v1.2.5 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -157,7 +157,7 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 
 ### Merchants
 
-Merchants are managed like tags and people (the Merchants tab has a search box beside its Add box that narrows the list by name when you press **Search**): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
+Merchants are managed like tags and people (the Merchants tab has a search box at the right of its Add row that narrows the list by name when you press **Search**): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
 
 ### Collections
 
@@ -170,6 +170,8 @@ Payment methods, people, tags, collections, and merchants can be **archived** on
 Payment methods, people, and merchants that are used by transactions cannot be deleted; archive them instead. Unused items can be deleted. Deleting a tag removes it from every transaction that had it; the transactions themselves are kept and History records how many were affected.
 
 ## Using the app
+
+**Sorting tables.** Select any column heading to sort its table by that column: once for ascending, again for descending, and a third time for the table's own order (▲ or ▼ marks the sorted column). Money, counts, IDs, and dates sort by value and text alphabetically; empty cells and — go last either way. The ledger sorts every entry in the time frame before drawing its first 200 rows, so a sorted column is sorted all the way down. A table keeps its sort until the page reloads. A heading's definition shows when you hover over it, or on a touch screen when you touch and hold it.
 
 ### Transactions
 
@@ -528,6 +530,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.5
+
+- Select a column heading to sort any table by it (ascending, descending, then the table's own order). The ledger sorts every entry in the time frame, not just the 200 drawn.
+- On a touch screen, touch and hold a heading to see its definition; a tap sorts.
+- The Merchants search box sits at the far right of its row.
 
 ### v1.2.4
 

@@ -54,7 +54,7 @@ function renderPeople() {
         formatMoney(ledger.gifted),
         formatMoney(ledger.refunded),
         formatMoney(ledger.paidBack),
-        person.isSelf ? { text: '—', num: true } : { text: outstandingText(ledger.outstanding), num: true, className: ledger.outstanding > 0 ? '' : 'money-in' },
+        person.isSelf ? { text: '—', num: true } : { text: outstandingText(ledger.outstanding), sort: ledger.outstanding, num: true, className: ledger.outstanding > 0 ? '' : 'money-in' },
         ledger.lastPayback ? formatDate(ledger.lastPayback) : '—',
         manageButtons('people', person, ledger.entries.length)
       ]

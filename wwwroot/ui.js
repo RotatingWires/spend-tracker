@@ -298,17 +298,48 @@ function initializeTooltips() {
   popup.className = 'help-tooltip';
   popup.hidden = true;
   document.body.append(popup);
-  document.addEventListener('click', event => {
-    const target = event.target.closest?.('.has-tooltip[title]');
-    if (!target) {
-      popup.hidden = true;
-      return;
-    }
+  const show = target => {
     popup.textContent = target.getAttribute('title');
     popup.hidden = false;
     const rect = target.getBoundingClientRect();
     popup.style.left = `${Math.max(8, Math.min(window.innerWidth - popup.offsetWidth - 8, rect.left))}px`;
     popup.style.top = `${rect.bottom + 8 + popup.offsetHeight > window.innerHeight ? rect.top - popup.offsetHeight - 8 : rect.bottom + 8}px`;
+  };
+  // A sortable heading sorts when tapped, so its definition shows on a touch-and-hold instead; the tap that ends the
+  // hold does not also sort.
+  let holdTimer = null;
+  let holdStart = null;
+  let heldHeading = false;
+  document.addEventListener('pointerdown', event => {
+    const heading = event.pointerType === 'touch' ? event.target.closest?.('th.sortable[title]') : null;
+    clearTimeout(holdTimer);
+    if (!heading) return;
+    holdStart = { x: event.clientX, y: event.clientY };
+    holdTimer = setTimeout(() => {
+      heldHeading = true;
+      show(heading);
+    }, 500);
+  });
+  document.addEventListener('pointermove', event => {
+    if (holdStart && Math.hypot(event.clientX - holdStart.x, event.clientY - holdStart.y) > 10) clearTimeout(holdTimer);
+  });
+  for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, () => clearTimeout(holdTimer));
+  document.addEventListener('contextmenu', event => {
+    if (event.target.closest?.('th.sortable[title]')) event.preventDefault();
+  });
+  document.addEventListener('click', event => {
+    if (heldHeading) {
+      heldHeading = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    const target = event.target.closest?.('.has-tooltip[title]');
+    if (!target) {
+      popup.hidden = true;
+      return;
+    }
+    show(target);
   }, true);
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') popup.hidden = true;

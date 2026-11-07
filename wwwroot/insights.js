@@ -281,7 +281,7 @@ function renderBalancesOverTime(stats) {
       const highest = row.balances.reduce((best, value, index) => (!best || value > best.value ? { value, month: months[index] } : best), null);
       return {
         onClick: () => openPersonDialog(row.person.id),
-        cells: [row.person.name, outstandingText(row.start), outstandingText(end), signedMoney(end - row.start), highest && highest.value > 0 ? `${formatMoney(highest.value)} (${formatMonth(highest.month)})` : '—']
+        cells: [row.person.name, { text: outstandingText(row.start), sort: row.start }, { text: outstandingText(end), sort: end }, signedMoney(end - row.start), highest && highest.value > 0 ? `${formatMoney(highest.value)} (${formatMonth(highest.month)})` : '—']
       };
     }),
     { empty: 'Nobody else owed you anything in this period.' });

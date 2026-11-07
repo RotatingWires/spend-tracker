@@ -31,23 +31,27 @@ function renderTransactions() {
   const rows = timeFrameTransactions({ listed: true }).filter(tx => !query || matchesSearch(tx, query)).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
-  const shown = rows.slice(0, ledgerLimit);
-  visibleLedgerIds = shown.map(tx => tx.id);
-  pruneSelection();
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
   // Only the methods used in the time frame get a column; with nothing listed, the active ones stand in.
   const methods = state.snapshot.paymentMethods.filter(method => (rows.length ? usedMethodIds.has(method.id) : !method.archived));
 
   const columns = [
-    { label: 'ID', title: 'The permanent ID of each entry. Search #12 to find entry #12.' },
-    { label: 'When' },
-    { label: 'For Who' },
-    { label: 'What' },
-    { label: 'Tags' },
-    ...(showCollections ? [{ label: 'Collections' }] : []),
-    ...methods.map(method => ({ label: method.name, num: true })),
-    { label: 'Net Spent', num: true, title: 'What each entry adds to net spent: purchases add, refunds subtract, and paybacks do not change it.' }
+    { label: 'ID', title: 'The permanent ID of each entry. Search #12 to find entry #12.', sortValue: tx => tx.id },
+    { label: 'When', sortValue: tx => Number(tx.date.replace(/-/g, '')) },
+    { label: 'For Who', sortValue: tx => whoLabel(tx).toLowerCase() || null },
+    { label: 'What', sortValue: tx => describeTransaction(tx).toLowerCase() || null },
+    { label: 'Tags', sortValue: tx => tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR).toLowerCase() || null },
+    ...(showCollections ? [{ label: 'Collections', sortValue: tx => collectionIdsOf(tx).map(collectionName).join(', ').toLowerCase() || null }] : []),
+    ...methods.map(method => ({ label: method.name, num: true, sortValue: tx => (tx.paymentMethodId === method.id ? netEffect(tx) ?? tx.amountCents : null) })),
+    { label: 'Net Spent', num: true, title: 'What each entry adds to net spent: purchases add, refunds subtract, and paybacks do not change it.', sortValue: netEffect }
   ];
+
+  // The ledger sorts every listed entry before drawing the first 200, so a sorted column is sorted all the way down.
+  const sort = tableSorts.get('transactionsTable');
+  const ordered = sort && columns[sort.index]?.sortValue ? sortByValue(rows, columns[sort.index].sortValue, sort.direction) : rows;
+  const shown = ordered.slice(0, ledgerLimit);
+  visibleLedgerIds = shown.map(tx => tx.id);
+  pruneSelection();
 
   const tableRows = shown.map(tx => {
     const what = document.createElement('span');
@@ -111,7 +115,7 @@ function renderTransactions() {
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
     : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches “${query}”. Search with an empty box to list them all.`
       : rows.length === 0 ? `Every ${query ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
-  renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
+  renderTable($('#transactionsTable'), columns, tableRows, { empty, footer, onSort: () => renderTransactions() });
   const more = rows.length - shown.length;
   $('#ledgerMore').hidden = more === 0;
   $('#ledgerMoreText').textContent = `Showing ${numberFormat.format(shown.length)} of ${plural(rows.length, 'entry', 'entries')}.`;
@@ -141,6 +145,11 @@ function tagList(tagIds) {
     list.append(tag);
   });
   return list;
+}
+
+/** What one entry adds to net spent: a purchase its amount, a refund minus its amount, a payback nothing (null). */
+function netEffect(tx) {
+  return tx.kind === 'Purchase' ? tx.amountCents : tx.kind === 'Refund' ? -tx.amountCents : null;
 }
 
 /** Purchases minus refunds; paybacks do not change net spent. */

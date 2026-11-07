@@ -236,25 +236,101 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
   };
 }
 
+// ---------------------------------------------------------------- sortable tables
+/*
+ * Every table sorts by a column when its heading is selected: ascending, then descending, then back to its own order.
+ * Money, numbers, dates, and IDs sort by value, other text alphabetically, and empty cells or "—" go last either way.
+ * A table keeps its choice until the page reloads. A cell can give its own value as { sort } (a balance whose text says
+ * "overpaid", say). A caller that draws only part of its rows (the ledger) sorts them itself: it passes onSort and
+ * gives its columns sortValue.
+ */
+const tableSorts = new Map();
+
+/** A comparable value for a cell's text: a number (money, counts, #IDs, dates as YYYYMMDD), text, or null. */
+function sortValueOf(raw) {
+  if (raw == null || typeof raw === 'number') return raw ?? null;
+  const text = String(raw).trim();
+  if (!text || text === '—') return null;
+  const date = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(text);
+  if (date) return Number(`${date[3]}${date[1]}${date[2]}`);
+  const number = /^([+−-])?\$?(\d[\d,]*(?:\.\d+)?)/.exec(text.replace(/^#/, ''));
+  if (number) return (number[1] === '−' || number[1] === '-' ? -1 : 1) * Number(number[2].replace(/,/g, ''));
+  return text.toLowerCase();
+}
+
+function cellSortValue(cell) {
+  if (cell instanceof Node) return sortValueOf(cell.textContent);
+  if (cell && typeof cell === 'object') {
+    if ('sort' in cell) return cell.sort;
+    const content = cell.content ?? cell.text;
+    return sortValueOf(content instanceof Node ? content.textContent : content);
+  }
+  return sortValueOf(cell);
+}
+
+/** A sorted copy (stable, so ties keep their order); numbers come before text, and nulls last in both directions. */
+function sortByValue(items, valueOf, direction) {
+  const keyed = items.map((item, index) => ({ item, index, value: valueOf(item) }));
+  keyed.sort((a, b) => {
+    if (a.value == null || b.value == null) return (a.value == null) - (b.value == null) || a.index - b.index;
+    const kindA = typeof a.value === 'number' ? 0 : 1;
+    const kindB = typeof b.value === 'number' ? 0 : 1;
+    const order = kindA - kindB || (kindA === 0 ? a.value - b.value : String(a.value).localeCompare(String(b.value), undefined, { numeric: true }));
+    return order * direction || a.index - b.index;
+  });
+  return keyed.map(entry => entry.item);
+}
+
+/** Ascending, then descending, then none, for a heading that was selected. */
+function cycleTableSort(key, index) {
+  const current = tableSorts.get(key);
+  if (!current || current.index !== index) tableSorts.set(key, { index, direction: 1 });
+  else if (current.direction === 1) tableSorts.set(key, { index, direction: -1 });
+  else tableSorts.delete(key);
+}
+
 /**
- * Renders a table. columns: [{ label, num, title }].
+ * Renders a table. columns: [{ label, num, title, sortValue, unsortable }].
  * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), onDoubleClick(event), className, id, selected }].
  * onDoubleClick opens on a double click (or Enter) instead, for rows a stray click should not open.
  */
-function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer = null } = {}) {
+function renderTable(table, columns, rows, options = {}) {
+  const { empty = 'Nothing here yet.', footer = null, onSort = null } = options;
+  const sortKey = table.id;
+  const sort = tableSorts.get(sortKey);
+  if (sort && !columns[sort.index]) tableSorts.delete(sortKey);
+  const drawn = sort && columns[sort.index] && !onSort ? sortByValue(rows, row => cellSortValue(row.cells[sort.index]), sort.direction) : rows;
+
   const head = document.createElement('thead');
   const headRow = document.createElement('tr');
-  for (const column of columns) {
+  columns.forEach((column, index) => {
     const th = document.createElement('th');
     th.scope = 'col';
     th.textContent = column.label;
     if (column.num) th.className = 'num';
-    if (column.title) {
-      th.title = column.title;
+    if (column.title) th.title = column.title;
+    if (column.label && !column.unsortable && rows.length > 1) {
+      th.classList.add('sortable');
+      th.tabIndex = 0;
+      th.setAttribute('aria-sort', sort?.index === index ? (sort.direction === 1 ? 'ascending' : 'descending') : 'none');
+      const resort = () => {
+        cycleTableSort(sortKey, index);
+        if (onSort) onSort();
+        else renderTable(table, columns, rows, options);
+        table.querySelectorAll('th')[index]?.focus();
+      };
+      th.addEventListener('click', resort);
+      th.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          resort();
+        }
+      });
+    } else if (column.title) {
       th.classList.add('has-tooltip');
     }
     headRow.append(th);
-  }
+  });
   head.append(headRow);
 
   const body = document.createElement('tbody');
@@ -267,7 +343,7 @@ function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer
     tr.append(td);
     body.append(tr);
   }
-  for (const row of rows) body.append(tableRow(columns, row));
+  for (const row of drawn) body.append(tableRow(columns, row));
 
   table.replaceChildren(head, body);
   if (footer) {
