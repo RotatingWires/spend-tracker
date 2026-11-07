@@ -318,6 +318,14 @@ function tableRow(columns, row) {
   return tr;
 }
 
+/** A search box and its Search button: the search runs on the button or Enter, never while typing. */
+function bindSearchForm(form, run) {
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    run(form.querySelector('input').value.trim());
+  });
+}
+
 function statCard(label, value, { sub = '', title = '' } = {}) {
   const card = document.createElement('div');
   card.className = 'stat-card';

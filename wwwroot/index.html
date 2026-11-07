@@ -24,7 +24,6 @@
           <div id="fileMenu" class="menu-dropdown" role="menu" hidden>
             <button type="button" id="newTransactionMenuItem" role="menuitem"><span></span><span class="menu-label">New Transaction...</span></button>
             <button type="button" id="refreshButton" role="menuitem"><span></span><span class="menu-label">Refresh</span></button>
-            <button type="button" id="searchMenuItem" role="menuitem"><span></span><span class="menu-label">Search...</span></button>
             <button type="button" id="selectModeButton" role="menuitemcheckbox" aria-checked="false"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Select...</span></button>
             <div class="menu-separator" role="separator"></div>
             <button type="button" id="transferMenuItem" role="menuitem"><span></span><span class="menu-label">Import/Export...</span></button>
@@ -70,6 +69,7 @@
       <div id="errorPanel" class="message-panel error-panel" role="alert" hidden></div>
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
+        <form class="panel-actions search-form" id="ledgerSearchForm" role="search"><input id="ledgerSearch" class="retro-input" type="search" maxlength="200" placeholder="Search entries" aria-label="Search entries in the time frame" autocomplete="off"><button type="submit">Search</button></form>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="ledgerMore" class="ledger-more" hidden><span id="ledgerMoreText"></span><button type="button" id="ledgerMoreButton">Show 200 More</button><button type="button" id="ledgerAllButton">Show All</button></div>
         <div id="archivedNote" class="note" hidden></div>
@@ -202,15 +202,17 @@
       </section>
 
       <section class="tab-panel" data-panel="merchants" role="tabpanel" hidden>
-        <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant" aria-label="New merchant name" required><button type="submit">Add</button></form>
+        <div class="tab-actions">
+          <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant" aria-label="New merchant name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="merchantSearchForm" role="search"><input id="merchantSearch" class="retro-input" type="search" maxlength="120" placeholder="Search merchants" aria-label="Search merchants" autocomplete="off"><button type="submit">Search</button></form>
+        </div>
         <div class="note">Spending per merchant. Add merchants here and choose them in the editor's Merchant dropdown; refunds count under their purchase's merchant. Select a merchant to list its entries.</div>
-        <div class="panel-actions"><input id="merchantSearch" class="retro-input" type="search" placeholder="Search merchants" aria-label="Search merchants" autocomplete="off"></div>
         <div class="table-wrap"><table id="merchantsTable"></table></div>
       </section>
 
       <section class="tab-panel" data-panel="history" role="tabpanel" hidden>
+        <form class="panel-actions search-form" id="historySearchForm" role="search"><input id="historySearch" class="retro-input" type="search" maxlength="200" placeholder="Search history" aria-label="Search history" autocomplete="off"><button type="submit">Search</button></form>
         <div class="note">Every add, edit, delete, and restore, newest first, with the values before and after the change.</div>
-        <div class="panel-actions"><input id="historySearch" class="retro-input" type="search" placeholder="Search history" aria-label="Search history" autocomplete="off"></div>
         <div class="table-wrap"><table id="historyTable"></table></div>
         <div class="panel-actions"><button type="button" id="historyMoreButton" hidden>Load Older</button></div>
       </section>
@@ -308,28 +310,6 @@
     </form>
   </dialog>
 
-  <dialog id="searchDialog" class="retro-dialog wide" aria-labelledby="searchTitle">
-    <form method="dialog" class="dialog-window">
-      <div class="dialog-title" id="searchTitle">Search</div>
-      <div class="dialog-body search-body">
-        <div class="search-tabs" role="tablist" aria-label="Search type">
-          <button type="button" id="keywordSearchTab" class="search-tab" role="tab" aria-selected="true" aria-controls="keywordSearchPanel">Keyword</button><button type="button" id="dateSearchTab" class="search-tab" role="tab" aria-selected="false" aria-controls="dateSearchPanel">Date</button>
-        </div>
-        <section id="keywordSearchPanel" class="search-tab-panel" role="tabpanel" aria-labelledby="keywordSearchTab">
-          <label for="searchKeyword" class="form-label">Keyword</label>
-          <div class="search-inline-row"><input id="searchKeyword" class="retro-input" type="search" autocomplete="off" maxlength="200" placeholder="Merchant, description, note, tag, collection, amount, or #ID"><button type="button" id="searchRunButton">Search</button></div>
-        </section>
-        <section id="dateSearchPanel" class="search-tab-panel" role="tabpanel" aria-labelledby="dateSearchTab" hidden>
-          <label for="searchDates" class="form-label">Date or date range</label>
-          <div class="search-inline-row"><input id="searchDates" class="retro-input" type="text" autocomplete="off" spellcheck="false" maxlength="60" placeholder="9/1/26 - 10/1/26, or one date like 9/14"><button type="button" id="searchDatesButton">Search</button></div>
-        </section>
-        <div id="searchSummary" class="note">Searches every transaction, in any time frame, archived or not.</div>
-        <div class="table-wrap"><table id="searchResults"></table></div>
-      </div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="submit">Close</button></div>
-    </form>
-  </dialog>
-
   <dialog id="chooseDialog" class="retro-dialog" aria-labelledby="chooseTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="chooseTitle">Choose</div>
@@ -414,7 +394,6 @@
   <script src="/manage.js"></script>
   <script src="/bulk.js"></script>
   <script src="/scopes.js"></script>
-  <script src="/search.js"></script>
   <script src="/fresh-start.js"></script>
   <script src="/ui.js"></script>
 </body>

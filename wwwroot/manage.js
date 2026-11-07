@@ -77,5 +77,8 @@ function initializeManage() {
     event.preventDefault();
     addManaged(form.dataset.add, form);
   }));
-  $('#merchantSearch').addEventListener('input', () => renderMerchantsTab());
+  bindSearchForm($('#merchantSearchForm'), query => {
+    state.merchantQuery = query;
+    renderMerchantsTab();
+  });
 }

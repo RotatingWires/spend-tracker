@@ -88,7 +88,6 @@ function renderAll() {
   if ($('#personDialog').open) renderPersonDialog();
   if ($('#dayDialog').open) renderDayDialog();
   if ($('#scopeDialog').open) renderScopeList();
-  if ($('#searchDialog').open) renderSearchResults();
 
   const count = state.model.transactions.length;
   // Messages go on the left and totals on the right, as in TaskList.
@@ -333,7 +332,6 @@ function startApp() {
   initializeHistory();
   initializeManage();
   initializeBulk();
-  initializeSearch();
   initializeRowHover();
   initializeTooltips();
 

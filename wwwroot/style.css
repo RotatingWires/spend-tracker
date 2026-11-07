@@ -214,24 +214,6 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 #chooseDialog, #chooseDialog .dialog-window, #chooseDialog .choose-body { overflow: visible; }
 .choose-body { display: grid; gap: 6px; }
 .choose-body .inline-select-menu, .choose-body .retro-select { width: 100%; }
-/* Search dialog: Keyword and Date tabs with full-width fields, as in TaskList. */
-.search-body { display: grid; gap: 8px; }
-.search-tabs { display: flex; align-items: flex-end; gap: 2px; margin: 0 0 -10px 6px; position: relative; z-index: 1; }
-.search-tab { padding: 5px 16px 6px; }
-.search-tab[aria-selected="true"] { position: relative; top: 2px; padding-top: 7px; padding-bottom: 7px; border-bottom-color: var(--face); z-index: 2; }
-.search-tab-panel {
-  display: grid;
-  gap: 6px;
-  padding: 12px;
-  background: var(--face);
-  border-top: 2px solid var(--light-edge);
-  border-left: 2px solid var(--light-edge);
-  border-right: 2px solid var(--dark-edge);
-  border-bottom: 2px solid var(--dark-edge);
-}
-.search-tab-panel[hidden] { display: none; }
-.search-inline-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
-.search-inline-row .retro-input { width: 100%; box-sizing: border-box; }
 .confirm-detail { max-height: 220px; overflow: auto; margin-top: 8px; padding: 4px 6px; white-space: pre-wrap; background: var(--surface); border: 1px solid var(--shadow); }
 
 .toolbar {
@@ -377,7 +359,10 @@ button:disabled { color: var(--shadow); cursor: default; }
 .panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .panel-actions .retro-input { min-width: 0; flex: 1 1 200px; max-width: 360px; }
 /* Add forms: the name box is exactly as tall as its Add button. */
-form.panel-actions[data-add] { align-items: stretch; }
+form.panel-actions[data-add], form.search-form { align-items: stretch; }
+/* An Add form with a Search form beside it, on one row that wraps on narrow screens. */
+.tab-actions { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 18px; }
+.tab-actions > .panel-actions { flex: 1 1 280px; max-width: 460px; }
 
 .stat-grid {
   display: grid;

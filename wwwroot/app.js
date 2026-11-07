@@ -15,6 +15,9 @@ const state = {
   // Bars or lines for charts over time, remembered in this browser.
   chartStyle: readSetting('spend-tracker-chart-style') === 'lines' ? 'lines' : 'bars',
   heat: { measure: 'net', year: null, rows: 'tags' },
+  // Searches applied with a Search button (or Enter), not while typing; empty means none.
+  ledgerQuery: '',
+  merchantQuery: '',
   compare: { a: null, b: null },
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
   includeGifts: readSetting('spend-tracker-include-gifts') === 'true',

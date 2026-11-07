@@ -243,37 +243,25 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
         expect(page.locator("#transactionsTable tbody tr", has_text="Venmo").locator("td").last).to_have_text("—")
 
-        # File → Search..., as in TaskList, looks anywhere in merchant, description, note, tags, collections, and amount,
-        # but not type, method, or people.
-        page.click("#fileMenuButton")
-        page.click("#searchMenuItem")
-        rows = page.locator("#searchResults tbody tr:not(.empty-row)")
+        # The ledger's search box looks anywhere in merchant, description, note, tags, collections, and amount, but not
+        # type, method, or people, among the entries in the time frame. It runs on Search or Enter, not while typing.
+        rows = page.locator("#transactionsTable tbody tr:not(.empty-row)")
         for query, expected in (("h", 0), ("inn", 2), ("DINER dinner", 2), ("enm", 1), ("12.17", 1), ("$40", 2), ("foo", 1),
                                 ("cash", 0), ("purchase", 0), ("alex", 0), ("zzz", 0)):
-            page.fill("#searchKeyword", query)
-            page.click("#searchRunButton")
+            page.fill("#ledgerSearch", query)
+            page.click("#ledgerSearchForm button")
             expect(rows).to_have_count(expected)
-        page.fill("#searchKeyword", "inn")
+        expect(page.locator("#transactionsTable tbody")).to_contain_text("matches “zzz”")
+        page.fill("#ledgerSearch", "inn")
         page.wait_for_timeout(200)
         expect(rows).to_have_count(0)  # still showing the last search ("zzz") until Search or Enter
         page.keyboard.press("Enter")
         expect(rows).to_have_count(2)
-        expect(page.locator("#searchDialog")).to_be_visible()  # Enter searches; it does not close the dialog
-        # The Date tab finds entries by date or date range, as in TaskList.
-        page.click("#dateSearchTab")
-        today = date.today()
-        page.fill("#searchDates", f"{today.month}/{today.day}/{today.year % 100:02d}")
+        expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$0.00")  # Diner $40 and its $40 refund
+        page.fill("#ledgerSearch", "")
         page.keyboard.press("Enter")
         expect(rows).to_have_count(4)
-        page.fill("#searchDates", f"1/1/20 - {today.month}/{today.day}/{today.year}")
-        page.click("#searchDatesButton")
-        expect(rows).to_have_count(4)
-        page.fill("#searchDates", "2/30")
-        page.keyboard.press("Enter")
-        expect(page.locator("#searchSummary")).to_contain_text("Enter dates as month/day")
-        self.shot(page, "search-dates")
-        page.click("#keywordSearchTab")
-        page.locator("#searchDialog button", has_text="Close").click()
+        expect(page.locator("#fileMenu")).not_to_contain_text("Search")  # File → Search... is gone
 
         # Invalid input shows the server's message and keeps the dialog open.
         page.click("#newTransactionButton")
@@ -671,13 +659,11 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#bulkControls")).to_be_hidden()
         expect(page.locator("#transactionsTable .selection-check")).to_have_count(0)
 
-        # The editor shows per-scope numbers, and searching #ID finds that entry.
-        page.click("#fileMenuButton")
-        page.click("#searchMenuItem")
-        page.fill("#searchKeyword", f"#{first['id']}")
+        # The editor shows per-scope numbers, and searching the ledger for #ID finds that entry.
+        page.fill("#ledgerSearch", f"#{first['id']}")
         page.keyboard.press("Enter")
-        expect(page.locator("#searchResults tbody tr")).to_have_count(1)
-        page.locator("#searchResults tbody tr").first.click()
+        expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
+        page.locator("#transactionsTable tbody tr").first.dblclick()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
 
         # Each number opens that scope's numbered list; rows on each item's tab open the same list.
@@ -686,6 +672,8 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hardware")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
+        page.fill("#ledgerSearch", "")
+        page.keyboard.press("Enter")
         # A person's row opens their dialog, which numbers their entries the same way.
         page.click('.tabs [data-tab="people"]')
         page.locator("#peopleTable tbody tr", has_text="Riley").click()
@@ -768,16 +756,29 @@ class BrowserTests(unittest.TestCase):
         page.click("#fileMenuButton")
         page.click("#refreshButton")
         page.click('.tabs [data-tab="merchants"]')
+        # The search box sits on the Add form's row, and only searches on Search or Enter.
+        add_box = page.locator('form[data-add="merchants"]').bounding_box()
+        search_box = page.locator("#merchantSearchForm").bounding_box()
+        self.assertEqual(round(add_box["y"]), round(search_box["y"]))
+        self.assertGreater(search_box["x"], add_box["x"] + add_box["width"])
+        all_merchants = page.locator("#merchantsTable tbody tr").count()
         page.fill("#merchantSearch", "zebra")
+        page.wait_for_timeout(200)
+        expect(page.locator("#merchantsTable tbody tr")).to_have_count(all_merchants)
+        page.click("#merchantSearchForm button")
         expect(page.locator("#merchantsTable tbody tr")).to_have_count(1)
         expect(page.locator("#merchantsTable tbody tr")).to_contain_text("Zebra Mart")
         page.fill("#merchantSearch", "")
+        page.keyboard.press("Enter")
+        expect(page.locator("#merchantsTable tbody tr")).to_have_count(all_merchants)
         page.click('.tabs [data-tab="history"]')
         page.fill("#historySearch", "yak shop")
+        page.keyboard.press("Enter")
         expect(page.locator("#historyTable tbody tr")).to_have_count(1)
         expect(page.locator("#historyTable tbody tr")).to_contain_text("Yak Shop")
         page.fill("#historySearch", "no such change anywhere")
-        expect(page.locator("#historyTable tbody tr")).to_contain_text("No change matches this search.")
+        page.click("#historySearchForm button")
+        expect(page.locator("#historyTable tbody tr")).to_contain_text("No change matches “no such change anywhere”.")
 
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})

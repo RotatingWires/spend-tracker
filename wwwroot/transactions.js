@@ -26,8 +26,9 @@ function monthTotals(transactions) {
 
 function renderTransactions() {
   const monthRows = timeFrameTransactions();
-  // Newest first: the highest ID on top, as in TaskList.
-  const rows = timeFrameTransactions({ listed: true }).sort((a, b) => b.id - a.id);
+  // Newest first: the highest ID on top, as in TaskList. A search keeps only the entries it matches.
+  const query = state.ledgerQuery;
+  const rows = timeFrameTransactions({ listed: true }).filter(tx => !query || matchesSearch(tx, query)).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
   const shown = rows.slice(0, ledgerLimit);
@@ -104,10 +105,12 @@ function renderTransactions() {
     ]
   };
 
-  const hidden = monthRows.length - rows.length;
+  const matching = query ? monthRows.filter(tx => matchesSearch(tx, query)) : monthRows;
+  const hidden = matching.length - rows.length;
   const empty = monthRows.length === 0
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
-    : rows.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
+    : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches “${query}”. Search with an empty box to list them all.`
+      : rows.length === 0 ? `Every ${query ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
   const more = rows.length - shown.length;
   $('#ledgerMore').hidden = more === 0;
@@ -263,6 +266,11 @@ function initializeTransactionEditor() {
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());
   $('#txAmount').addEventListener('change', () => formatAmountInput($('#txAmount')));
+  bindSearchForm($('#ledgerSearchForm'), query => {
+    state.ledgerQuery = query;
+    ledgerLimit = LEDGER_PAGE;
+    renderTransactions();
+  });
 }
 
 /** Rewrites a valid amount box as "1,234.50" once the user leaves it; anything unparseable is left for Save to report. */
