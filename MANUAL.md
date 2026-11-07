@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.0 Manual
+# SpendTracker v1.2.1 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -319,6 +319,7 @@ Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show
 - The app downloads all of your data once, when it opens. After that, saving, deleting, archiving, bulk actions, and adding, renaming, or archiving a payment method, person, tag, merchant, or collection merge the server's answer into the data already in the browser instead of downloading everything again. Deleting one of those items, Fresh Start, Restore, and **File → Refresh** load everything again, since they can change many entries at once. With 5,000 entries, a save redraws in about 5 ms instead of about 55 ms.
 - Stats and its charts (`charts.js`, `stats.js`, `heatmaps.js`, `insights.js`, `counts.js`) load the first time the Stats tab opens, so starting up reads only what the ledger needs.
 - The ledger draws 200 rows at a time (about 4 ms instead of about 75 ms for 5,000 rows).
+- The server compresses its responses with Brotli or gzip. With 2,000 entries the data download is 139 KB instead of 938 KB, and scripts and styles shrink about threefold. (Only plain HTTP is compressed, ASP.NET's default; behind an HTTPS reverse proxy, let the proxy compress.)
 
 ## Data and backups
 
@@ -527,6 +528,11 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.1
+
+- The server compresses its responses (Brotli or gzip): with 2,000 entries the data download is 139 KB instead of 938 KB.
+- Removed an unused screenshot from the repository and leftover styles for the old toolbar search box.
 
 ### v1.2.0
 
