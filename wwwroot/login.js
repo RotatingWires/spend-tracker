@@ -15,7 +15,7 @@ function applyReleaseLabel(version) {
   if (!version) return;
   document.title = `SpendTracker v${version} Login`;
   const label = document.querySelector('.title-left');
-  if (label) label.textContent = `SpendTracker v${version}`;
+  if (label) label.replaceChildren('SpendTracker', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${version}` }));
 }
 
 async function frontendReleaseVersion(fallback = '') {

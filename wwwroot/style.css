@@ -910,3 +910,8 @@ textarea:focus-visible,
   .tabs button { padding-left: 8px; padding-right: 8px; }
   .inline-select-menu, .retro-select { min-width: 0; }
 }
+
+/* Phones leave the version out of the title bar, where it would be cut off; the About box still shows it. */
+@media (max-width: 650px) {
+  .title-version { display: none; }
+}

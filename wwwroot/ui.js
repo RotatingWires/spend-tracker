@@ -189,7 +189,8 @@ function menuSeparator() {
 function applyReleaseLabel(version) {
   if (!version) return;
   document.title = `SpendTracker v${version}`;
-  $('.title-left').textContent = `SpendTracker v${version}`;
+  // The version is its own span so phones can hide it from the title bar.
+  $('.title-left').replaceChildren('SpendTracker', Object.assign(document.createElement('span'), { className: 'title-version', textContent: ` v${version}` }));
   $('#aboutVersion').textContent = `SpendTracker v${version}`;
 }
 
