@@ -233,9 +233,9 @@ button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1
 .toolbar-separator { width: 2px; height: 24px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--light-edge); margin: 0 3px; }
 .icon-button { min-width: 30px; padding: 4px 7px; }
 /* The month arrows match the Time frame dropdown between them exactly, in every browser. */
-#monthControls .icon-button, #monthControls .retro-select { box-sizing: border-box; height: 30px; }
+#monthControls .icon-button, #monthControls .retro-select, #ledgerFilterControls .retro-select { box-sizing: border-box; height: 30px; }
 /* No extra black edge on the dropdown, so it and its ◀ / ▶ buttons have the same bevel and bottom line. */
-#monthControls .retro-select { box-shadow: none; }
+#monthControls .retro-select, #ledgerFilterControls .retro-select { box-shadow: none; }
 #monthControls .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0; }
 
 /* ---------- controls ---------- */
