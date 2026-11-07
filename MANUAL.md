@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.6 Manual
+# SpendTracker v1.2.7 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -183,7 +183,7 @@ The **search box** above the ledger, with its **Search** button (or Enter, or le
 
 Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
-In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it.
+In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown with more than ten choices (merchants, tags, people, months, filters) starts with a search box that narrows the list as you type; Enter picks the first match in a one-choice list. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it.
 
 - **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
 - **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person, with **Split Evenly** and a running total; Save refuses shares that do not add up to the amount.
@@ -233,7 +233,7 @@ Stats has six sub-tabs, like TaskList Stats' tabs; the one you were last on is r
 
 ### People
 
-An **Add** form, then one row per person, you first (*(you)*, with no balance): purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
+An **Add** form, then one row per person, you first (*(you)*, with no balance) and then everyone by name, as in every list of people: purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
 
 ### Payment Methods, Tags, Collections, and Merchants
 
@@ -532,6 +532,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.7
+
+- Every dialog puts **Cancel** first and the confirming button (OK, Save, Reset selected data) on the right, as in TaskList and NewsReview; Enter still confirms.
+- Dropdowns with more than ten choices, such as Merchant and Tags, have a search box at the top.
+- People are listed by name after Me, in dropdowns, dialogs, and the People tab.
 
 ### v1.2.6
 

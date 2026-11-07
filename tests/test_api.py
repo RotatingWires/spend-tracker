@@ -541,6 +541,13 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual(first["id"], 1)
         self.assertEqual({n["scope"]: n["number"] for n in first["numbers"]}["person"], 1)
 
+    def test_people_are_listed_me_first_then_by_name(self):
+        for name in ("Zed", "adam", "Maya"):
+            self.api.post("/api/people", {"name": name})
+        names = [p["name"] for p in self.api.get("/api/snapshot")["people"]]
+        self.assertEqual(names[0], "Me")
+        self.assertEqual(names[1:], sorted(names[1:], key=str.lower))
+
     def test_history_search(self):
         self.purchase(merchant="Walmart", description="groceries")
         self.purchase(merchant="Gas Station", description="snacks")

@@ -300,7 +300,7 @@ sealed class Store
     static List<Person> ReadPeople(SqliteConnection connection, SqliteTransaction? transaction)
     {
         var people = new List<Person>();
-        using var command = Sql(connection, transaction, "SELECT id, name, is_self, archived, created_at FROM people ORDER BY is_self DESC, id;");
+        using var command = Sql(connection, transaction, "SELECT id, name, is_self, archived, created_at FROM people ORDER BY is_self DESC, name COLLATE NOCASE, id;");
         using var reader = command.ExecuteReader();
         while (reader.Read())
             people.Add(new Person(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2) != 0, reader.GetInt64(3) != 0, reader.GetString(4)));

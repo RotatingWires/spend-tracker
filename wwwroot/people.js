@@ -43,7 +43,8 @@ function outstandingText(cents) {
 function renderPeople() {
   const rows = state.snapshot.people
     .map(person => ({ person, ledger: personLedger(person.id) }))
-    .sort((a, b) => b.person.isSelf - a.person.isSelf || b.ledger.outstanding - a.ledger.outstanding || a.person.name.localeCompare(b.person.name))
+    // Me first, then A–Z, like the dropdowns; the Balance heading sorts by balance.
+    .sort((a, b) => b.person.isSelf - a.person.isSelf || a.person.name.localeCompare(b.person.name, undefined, { sensitivity: 'base' }))
     .map(({ person, ledger }) => ({
       onClick: () => openPersonDialog(person.id),
       cells: [

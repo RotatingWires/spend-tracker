@@ -633,10 +633,12 @@ class BrowserTests(unittest.TestCase):
         # The bulk dialogs can add a new item ("Add New..."), which is then checked.
         page.click("#bulkActions .split-arrow")
         page.locator("#bulkActions .split-dropdown button", has_text="Tags...").click()
+        expect(page.locator("#chooseDialog .dialog-buttons button")).to_have_text(["Cancel", "OK"])
         page.click("#chooseMulti .retro-select")
         page.locator("#chooseMulti .menu-dropdown button", has_text="Add New...").click()
+        expect(page.locator("#promptDialog .dialog-buttons button")).to_have_text(["Cancel", "Save"])
         page.fill("#promptInput", "errands")
-        page.keyboard.press("Enter")
+        page.keyboard.press("Enter")  # Enter saves, though Cancel comes first
         expect(page.locator("#chooseMulti .retro-select")).to_have_text("errands▼")
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
@@ -828,8 +830,28 @@ class BrowserTests(unittest.TestCase):
         # Merchants and History have search boxes.
         api.post("/api/merchants", {"name": "Zebra Mart"})
         api.post("/api/merchants", {"name": "Yak Shop"})
+        for index in range(12):
+            api.post("/api/merchants", {"name": f"Filler {index:02d}"})
         page.click("#fileMenuButton")
         page.click("#refreshButton")
+
+        # A long dropdown starts with a filter box: typing narrows it, and Enter picks the first match.
+        page.click("#newTransactionButton")
+        page.click("#txMerchant .retro-select")
+        expect(page.locator("#txMerchant .menu-search input")).to_be_focused()
+        page.keyboard.type("zeb")
+        expect(page.locator("#txMerchant .menu-list button")).to_have_text(["Zebra Mart", "Add New..."])
+        page.keyboard.press("Enter")
+        expect(page.locator("#txMerchant .retro-select")).to_have_text("Zebra Mart▼")
+        expect(page.locator("#transactionDialog")).to_be_visible()  # Enter picked the merchant; it did not save
+        # Dialogs put Cancel first and the confirming button on the right.
+        expect(page.locator("#transactionDialog .dialog-buttons button").last).to_have_text("Save")
+        page.click("#txCancelButton")
+        page.click("#fileMenuButton")
+        page.click("#freshStartMenuItem")
+        expect(page.locator("#freshStartDialog .fresh-start-actions button")).to_have_text(["Cancel", "Reset selected data"])
+        page.locator("#freshStartDialog .fresh-start-actions button", has_text="Cancel").click()
+        expect(page.locator("#freshStartDialog")).not_to_be_visible()
         page.click('.tabs [data-tab="merchants"]')
         # The search box sits on the Add form's row, and only searches on Search or Enter.
         add_box = page.locator('form[data-add="merchants"]').bounding_box()

@@ -2,6 +2,15 @@
 
 /* Reusable Win95-style widgets: menus, single-select dropdowns, tables, stat cards, and modal prompts. */
 
+/*
+ * Every dialog puts Cancel first and the confirming button last, on the right, as in TaskList and NewsReview. Cancel
+ * is a plain button marked data-close-dialog, so the confirming button stays the form's default and Enter confirms.
+ */
+document.addEventListener('click', event => {
+  const cancel = event.target.closest?.('[data-close-dialog]');
+  if (cancel) cancel.closest('dialog')?.close(cancel.value || 'cancel');
+});
+
 function closeMenus() {
   $$('.menu-dropdown').forEach(menu => { menu.hidden = true; });
   $$('[aria-haspopup="menu"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
@@ -84,6 +93,47 @@ function addNewItem(menu, onAdd) {
   menu.append(item);
 }
 
+/*
+ * A dropdown with more than ten choices (merchants, tags, people, months, ...) starts with a filter box: typing
+ * narrows the list as you go, ignoring case. It clears each time the dropdown opens and takes focus there, except on
+ * touch screens, where focusing would open the keyboard over the list.
+ */
+const MENU_SEARCH_OVER = 10;
+
+function menuSearch(menu, render) {
+  const box = document.createElement('div');
+  box.className = 'menu-search';
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.className = 'retro-input';
+  input.placeholder = 'Search';
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', 'Search this list');
+  box.append(input);
+  const list = document.createElement('div');
+  list.className = 'menu-list';
+  menu.replaceChildren(box, list);
+  box.addEventListener('click', event => event.stopPropagation());
+  input.addEventListener('input', () => render());
+  const query = () => input.value.trim().toLowerCase();
+  return {
+    list,
+    input,
+    query,
+    matches: text => !query() || text.toLowerCase().includes(query()),
+    show(count) {
+      box.hidden = count <= MENU_SEARCH_OVER;
+      if (box.hidden) input.value = '';
+    },
+    opened() {
+      if (box.hidden) return;
+      input.value = '';
+      render();
+      if (!window.matchMedia('(pointer: coarse)').matches) input.focus();
+    }
+  };
+}
+
 function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
@@ -107,12 +157,20 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = 
 
   let options = [];
   let current = '';
+  const search = menuSearch(menu, () => render());
+  // Enter in the filter box picks the first match.
+  search.input.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    search.list.querySelector('[role="menuitemradio"]')?.click();
+  });
 
   function render() {
     const selected = options.find(option => option.value === current);
     label.textContent = selected?.label ?? '—';
     button.disabled = options.length === 0 && !(onAdd && canAdd());
-    menu.replaceChildren(...options.map(option => menuButton(option.label, {
+    search.show(options.length);
+    search.list.replaceChildren(...options.filter(option => search.matches(option.label)).map(option => menuButton(option.label, {
       role: 'menuitemradio',
       checked: option.value === current,
       onClick: event => {
@@ -125,12 +183,13 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = 
         onChange(current);
       }
     })));
-    if (canAdd()) addNewItem(menu, onAdd);
+    if (canAdd()) addNewItem(search.list, onAdd);
   }
 
   button.addEventListener('click', event => {
     event.stopPropagation();
     toggleMenu(button, menu);
+    if (!menu.hidden) search.opened();
   });
 
   return {
@@ -178,6 +237,10 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
   let selected = new Set();
   let changed = false;
   const expanded = new Set();
+  const search = menuSearch(menu, () => render());
+  search.input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') event.preventDefault();
+  });
 
   function groupHeading(group) {
     const inGroup = options.filter(option => groupOf(option.value) === group);
@@ -186,7 +249,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
     heading.type = 'button';
     heading.className = 'menu-group';
     heading.setAttribute('role', 'menuitem');
-    heading.setAttribute('aria-expanded', String(expanded.has(group)));
+    heading.setAttribute('aria-expanded', String(expanded.has(group) || Boolean(search.query())));
     heading.dataset.group = group;
     const arrow = document.createElement('span');
     arrow.className = 'menu-group-arrow';
@@ -210,13 +273,16 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
     label.textContent = names.length ? summary(names) : empty;
     button.title = label.textContent;
     button.disabled = options.length === 0 && !(onAdd && canAdd());
+    search.show(options.length);
+    // While filtering, every group with a match shows its matches, open or not.
+    const shown = options.filter(option => search.matches(option.label));
     const items = [];
     let lastGroup = null;
-    for (const option of options) {
+    for (const option of shown) {
       const group = groupOf ? groupOf(option.value) : null;
       if (group != null && group !== lastGroup) items.push(groupHeading(group));
       lastGroup = group;
-      if (group != null && !expanded.has(group)) continue;
+      if (group != null && !expanded.has(group) && !search.query()) continue;
       const item = menuButton(option.label, {
         role: 'menuitemcheckbox',
         checked: selected.has(option.value),
@@ -234,8 +300,8 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
       if (group != null) item.classList.add('menu-grouped');
       items.push(item);
     }
-    menu.replaceChildren(...items);
-    if (canAdd()) addNewItem(menu, onAdd);
+    search.list.replaceChildren(...items);
+    if (canAdd()) addNewItem(search.list, onAdd);
   }
 
   const values = () => options.filter(option => selected.has(option.value)).map(option => option.value);
@@ -243,6 +309,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
   button.addEventListener('click', event => {
     event.stopPropagation();
     toggleMenu(button, menu);
+    if (!menu.hidden) search.opened();
   });
   menu.addEventListener('click', event => event.stopPropagation());
   // Menus close from many places (closeMenus, Escape, clicks elsewhere), so watch the menu itself.
@@ -535,12 +602,6 @@ function promptText(title, label, value = '', { maxLength = 60 } = {}) {
   input.maxLength = maxLength;
   input.value = value;
   dialog.returnValue = '';
-  // Enter saves: Cancel comes first in the button row, so the form's default submit would cancel.
-  input.onkeydown = event => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    dialog.close('ok');
-  };
   dialog.showModal();
   input.select();
   return new Promise(resolve => {

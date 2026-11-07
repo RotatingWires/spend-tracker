@@ -258,7 +258,8 @@ function applyListItem(path, item) {
     const right = b.name.toLowerCase();
     return left < right ? -1 : left > right ? 1 : a.id - b.id;
   };
-  list.sort(path === 'people' ? (a, b) => b.isSelf - a.isSelf || a.id - b.id : path === 'payment-methods' ? (a, b) => a.id - b.id : byName);
+  // Me first, then everyone by name, like tags and merchants; payment methods keep their order.
+  list.sort(path === 'people' ? (a, b) => b.isSelf - a.isSelf || byName(a, b) : path === 'payment-methods' ? (a, b) => a.id - b.id : byName);
   state.snapshot[key] = list;
   // Entries carry their merchant's name too.
   if (path === 'merchants') for (const tx of state.snapshot.transactions) if (tx.merchantId === item.id) tx.merchant = item.name;

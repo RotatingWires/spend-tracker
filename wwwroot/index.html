@@ -310,7 +310,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="confirmTitle">Confirm</div>
       <div class="dialog-body"><p id="confirmMessage"></p><div id="confirmDetail" class="confirm-detail" hidden></div></div>
-      <div class="dialog-buttons"><button type="submit" value="ok" id="confirmOkButton">OK</button><button type="submit" value="cancel" id="confirmCancelButton">Cancel</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" id="confirmCancelButton" data-close-dialog>Cancel</button><button type="submit" value="ok" id="confirmOkButton">OK</button></div>
     </form>
   </dialog>
 
@@ -318,7 +318,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="chooseTitle">Choose</div>
       <div class="dialog-body choose-body"><span class="form-label" id="chooseModeLabel" hidden>Change</span><div id="chooseMode" aria-labelledby="chooseModeLabel" hidden></div><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div><div id="chooseMulti" aria-labelledby="chooseLabel" hidden></div></div>
-      <div class="dialog-buttons"><button type="submit" value="ok" id="chooseOkButton">OK</button><button type="submit" value="cancel">Cancel</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="submit" value="ok" id="chooseOkButton">OK</button></div>
     </form>
   </dialog>
 
@@ -326,7 +326,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="promptTitle">Rename</div>
       <div class="dialog-body"><label for="promptInput" id="promptLabel">Name</label><input id="promptInput" class="retro-input prompt-input" type="text" maxlength="60"></div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="submit" value="cancel">Cancel</button><button type="submit" value="ok">Save</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="submit" value="ok">Save</button></div>
     </form>
   </dialog>
 
@@ -362,7 +362,7 @@
         <label class="fresh-start-confirm">Type RESET SELECTED to confirm<input id="freshStartConfirmation" class="retro-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"></label>
         <p id="freshStartError" class="fresh-start-error" role="alert" aria-live="polite"></p>
       </div>
-      <div class="fresh-start-actions"><button type="button" id="freshStartButton" class="danger">Reset selected data</button><button type="submit" value="cancel">Cancel</button></div>
+      <div class="fresh-start-actions"><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="button" id="freshStartButton" class="danger">Reset selected data</button></div>
     </form>
   </dialog>
 
