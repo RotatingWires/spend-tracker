@@ -59,8 +59,13 @@ function renderCollectionsTab() {
 }
 
 function renderMerchantsTab() {
-  renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', state.snapshot.merchants, merchantIdsOf,
-    { label: 'Merchant', empty: 'No merchants yet. Add one above, then choose it in the editor.' });
+  // The search box narrows the list by name, ignoring case.
+  const query = $('#merchantSearch').value.trim().toLowerCase();
+  const merchants = query ? state.snapshot.merchants.filter(merchant => merchant.name.toLowerCase().includes(query)) : state.snapshot.merchants;
+  renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', merchants, merchantIdsOf, {
+    label: 'Merchant',
+    empty: query ? `No merchant matches “${$('#merchantSearch').value.trim()}”.` : 'No merchants yet. Add one above, then choose it in the editor.'
+  });
 }
 
 function showCollectionStats(collection) {

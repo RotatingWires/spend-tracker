@@ -485,7 +485,7 @@ class BrowserTests(unittest.TestCase):
         heading.click()
         expect(page.locator("#timeFrameSelect .menu-dropdown button", has_text="January 2024")).to_have_attribute("aria-checked", "true")
         page.keyboard.press("Escape")
-        expect(page.locator("#timeFrameSelect .retro-select")).to_have_text("February 2024, January 2024▼")
+        expect(page.locator("#timeFrameSelect .retro-select")).to_have_text("2 months▼")  # several months show as a count
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(3)
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$1,200.00")  # $600 + $700 − $100 refund
         expect(page.locator("#transactionsTable tbody tr", has_text="Hotel").first).to_contain_text("Beach trip")
@@ -747,7 +747,12 @@ class BrowserTests(unittest.TestCase):
         page.click("#txSaveButton")
         expect(rows.first).to_contain_text("local update")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$212.00")
+        # A single click does not open an entry; a double click does.
         rows.first.click()
+        page.wait_for_timeout(300)
+        expect(page.locator("#transactionDialog")).not_to_be_visible()
+        rows.first.dblclick()
+        expect(page.locator("#transactionDialog")).to_be_visible()
         page.click("#txDeleteButton")
         page.click("#confirmOkButton")
         expect(page.locator("#transactionsTable")).not_to_contain_text("local update")
@@ -756,6 +761,23 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="stats"]')
         expect(page.locator("#statsTotals .stat-card")).to_have_count(10)
         self.assertEqual(page.evaluate("typeof renderStats"), "function")
+
+        # Merchants and History have search boxes.
+        api.post("/api/merchants", {"name": "Zebra Mart"})
+        api.post("/api/merchants", {"name": "Yak Shop"})
+        page.click("#fileMenuButton")
+        page.click("#refreshButton")
+        page.click('.tabs [data-tab="merchants"]')
+        page.fill("#merchantSearch", "zebra")
+        expect(page.locator("#merchantsTable tbody tr")).to_have_count(1)
+        expect(page.locator("#merchantsTable tbody tr")).to_contain_text("Zebra Mart")
+        page.fill("#merchantSearch", "")
+        page.click('.tabs [data-tab="history"]')
+        page.fill("#historySearch", "yak shop")
+        expect(page.locator("#historyTable tbody tr")).to_have_count(1)
+        expect(page.locator("#historyTable tbody tr")).to_contain_text("Yak Shop")
+        page.fill("#historySearch", "no such change anywhere")
+        expect(page.locator("#historyTable tbody tr")).to_contain_text("No change matches this search.")
 
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})

@@ -238,7 +238,8 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
 
 /**
  * Renders a table. columns: [{ label, num, title }].
- * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), className, id, selected }].
+ * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), onDoubleClick(event), className, id, selected }].
+ * onDoubleClick opens on a double click (or Enter) instead, for rows a stray click should not open.
  */
 function renderTable(table, columns, rows, { empty = 'Nothing here yet.', footer = null } = {}) {
   const head = document.createElement('thead');
@@ -292,16 +293,25 @@ function tableRow(columns, row) {
     else td.textContent = String(content);
     tr.append(td);
   });
-  if (row.onClick) {
+  if (row.onClick || row.onDoubleClick) {
     tr.classList.add('clickable');
     tr.tabIndex = 0;
-    tr.addEventListener('click', event => {
-      if (!event.target.closest('button')) row.onClick(event);
-    });
+    if (row.onClick) {
+      tr.addEventListener('click', event => {
+        if (!event.target.closest('button')) row.onClick(event);
+      });
+    }
+    if (row.onDoubleClick) {
+      tr.addEventListener('dblclick', event => {
+        if (event.target.closest('button, input')) return;
+        window.getSelection()?.removeAllRanges(); // a double click selects a word; opening the editor should not
+        row.onDoubleClick(event);
+      });
+    }
     tr.addEventListener('keydown', event => {
       if ((event.key === 'Enter' || event.key === ' ') && event.target === tr && !event.repeat) {
         event.preventDefault();
-        row.onClick(event);
+        (row.onClick ?? row.onDoubleClick)(event);
       }
     });
   }

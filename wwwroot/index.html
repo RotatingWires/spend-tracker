@@ -204,11 +204,13 @@
       <section class="tab-panel" data-panel="merchants" role="tabpanel" hidden>
         <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant" aria-label="New merchant name" required><button type="submit">Add</button></form>
         <div class="note">Spending per merchant. Add merchants here and choose them in the editor's Merchant dropdown; refunds count under their purchase's merchant. Select a merchant to list its entries.</div>
+        <div class="panel-actions"><input id="merchantSearch" class="retro-input" type="search" placeholder="Search merchants" aria-label="Search merchants" autocomplete="off"></div>
         <div class="table-wrap"><table id="merchantsTable"></table></div>
       </section>
 
       <section class="tab-panel" data-panel="history" role="tabpanel" hidden>
         <div class="note">Every add, edit, delete, and restore, newest first, with the values before and after the change.</div>
+        <div class="panel-actions"><input id="historySearch" class="retro-input" type="search" placeholder="Search history" aria-label="Search history" autocomplete="off"></div>
         <div class="table-wrap"><table id="historyTable"></table></div>
         <div class="panel-actions"><button type="button" id="historyMoreButton" hidden>Load Older</button></div>
       </section>
@@ -368,10 +370,11 @@
           <label><input type="checkbox" class="retro-check" data-fresh-start="archivedEntries"> <span><strong>Archived entries</strong> <span data-fresh-count="archivedEntries"></span><br>Archived entries still count in totals and balances, so those change. An archived purchase stays while an active refund or payback links to it.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="allEntries"> <span><strong>Every entry</strong> <span data-fresh-count="allEntries"></span><br>All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay unless you also clear unused labels.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="unusedLabels"> <span><strong>Unused labels</strong> <span data-fresh-count="unusedLabels"></span><br>Merchants, tags, collections, people, and payment methods no remaining entry uses. Me and one active payment method always stay.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="allLabels"> <span><strong>Every label, used ones too</strong> <span data-fresh-count="allLabels"></span><br>All merchants, tags, collections, people but Me, and payment methods, so IDs and entry numbers start again at 1 and the payment methods are back to Cash, Credit Card, and Debit Card. Only together with every entry.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="history" checked> <span><strong>Change history</strong> <span data-fresh-count="history"></span><br>Every saved add, edit, delete, and restore on the History tab, with its before and after values.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="recoveryBackups" checked> <span><strong>Pre-restore recovery backups</strong> <span data-fresh-count="recoveryBackups"></span><br>ZIPs the server saved in data/backups before each restore.</span></label>
         </fieldset>
-        <p class="fresh-start-note">Removed entries and labels are recorded as Deleted on the History tab, like a normal delete, unless history is cleared too. Entry numbers are never reused. Your password and browser preferences are kept. <span id="freshStartSize"></span></p>
+        <p class="fresh-start-note">Removed entries and labels are recorded as Deleted on the History tab, like a normal delete, unless history is cleared too. Entry numbers and IDs are never reused, unless every label is cleared too. Your password and browser preferences are kept. <span id="freshStartSize"></span></p>
         <label class="fresh-start-confirm">Type RESET SELECTED to confirm<input id="freshStartConfirmation" class="retro-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"></label>
         <p id="freshStartError" class="fresh-start-error" role="alert" aria-live="polite"></p>
       </div>

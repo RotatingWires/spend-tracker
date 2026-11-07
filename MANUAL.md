@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.2 Manual
+# SpendTracker v1.2.3 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -158,7 +158,7 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 
 ### Merchants
 
-Merchants are managed like tags and people: add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
+Merchants are managed like tags and people (the Merchants tab has a search box that narrows the list by name): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
 
 ### Collections
 
@@ -174,11 +174,11 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. The dropdown names a single month and shows several as a count, such as *3 months*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
 **File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
-Select a row (click, or focus it and press Enter) to edit it. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
 
@@ -238,7 +238,7 @@ Four tabs with the same layout: an **Add** form, then one row per payment method
 
 ### History
 
-Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. History is stored in the database and included in backups. **File → Fresh Start...** can clear it; see [Fresh Start](#fresh-start).
+Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. The search box finds changes anywhere in history whose action, type, ID, or before and after values contain the text (ignoring case), such as a merchant name, description, or amount in cents. History is stored in the database and included in backups. **File → Fresh Start...** can clear it; see [Fresh Start](#fresh-start).
 
 ### Menus
 
@@ -369,6 +369,7 @@ Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0
 | Archived entries | Archived purchases, refunds, and paybacks. Archived entries still count in totals and balances, so those change. An archived purchase stays while an active (unarchived) refund or payback still links to it; the dialog says how many stay for that reason. |
 | Every entry | All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay. |
 | Unused labels | Merchants, tags, collections, people, and payment methods that no remaining entry uses. Me always stays, and so does one active payment method (the oldest one) when no active method is in use. |
+| Every label, used ones too | Only together with **Every entry** (ticking it ticks that too). All merchants, tags, collections, people but Me, and payment methods. IDs and per-scope entry numbers then start again at 1, and the payment methods are back to a new database's Cash, Credit Card, and Debit Card. |
 | Change history | Every entry on the History tab. |
 | Pre-restore recovery backups | The `before-restore-*.zip` files in `data/backups/`. |
 
@@ -528,6 +529,14 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.3
+
+- The Time frame dropdown shows several months as a count (*3 months*) instead of listing them.
+- Merchants and History have search boxes; History searches every recorded change on the server.
+- **Fresh Start** can clear every label, used ones too (together with every entry), so IDs and entry numbers start again at 1.
+- Ledger rows open on a double click (or Enter) instead of a single click.
+- The ledger table uses separate borders, so its pinned Totals row sits flush at the bottom in more browsers.
 
 ### v1.2.2
 

@@ -28,6 +28,7 @@ async function openFreshStart() {
       archivedEntries: plural(summary.archivedEntries, 'entry', 'entries') + (kept ? `; ${kept} kept because an active entry links to them` : ''),
       allEntries: plural(summary.entries, 'entry', 'entries'),
       unusedLabels: plural(summary.unusedLabels, 'label'),
+      allLabels: plural(summary.allLabels, 'label'),
       history: plural(summary.historyEntries, 'change'),
       recoveryBackups: `${plural(summary.recoveryBackups, 'file')}, ${formatBytes(summary.recoveryBackupBytes)}`
     };
@@ -72,6 +73,14 @@ async function runFreshStart() {
     button.disabled = false;
   }
 }
+
+// Clearing every label needs every entry gone too, since entries use labels; the two boxes keep each other in step.
+$('[data-fresh-start="allLabels"]').addEventListener('change', event => {
+  if (event.target.checked) $('[data-fresh-start="allEntries"]').checked = true;
+});
+$('[data-fresh-start="allEntries"]').addEventListener('change', event => {
+  if (!event.target.checked) $('[data-fresh-start="allLabels"]').checked = false;
+});
 
 $('#freshStartMenuItem').addEventListener('click', openFreshStart);
 $('#freshStartButton').addEventListener('click', runFreshStart);

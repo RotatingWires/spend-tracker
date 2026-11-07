@@ -77,4 +77,5 @@ function initializeManage() {
     event.preventDefault();
     addManaged(form.dataset.add, form);
   }));
+  $('#merchantSearch').addEventListener('input', () => renderMerchantsTab());
 }

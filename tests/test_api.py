@@ -520,6 +520,34 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertGreaterEqual(sum(entry["action"] == "Deleted" for entry in self.history()), 10)
         self.purchase(method=snapshot["paymentMethods"][0]["id"], merchant="New start")
 
+    def test_fresh_start_every_label_starts_ids_over(self):
+        tag = self.api.post("/api/tags", {"name": "food"})["id"]
+        self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 2000)], method=self.debit, tagIds=[tag], merchant="Store")
+        self.assertEqual(self.api.get("/api/fresh-start")["allLabels"], 6)  # food, Store, Alex, and the three payment methods
+        # Used labels can only go with the entries that use them.
+        self.assertRejected(lambda: self.fresh_start(allLabels=True), 400, contains="every entry")
+
+        result = self.fresh_start(allEntries=True, allLabels=True)
+        self.assertEqual((result["removedEntries"], result["removedLabels"]), (1, 6))
+        snapshot = self.api.get("/api/snapshot")
+        self.assertEqual([p["name"] for p in snapshot["people"]], ["Me"])
+        self.assertEqual([(m["id"], m["name"]) for m in snapshot["paymentMethods"]], [(1, "Cash"), (2, "Credit Card"), (3, "Debit Card")])
+        # IDs and per-scope numbers start again at 1.
+        self.assertEqual(self.api.post("/api/tags", {"name": "groceries"})["id"], 1)
+        self.assertEqual(self.api.post("/api/merchants", {"name": "Market"})["id"], 1)
+        friend = self.api.post("/api/people", {"name": "Sam"})["id"]
+        self.assertEqual(friend, self.me + 1)
+        first = self.purchase(amount=500, method=1, person=friend)
+        self.assertEqual(first["id"], 1)
+        self.assertEqual({n["scope"]: n["number"] for n in first["numbers"]}["person"], 1)
+
+    def test_history_search(self):
+        self.purchase(merchant="Walmart", description="groceries")
+        self.purchase(merchant="Gas Station", description="snacks")
+        found = self.api.get("/api/history?query=walmart")["entries"]
+        self.assertTrue(found and all("Walmart" in json.dumps(entry) for entry in found))
+        self.assertEqual(self.api.get("/api/history?query=nothing%25like_this")["entries"], [])
+
     def test_fresh_start_clears_history_and_recovery_backups_and_frees_space(self):
         for index in range(60):
             self.purchase(amount=100 + index, merchant=f"Shop {index % 5}", note="n" * 1500)

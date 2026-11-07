@@ -277,11 +277,11 @@ sealed class Store
         ReadLabels(connection, transaction, Collections),
         ReadTransactions(connection, transaction, null));
 
-    public HistoryPage ReadHistory(long? beforeId, int limit)
+    public HistoryPage ReadHistory(long? beforeId, int limit, string? query = null)
     {
         limit = Math.Clamp(limit, 1, 500);
         using var connection = Open();
-        var entries = ReadHistoryEntries(connection, null, beforeId, limit + 1);
+        var entries = ReadHistoryEntries(connection, null, beforeId, limit + 1, query);
         var hasMore = entries.Count > limit;
         if (hasMore) entries.RemoveAt(entries.Count - 1);
         return new HistoryPage(entries, hasMore);
@@ -415,16 +415,20 @@ sealed class Store
         return links;
     }
 
-    static List<HistoryEntry> ReadHistoryEntries(SqliteConnection connection, SqliteTransaction? transaction, long? beforeId, int? limit)
+    /// <summary>With query, only changes whose action, type, ID, or before/after values contain it (ignoring case).</summary>
+    static List<HistoryEntry> ReadHistoryEntries(SqliteConnection connection, SqliteTransaction? transaction, long? beforeId, int? limit, string? query = null)
     {
         var entries = new List<HistoryEntry>();
+        var pattern = string.IsNullOrWhiteSpace(query) ? null
+            : "%" + query.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
         using var command = Sql(connection, transaction, """
             SELECT id, at, action, entity, entity_id, before_json, after_json
             FROM history
-            WHERE $beforeId IS NULL OR id < $beforeId
+            WHERE ($beforeId IS NULL OR id < $beforeId)
+              AND ($pattern IS NULL OR (action || ' ' || entity || ' #' || IFNULL(entity_id, '') || ' ' || IFNULL(before_json, '') || ' ' || IFNULL(after_json, '')) LIKE $pattern ESCAPE '\')
             ORDER BY id DESC
             LIMIT $limit;
-            """, ("$beforeId", beforeId), ("$limit", limit ?? -1));
+            """, ("$beforeId", beforeId), ("$limit", limit ?? -1), ("$pattern", pattern));
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
@@ -1167,7 +1171,7 @@ sealed class Store
     // ---------------------------------------------------------------- fresh start
 
     /// <summary>Fresh start options handled in the database; recovery backups are files, so Program.cs removes those.</summary>
-    public static readonly string[] FreshStartOptions = ["archivedEntries", "allEntries", "unusedLabels", "history"];
+    public static readonly string[] FreshStartOptions = ["archivedEntries", "allEntries", "unusedLabels", "allLabels", "history"];
 
     // Archived entries go unless an active refund or payback still points at them, which would leave it linked to nothing.
     const string DeletableArchivedEntries = """
@@ -1205,11 +1209,13 @@ sealed class Store
         long Count(string sql) => Convert.ToInt64(Scalar(connection, transaction, sql), CultureInfo.InvariantCulture);
         var labels = UnusedLabels.Sum(label => Count($"SELECT COUNT(*) FROM {label.Table} WHERE {label.Unused};"))
             + Count($"SELECT COUNT(*) FROM ({UnusedPaymentMethods});");
+        var allLabels = Count("SELECT (SELECT COUNT(*) FROM tags) + (SELECT COUNT(*) FROM collections) + (SELECT COUNT(*) FROM merchants) + (SELECT COUNT(*) FROM people WHERE is_self = 0) + (SELECT COUNT(*) FROM payment_methods);");
         return new FreshStartSummary(
             Count($"SELECT COUNT(*) FROM ({DeletableArchivedEntries});"),
             Count("SELECT COUNT(*) FROM transactions WHERE archived = 1;"),
             Count("SELECT COUNT(*) FROM transactions;"),
             labels,
+            allLabels,
             Count("SELECT COUNT(*) FROM history;"));
     }
 
@@ -1220,6 +1226,8 @@ sealed class Store
     public FreshStartResult FreshStart(IReadOnlyDictionary<string, bool> selections)
     {
         bool Selected(string key) => selections.TryGetValue(key, out var selected) && selected;
+        if (Selected("allLabels") && !Selected("allEntries"))
+            throw RequestException.Invalid("Every label can only be cleared together with every entry, since entries use them.");
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         var recordHistory = !Selected("history");
@@ -1247,7 +1255,35 @@ sealed class Store
             removedEntries = ids.Count;
         }
 
-        if (Selected("unusedLabels"))
+        if (Selected("allLabels"))
+        {
+            // Every entry is gone too, so nothing uses a label any more: all of them go, numbering starts over, and the
+            // next IDs are 1 again. The default payment methods come back as in a new database; Me stays.
+            foreach (var (table, entity, scope, _) in UnusedLabels)
+            {
+                var all = table switch
+                {
+                    "merchants" => ReadMerchants(connection, transaction).Select(m => ((object)m, m.Id)),
+                    "people" => ReadPeople(connection, transaction).Select(p => ((object)p, p.Id)),
+                    _ => ReadLabels(connection, transaction, table == "tags" ? Tags : Collections).Select(l => ((object)l, l.Id)),
+                };
+                removedLabels += RemoveLabels(connection, transaction, table, entity, scope,
+                    table == "people" ? "SELECT id FROM people WHERE is_self = 0" : $"SELECT id FROM {table}", all, recordHistory);
+            }
+            removedLabels += RemoveLabels(connection, transaction, "payment_methods", "PaymentMethod", "method", "SELECT id FROM payment_methods",
+                ReadPaymentMethods(connection, transaction).Select(m => ((object)m, m.Id)), recordHistory);
+            Execute(connection, transaction, """
+                DELETE FROM scope_numbers;
+                DELETE FROM scope_counters;
+                DELETE FROM sqlite_sequence WHERE name IN ('payment_methods', 'tags', 'collections', 'merchants', 'transactions');
+                UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM people) WHERE name = 'people';
+                INSERT INTO payment_methods (name, created_at) VALUES ('Cash', $now), ('Credit Card', $now), ('Debit Card', $now);
+                """, ("$now", Now()));
+            if (recordHistory)
+                foreach (var method in ReadPaymentMethods(connection, transaction))
+                    RecordHistory(connection, transaction, "Created", "PaymentMethod", method.Id, null, method);
+        }
+        else if (Selected("unusedLabels"))
         {
             foreach (var (table, entity, scope, unused) in UnusedLabels)
             {
@@ -1402,7 +1438,7 @@ record TransactionRequest(string? Kind, string? Date, long? AmountCents, long? P
 record ShareRequest(long? PersonId, long? AmountCents, bool? Gift = null);
 record TransactionValues(string Kind, string Date, long AmountCents, long PaymentMethodId, long? PersonId, long? LinkedId,
     long? MerchantId, string Merchant, string Description, string Note, bool Archived, List<long> TagIds, List<long> CollectionIds, List<Share> Shares);
-record FreshStartSummary(long ArchivedEntries, long AllArchivedEntries, long Entries, long UnusedLabels, long HistoryEntries);
+record FreshStartSummary(long ArchivedEntries, long AllArchivedEntries, long Entries, long UnusedLabels, long AllLabels, long HistoryEntries);
 record FreshStartResult(long RemovedEntries, long KeptArchivedEntries, long RemovedLabels, long RemovedHistory);
 record NameRequest(string? Name);
 record UpdateNameRequest(string? Name, bool? Archived);

@@ -75,7 +75,9 @@ function renderTransactions() {
       id: tx.id,
       className: [tx.archived ? 'archived-row' : '', selected ? 'tx-selected' : ''].filter(Boolean).join(' '),
       selected: selectionMode ? selected : undefined,
-      onClick: event => selectionMode ? toggleSelection(tx.id, event.shiftKey) : openTransactionEditor(tx),
+      // A double click opens the editor, so a stray click does not; in selection mode a single click selects.
+      onClick: selectionMode ? event => toggleSelection(tx.id, event.shiftKey) : null,
+      onDoubleClick: selectionMode ? null : () => openTransactionEditor(tx),
       cells: [
         selectionMode ? selectionCell(tx) : `#${tx.id}`,
         formatDate(tx.date),

@@ -228,7 +228,7 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
 var api = app.MapGroup("/api").RequireAuthorization();
 
 api.MapGet("/snapshot", () => Results.Ok(store.ReadSnapshot(appVersion)));
-api.MapGet("/history", (long? beforeId, int? limit) => Results.Ok(store.ReadHistory(beforeId, limit ?? 200)));
+api.MapGet("/history", (long? beforeId, int? limit, string? query) => Results.Ok(store.ReadHistory(beforeId, limit ?? 200, query)));
 
 api.MapPost("/transactions", (TransactionRequest request) =>
 {
@@ -324,7 +324,7 @@ api.MapGet("/fresh-start", () =>
     var backups = RecoveryBackups(dataDir);
     return Results.Ok(new
     {
-        summary.ArchivedEntries, summary.AllArchivedEntries, summary.Entries, summary.UnusedLabels, summary.HistoryEntries,
+        summary.ArchivedEntries, summary.AllArchivedEntries, summary.Entries, summary.UnusedLabels, summary.AllLabels, summary.HistoryEntries,
         RecoveryBackups = backups.Length, RecoveryBackupBytes = backups.Sum(file => file.Length), DatabaseBytes = store.DatabaseBytes()
     });
 });

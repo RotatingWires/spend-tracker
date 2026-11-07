@@ -29,11 +29,16 @@ const SIMPLE_FIELDS = [
 ];
 
 async function loadHistory({ older = false } = {}) {
-  if (historyState.loading) return;
+  // A new search while a page is loading runs again once it arrives, so the list never shows an older search.
+  if (historyState.loading) {
+    if (!older) historyState.reload = true;
+    return;
+  }
   historyState.loading = true;
   try {
     const beforeId = older && historyState.entries.length ? historyState.entries.at(-1).id : null;
-    const query = `?limit=${HISTORY_PAGE_SIZE}${beforeId ? `&beforeId=${beforeId}` : ''}`;
+    const search = $('#historySearch').value.trim();
+    const query = `?limit=${HISTORY_PAGE_SIZE}${beforeId ? `&beforeId=${beforeId}` : ''}${search ? `&query=${encodeURIComponent(search)}` : ''}`;
     const page = await api(`/history${query}`);
     historyState.entries = older ? [...historyState.entries, ...page.entries] : page.entries;
     historyState.hasMore = page.hasMore;
@@ -42,6 +47,10 @@ async function loadHistory({ older = false } = {}) {
     showError(`Could not load history: ${error.message}`);
   } finally {
     historyState.loading = false;
+    if (historyState.reload) {
+      historyState.reload = false;
+      loadHistory();
+    }
   }
 }
 
@@ -79,10 +88,16 @@ function renderHistory() {
     historyState.entries.map(entry => ({
       cells: [formatDateTime(entry.at), entry.action, ENTITY_LABELS[entry.entity] ?? entry.entity, historySubject(entry), historyDetails(entry)]
     })),
-    { empty: 'No changes recorded yet.' });
+    { empty: $('#historySearch').value.trim() ? 'No change matches this search.' : 'No changes recorded yet.' });
   $('#historyMoreButton').hidden = !historyState.hasMore;
 }
 
 function initializeHistory() {
   $('#historyMoreButton').addEventListener('click', () => loadHistory({ older: true }));
+  // The server searches every change (action, type, ID, and the values before and after), a moment after typing stops.
+  let searchTimer;
+  $('#historySearch').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadHistory(), 250);
+  });
 }
