@@ -211,6 +211,60 @@ function buildModel(snapshot) {
   return { methods, people, tags, merchants, collections, byId, self, linked, transactions: snapshot.transactions };
 }
 
+// ---------------------------------------------------------------- local updates
+/*
+ * After a save, the server's answer is merged into the snapshot already in the browser instead of downloading every
+ * entry again: a saved entry comes back whole (with its numbers), and saving one entry never changes another. Changes
+ * that can touch many entries at once (deleting a list item, Fresh Start, Restore) and File → Refresh still load the
+ * whole snapshot.
+ */
+const SNAPSHOT_LISTS = { 'payment-methods': 'paymentMethods', people: 'people', tags: 'tags', merchants: 'merchants', collections: 'collections' };
+
+/** The server's order: by date, then ID. */
+function compareTransactions(a, b) {
+  return a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id;
+}
+
+/** Replaces saved entries (or adds new ones) in date order and drops deleted ones, then redraws. */
+function applyTransactionChanges({ saved = [], deleted = [] }) {
+  const replaced = new Set([...deleted, ...saved.map(tx => tx.id)]);
+  const list = state.snapshot.transactions.filter(tx => !replaced.has(tx.id));
+  for (const tx of saved) {
+    let low = 0;
+    let high = list.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (compareTransactions(list[middle], tx) < 0) low = middle + 1;
+      else high = middle;
+    }
+    list.splice(low, 0, tx);
+  }
+  state.snapshot.transactions = list;
+  refreshModel();
+}
+
+/** Adds or replaces one payment method, person, tag, merchant, or collection, in the server's order. */
+function applyListItem(path, item) {
+  const key = SNAPSHOT_LISTS[path];
+  const list = state.snapshot[key].filter(entry => entry.id !== item.id);
+  list.push(item);
+  const byName = (a, b) => {
+    const left = a.name.toLowerCase();
+    const right = b.name.toLowerCase();
+    return left < right ? -1 : left > right ? 1 : a.id - b.id;
+  };
+  list.sort(path === 'people' ? (a, b) => b.isSelf - a.isSelf || a.id - b.id : path === 'payment-methods' ? (a, b) => a.id - b.id : byName);
+  state.snapshot[key] = list;
+  // Entries carry their merchant's name too.
+  if (path === 'merchants') for (const tx of state.snapshot.transactions) if (tx.merchantId === item.id) tx.merchant = item.name;
+  refreshModel();
+}
+
+function refreshModel() {
+  state.model = buildModel(state.snapshot);
+  renderAll();
+}
+
 /** Everyone a purchase was for (its shares), or the one person a refund or payback is about. */
 function peopleOf(tx) {
   return tx.kind === 'Purchase' ? tx.shares.map(share => share.personId) : [tx.personId];

@@ -3,6 +3,10 @@
 /* Transactions tab (the monthly ledger) and the shared transaction editor dialog. */
 
 const KIND_LABELS = { Purchase: 'Purchase', Refund: 'Refund', Payback: 'Payback' };
+// The ledger draws 200 rows at first and more on request, so a long time frame stays quick. A new time frame starts
+// over at 200.
+const LEDGER_PAGE = 200;
+let ledgerLimit = LEDGER_PAGE;
 
 function monthTotals(transactions) {
   const totals = { spent: 0, refunded: 0, paidBack: 0, purchases: 0 };
@@ -26,7 +30,8 @@ function renderTransactions() {
   const rows = timeFrameTransactions({ listed: true }).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
-  visibleLedgerIds = rows.map(tx => tx.id);
+  const shown = rows.slice(0, ledgerLimit);
+  visibleLedgerIds = shown.map(tx => tx.id);
   pruneSelection();
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
   const methods = state.snapshot.paymentMethods.filter(method => !method.archived || usedMethodIds.has(method.id));
@@ -42,7 +47,7 @@ function renderTransactions() {
     { label: 'Net Spent', num: true, title: 'What each entry adds to net spent: purchases add, refunds subtract, and paybacks do not change it.' }
   ];
 
-  const tableRows = rows.map(tx => {
+  const tableRows = shown.map(tx => {
     const what = document.createElement('span');
     if (tx.kind !== 'Purchase') {
       const badge = document.createElement('span');
@@ -85,7 +90,7 @@ function renderTransactions() {
 
   const footer = rows.length === 0 ? null : {
     cells: [
-      { text: 'Totals', title: 'Net spent (purchases minus refunds) of the listed rows, per payment method and in all. Paybacks are listed but not included.' },
+      { text: 'Totals', title: 'Net spent (purchases minus refunds) of every listed entry in the time frame, including rows not shown yet, per payment method and in all. Paybacks are listed but not included.' },
       '',
       '',
       '',
@@ -101,6 +106,18 @@ function renderTransactions() {
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
     : rows.length === 0 ? `Every entry in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer });
+  const more = rows.length - shown.length;
+  $('#ledgerMore').hidden = more === 0;
+  $('#ledgerMoreText').textContent = `Showing ${numberFormat.format(shown.length)} of ${plural(rows.length, 'entry', 'entries')}.`;
+  $('#ledgerMoreButton').textContent = `Show ${numberFormat.format(Math.min(LEDGER_PAGE, more))} More`;
+  $('#ledgerMoreButton').onclick = () => {
+    ledgerLimit += LEDGER_PAGE;
+    renderTransactions();
+  };
+  $('#ledgerAllButton').onclick = () => {
+    ledgerLimit = Infinity;
+    renderTransactions();
+  };
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
   $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in Stats. View → Show Archived lists them.`;
   updateBulkControls();
@@ -258,7 +275,7 @@ async function addFromEditor(path, choose) {
   if (!name) return;
   try {
     const created = await api(`/${path}`, { method: 'POST', body: { name } });
-    await loadSnapshot();
+    applyListItem(path, created);
     choose(created.id);
     $('#txError').textContent = '';
     setStatus(`Added ${config.singular} ${created.name}.`);
@@ -651,7 +668,7 @@ async function saveTransaction(changes = {}) {
       ? await api(`/transactions/${existing.id}`, { method: 'PUT', body })
       : await api('/transactions', { method: 'POST', body });
     $('#transactionDialog').close();
-    await loadSnapshot();
+    applyTransactionChanges({ saved: [saved] });
     const verb = existing && saved.archived !== existing.archived ? (saved.archived ? 'Archived' : 'Restored') : existing ? 'Saved' : 'Added';
     setStatus(`${verb} ${KIND_LABELS[saved.kind].toLowerCase()} #${saved.id}, ${formatMoney(saved.amountCents)} on ${formatDate(saved.date)}.`);
   } catch (saveError) {
@@ -670,7 +687,7 @@ async function deleteTransaction() {
   try {
     await api(`/transactions/${tx.id}`, { method: 'DELETE' });
     $('#transactionDialog').close();
-    await loadSnapshot();
+    applyTransactionChanges({ deleted: [tx.id] });
     setStatus(`Deleted ${KIND_LABELS[tx.kind].toLowerCase()} ${formatMoney(tx.amountCents)}.`);
   } catch (error) {
     $('#txError').textContent = error.message;

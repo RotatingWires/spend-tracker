@@ -28,9 +28,9 @@ async function addManaged(path, form) {
   const name = input.value.trim();
   if (!name) return;
   try {
-    await api(`/${path}`, { method: 'POST', body: { name } });
+    const created = await api(`/${path}`, { method: 'POST', body: { name } });
     input.value = '';
-    await loadSnapshot();
+    applyListItem(path, created);
     setStatus(`Added ${MANAGED[path].singular} ${name}.`);
   } catch (error) {
     showError(error.message);
@@ -41,8 +41,7 @@ async function renameManaged(path, item) {
   const name = await promptText(`Rename ${MANAGED[path].singular}`, 'New name', item.name, { maxLength: MANAGED[path].maxLength ?? 60 });
   if (name == null || name === item.name) return;
   try {
-    await api(`/${path}/${item.id}`, { method: 'PATCH', body: { name } });
-    await loadSnapshot();
+    applyListItem(path, await api(`/${path}/${item.id}`, { method: 'PATCH', body: { name } }));
     setStatus(`Renamed ${item.name} to ${name}.`);
   } catch (error) {
     showError(error.message);
@@ -51,8 +50,7 @@ async function renameManaged(path, item) {
 
 async function setArchived(path, item, archived) {
   try {
-    await api(`/${path}/${item.id}`, { method: 'PATCH', body: { archived } });
-    await loadSnapshot();
+    applyListItem(path, await api(`/${path}/${item.id}`, { method: 'PATCH', body: { archived } }));
     setStatus(`${archived ? 'Archived' : 'Restored'} ${item.name}.`);
   } catch (error) {
     showError(error.message);
@@ -66,6 +64,7 @@ async function deleteManaged(path, config, item, uses) {
   if (!await confirmAction(`Delete ${config.singular}`, `Delete ${item.name}?${consequence}`, 'Delete')) return;
   try {
     await api(`/${path}/${item.id}`, { method: 'DELETE' });
+    // Deleting a tag or collection takes it off every entry, so everything is loaded again.
     await loadSnapshot();
     setStatus(`Deleted ${item.name}.`);
   } catch (error) {

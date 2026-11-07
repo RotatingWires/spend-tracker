@@ -685,6 +685,55 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#scopeTable tbody tr", has_text="Hardware")).to_contain_text(f"#{first['id']}")  # other tests also pay cash
         page.locator("#scopeDialog button", has_text="Close").click()
 
+    def test_ledger_pages_lazy_stats_and_local_updates(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        snapshots = []
+        page.on("request", lambda request: snapshots.append(request.url) if request.url.endswith("/api/snapshot") else None)
+        self.log_in(page)
+        # Stats and its charts are not loaded until the Stats tab opens.
+        self.assertEqual(page.evaluate("typeof renderStats"), "undefined")
+        api = self.api_client()
+        snapshot = api.get("/api/snapshot")
+        me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
+        cash = snapshot["paymentMethods"][0]["id"]
+        # January 2023 is used by no other test: 205 purchases of $1.00.
+        for day in range(205):
+            api.post("/api/transactions", {
+                "kind": "Purchase", "date": f"2023-01-{day % 28 + 1:02d}", "amountCents": 100, "paymentMethodId": cash, "personId": None,
+                "linkedId": None, "merchantId": None, "description": f"bulk {day}", "note": "", "tagIds": [], "shares": [{"personId": me, "amountCents": 100}]})
+        page.click("#fileMenuButton")
+        page.click("#refreshButton")
+        self.choose_time_frame(page, ["January 2023"])
+
+        # The ledger draws 200 rows at first; the Totals row covers all of them.
+        rows = page.locator("#transactionsTable tbody tr")
+        expect(rows).to_have_count(200)
+        expect(page.locator("#ledgerMoreText")).to_have_text("Showing 200 of 205 entries.")
+        expect(page.locator("#ledgerMoreButton")).to_have_text("Show 5 More")
+        expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$205.00")
+        page.click("#ledgerMoreButton")
+        expect(rows).to_have_count(205)
+        expect(page.locator("#ledgerMore")).to_be_hidden()
+
+        # Saving merges the server's answer instead of downloading every entry again.
+        before = len(snapshots)
+        page.click("#newTransactionButton")
+        page.fill("#txDate", "2023-01-31")
+        page.fill("#txAmount", "7")
+        page.fill("#txDescription", "local update")
+        page.click("#txSaveButton")
+        expect(rows.first).to_contain_text("local update")
+        expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$212.00")
+        rows.first.click()
+        page.click("#txDeleteButton")
+        page.click("#confirmOkButton")
+        expect(page.locator("#transactionsTable")).not_to_contain_text("local update")
+        self.assertEqual(len(snapshots), before)
+
+        page.click('.tabs [data-tab="stats"]')
+        expect(page.locator("#statsTotals .stat-card")).to_have_count(10)
+        self.assertEqual(page.evaluate("typeof renderStats"), "function")
+
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)

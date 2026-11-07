@@ -189,6 +189,8 @@ async function runBulkAction(name) {
   $('#appWindow').inert = true;
   const skipped = [];
   let changed = 0;
+  const saved = [];
+  const deleted = [];
   try {
     const items = action.order ? action.order(selected) : selected;
     for (const [index, tx] of items.entries()) {
@@ -199,8 +201,12 @@ async function runBulkAction(name) {
         continue;
       }
       try {
-        if (plan.method === 'DELETE') await api(`/transactions/${tx.id}`, { method: 'DELETE' });
-        else await api(`/transactions/${tx.id}`, { method: 'PUT', body: plan.body });
+        if (plan.method === 'DELETE') {
+          await api(`/transactions/${tx.id}`, { method: 'DELETE' });
+          deleted.push(tx.id);
+        } else {
+          saved.push(await api(`/transactions/${tx.id}`, { method: 'PUT', body: plan.body }));
+        }
         changed++;
         selectedIds.delete(tx.id);
       } catch (error) {
@@ -210,7 +216,8 @@ async function runBulkAction(name) {
   } finally {
     bulkBusy = false;
     $('#appWindow').inert = false;
-    await loadSnapshot();
+    // Only the entries that changed are replaced; nothing else is downloaded again.
+    applyTransactionChanges({ saved, deleted });
   }
   const summary = `${action.label}: ${plural(changed, 'entry', 'entries')} changed${skipped.length ? `, ${skipped.length} skipped` : ''}.`;
   setStatus(summary);

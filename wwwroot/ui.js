@@ -5,7 +5,7 @@
 const TAB_RENDERERS = {
   transactions: renderTransactions,
   calendar: renderCalendar,
-  stats: renderStats,
+  stats: () => showStats(),
   people: renderPeople,
   methods: renderMethodsTab,
   tags: renderTagsTab,
@@ -14,6 +14,42 @@ const TAB_RENDERERS = {
   history: () => loadHistory()
 };
 const MONTH_TABS = new Set(['transactions', 'calendar']);
+// Stats and its charts load the first time the Stats tab opens, so starting up reads only what the ledger needs.
+const STATS_SCRIPTS = ['/charts.js', '/stats.js', '/heatmaps.js', '/insights.js', '/counts.js'];
+let statsLoading = null;
+let statsLoaded = false;
+
+function loadStatsScripts() {
+  statsLoading ??= Promise.all(STATS_SCRIPTS.map(src => new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false; // Run in the listed order, while downloading together.
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Could not load ${src}.`));
+    document.body.append(script);
+  }))).then(() => {
+    initializeStats();
+    statsLoaded = true;
+  }).catch(error => {
+    statsLoading = null; // Try again next time the tab opens.
+    throw error;
+  });
+  return statsLoading;
+}
+
+function showStats() {
+  if (statsLoaded) {
+    renderStats();
+    return;
+  }
+  setStatus('Loading Stats...');
+  loadStatsScripts()
+    .then(() => {
+      setStatus('Ready');
+      if (state.activeTab === 'stats') renderStats();
+    })
+    .catch(error => showError(error.message));
+}
 let timeFrameSelect = null;
 
 async function loadSnapshot() {
@@ -66,7 +102,7 @@ function switchTab(name) {
   $$('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.tab === name ? 'true' : 'false'));
   $$('.tab-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
   closeMenus();
-  Charts.hideTooltip();
+  if (statsLoaded) Charts.hideTooltip();
   $('#workspace').scrollTop = 0;
   renderAll();
 }
@@ -90,6 +126,7 @@ function changeTimeFrame(values) {
   if (values.includes('all') && !state.timeFrame.all) state.timeFrame = { all: true, months: [] };
   else if (months.length) state.timeFrame = { all: false, months };
   calendarCollectionId = null;
+  ledgerLimit = LEDGER_PAGE;
   renderAll();
 }
 
@@ -97,6 +134,7 @@ function shiftTimeFrame(delta) {
   if (state.timeFrame.all) return;
   state.timeFrame = { all: false, months: state.timeFrame.months.map(month => shiftMonth(month, delta)) };
   calendarCollectionId = null;
+  ledgerLimit = LEDGER_PAGE;
   renderAll();
 }
 
@@ -288,7 +326,6 @@ function startApp() {
   });
   initializeTransactionEditor();
   initializeCalendar();
-  initializeStats();
   initializePeople();
   initializeHistory();
   initializeManage();
@@ -347,13 +384,13 @@ function startApp() {
     closeMenus();
   }, true);
   window.addEventListener('spend-theme-change', () => {
-    if (state.activeTab === 'stats') renderStats();
+    if (state.activeTab === 'stats' && statsLoaded) renderStats();
   });
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (state.activeTab === 'stats' && state.model) renderStats();
+      if (state.activeTab === 'stats' && state.model && statsLoaded) renderStats();
     }, 150);
   });
 
