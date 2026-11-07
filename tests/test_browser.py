@@ -242,6 +242,25 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable thead th").last).to_have_text("Net Spent")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
         expect(page.locator("#transactionsTable tbody tr", has_text="Venmo").locator("td").last).to_have_text("—")
+        # Linked To: a refund shows the purchase it is for, and the purchase shows its refund. Double-clicking one opens
+        # that entry, not the row's own.
+        refund_row = page.locator("#transactionsTable tbody tr", has_text="Refund:")
+        diner_row = page.locator("#transactionsTable tbody tr", has_text="Diner — dinner").filter(has_not_text="Refund:")
+        refund_id = refund_row.locator("td").first.inner_text().strip("#")
+        expect(diner_row.locator(".linked-entry")).to_have_text(f"Refund #{refund_id}")
+        diner_row.locator(".linked-entry").dblclick()
+        expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Refund #{refund_id}")
+        page.click("#txCancelButton")
+        linked = refund_row.locator(".linked-entry")
+        expect(linked).to_contain_text("Diner — dinner")
+        linked.dblclick()
+        expect(page.locator("#transactionDialogTitle")).to_contain_text("Edit Purchase")
+        # View Entry in Time shows the entry in the ledger, highlighted like TaskList's visited task.
+        page.click("#txViewButton")
+        expect(page.locator("#transactionDialog")).not_to_be_visible()
+        expect(page.locator("#transactionsTable tr.visit-highlight")).to_have_count(1)
+        expect(page.locator("#transactionsTable tr.visit-highlight")).to_contain_text("Diner — dinner")
+        expect(page.locator("#transactionsTable tr.visit-highlight")).not_to_contain_text("Refund:")
 
         # The ledger's search box looks anywhere in merchant, description, note, tags, collections, and amount, but not
         # type, method, or people, among the entries in the time frame. It runs on Search or Enter, not while typing.
@@ -512,6 +531,11 @@ class BrowserTests(unittest.TestCase):
         self.shot(page, "calendar-all-time")
         self.choose_time_frame(page, ["January 2024"])
         expect(page.locator("#calendarMonths legend")).to_have_text(["January 2024"])
+        # Today appears away from this month and goes back to it.
+        page.click("#todayButton")
+        expect(page.locator("#titleScope")).to_have_text(date.today().strftime("%B %Y"))
+        expect(page.locator("#todayButton")).to_be_hidden()
+        self.choose_time_frame(page, ["January 2024"])
 
         # Collections total their own purchases and the refunds on them, wherever they are dated.
         page.click('.tabs [data-tab="collections"]')
@@ -687,10 +711,11 @@ class BrowserTests(unittest.TestCase):
         page.locator("#ledgerFilterSelect .menu-dropdown button", has_text="Payback").click()
         expect(ledger_rows).to_have_count(0)  # the payback has no merchant of its own
         expect(page.locator("#ledgerFilterSelect .retro-select")).to_have_text("3 filters▼")
-        for label in ("Payback", "Bakery", "Hardware"):
-            page.locator("#ledgerFilterSelect .menu-dropdown button", has_text=label).click()
         page.keyboard.press("Escape")
+        # Clear Filters appears only while a filter is checked.
+        page.click("#clearFiltersButton")
         expect(page.locator("#ledgerFilterSelect .retro-select")).to_have_text("None▼")
+        expect(page.locator("#clearFiltersButton")).to_be_hidden()
         expect(page.locator("#previousMonthButton")).to_have_text("")  # drawn arrows, not characters a phone shows as emoji
 
         # The editor shows per-scope numbers, and searching the ledger for #ID finds that entry. As in NewsReview, a

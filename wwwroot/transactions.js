@@ -7,6 +7,7 @@ const KIND_LABELS = { Purchase: 'Purchase', Refund: 'Refund', Payback: 'Payback'
 // over at 200.
 const LEDGER_PAGE = 200;
 let ledgerLimit = LEDGER_PAGE;
+let ledgerSearch = null;
 
 function monthTotals(transactions) {
   const totals = { spent: 0, refunded: 0, paidBack: 0, purchases: 0 };
@@ -34,6 +35,8 @@ function renderTransactions() {
   const rows = timeFrameTransactions({ listed: true }).filter(visible).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
+  // The Linked To column appears when a listed entry is linked to another: a refund or payback to its purchase.
+  const showLinked = rows.some(tx => linkedEntries(tx).length > 0);
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
   // Only the methods used in the time frame get a column; with nothing listed, the active ones stand in.
   const methods = state.snapshot.paymentMethods.filter(method => (rows.length ? usedMethodIds.has(method.id) : !method.archived));
@@ -43,6 +46,7 @@ function renderTransactions() {
     { label: 'When', sortValue: tx => Number(tx.date.replace(/-/g, '')) },
     { label: 'For Who', sortValue: tx => whoLabel(tx).toLowerCase() || null },
     { label: 'What', sortValue: tx => describeTransaction(tx).toLowerCase() || null },
+    ...(showLinked ? [{ label: 'Linked To', title: 'For a refund or payback, the purchase it is for; for a purchase, its refunds and paybacks. Double-click one to open it.', sortValue: tx => tx.linkedId ?? (linkedEntries(tx)[0]?.id ?? null) }] : []),
     { label: 'Tags', sortValue: tx => tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR).toLowerCase() || null },
     ...(showCollections ? [{ label: 'Collections', sortValue: tx => collectionIdsOf(tx).map(collectionName).join(', ').toLowerCase() || null }] : []),
     ...methods.map(method => ({ label: method.name, num: true, sortValue: tx => (tx.paymentMethodId === method.id ? netEffect(tx) ?? tx.amountCents : null) })),
@@ -91,6 +95,7 @@ function renderTransactions() {
         formatDate(tx.date),
         whoLabel(tx),
         what,
+        ...(showLinked ? [linkedCell(tx)] : []),
         tagList(tagIdsOf(tx)),
         ...(showCollections ? [collectionIdsOf(tx).map(collectionName).join(', ')] : []),
         ...methods.map(method => method.id === tx.paymentMethodId ? moneyCell(tx.amountCents, { direction }) : { text: '', num: true }),
@@ -106,6 +111,7 @@ function renderTransactions() {
       '',
       '',
       '',
+      ...(showLinked ? [''] : []),
       ...(showCollections ? [''] : []),
       ...methods.map(method => ({ text: formatMoney(netOf(rows.filter(tx => tx.paymentMethodId === method.id))), num: true })),
       { text: formatMoney(netOf(rows)), num: true }
@@ -185,6 +191,7 @@ function renderLedgerFilters() {
   ledgerFilterSelect.setOptions(ledgerFilterOptions(), state.ledgerFilters);
   // A filter whose item was deleted drops out.
   state.ledgerFilters = ledgerFilterSelect.values;
+  $('#clearFiltersButton').hidden = state.ledgerFilters.length === 0;
 }
 
 function matchesLedgerFilters(tx) {
@@ -204,6 +211,38 @@ function matchesLedgerFilters(tx) {
   };
   for (const [group, ids] of wanted) if (!valuesOf[group]().some(value => ids.has(value))) return false;
   return true;
+}
+
+/** The entries linked to this one: a refund's or payback's purchase, or a purchase's refunds and paybacks. */
+function linkedEntries(tx) {
+  if (tx.linkedId != null) return [state.model.byId.get(tx.linkedId)].filter(Boolean);
+  return state.model.linked.get(tx.id) ?? [];
+}
+
+/**
+ * The Linked To cell: "Purchase #12 · Amazon — cable" on a refund or payback, "Refund #14, Payback #15" on a purchase.
+ * Double-clicking one opens that entry, not the row's own.
+ */
+function linkedCell(tx) {
+  const entries = linkedEntries(tx);
+  if (!entries.length) return '';
+  const cell = document.createElement('span');
+  entries.forEach((entry, index) => {
+    if (index) cell.append(', ');
+    const link = document.createElement('span');
+    link.className = 'linked-entry';
+    const what = tx.linkedId != null ? ` · ${describeTransaction(entry) || formatMoney(entry.amountCents)}` : '';
+    link.textContent = `${KIND_LABELS[entry.kind]} #${entry.id}${what}`;
+    link.title = `Double-click to open ${KIND_LABELS[entry.kind].toLowerCase()} #${entry.id} (${formatDate(entry.date)}, ${formatMoney(entry.amountCents)})`;
+    link.addEventListener('dblclick', event => {
+      if (selectionMode) return;
+      event.stopPropagation();
+      window.getSelection()?.removeAllRanges();
+      openTransactionEditor(entry);
+    });
+    cell.append(link);
+  });
+  return cell;
 }
 
 /** What one entry adds to net spent: a purchase its amount, a refund minus its amount, a payback nothing (null). */
@@ -334,11 +373,50 @@ function initializeTransactionEditor() {
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());
   $('#txAmount').addEventListener('change', () => formatAmountInput($('#txAmount')));
-  bindSearchForm($('#ledgerSearchForm'), query => {
+  ledgerSearch = bindSearchForm($('#ledgerSearchForm'), query => {
     state.ledgerQuery = query;
     ledgerLimit = LEDGER_PAGE;
     renderTransactions();
   });
+  $('#txViewButton').addEventListener('click', () => viewEntryInTime(editor.transaction));
+  $('#clearFiltersButton').addEventListener('click', () => {
+    state.ledgerFilters = [];
+    ledgerLimit = LEDGER_PAGE;
+    renderTransactions();
+    setStatus('Filters cleared.');
+  });
+}
+
+/**
+ * View Entry in Time: closes the editor and shows the entry in the ledger, like TaskList's visit: its month, with
+ * filters and search cleared (and archived entries listed when it is archived), scrolled to and highlighted briefly.
+ */
+function viewEntryInTime(tx) {
+  if (!tx) return;
+  $('#transactionDialog').close();
+  state.ledgerFilters = [];
+  state.ledgerQuery = '';
+  ledgerSearch?.clear();
+  if (tx.archived && !state.showArchived) {
+    state.showArchived = true;
+    writeSetting('spend-tracker-show-archived', 'true');
+  }
+  state.timeFrame = { all: false, months: [monthOf(tx.date)] };
+  calendarCollectionId = null;
+  ledgerLimit = LEDGER_PAGE;
+  switchTab('transactions');
+  let row = $(`#transactionsTable tbody tr[data-id="${tx.id}"]`);
+  if (!row) {
+    // Past the first 200 rows of a sorted month: draw them all.
+    ledgerLimit = Infinity;
+    renderTransactions();
+    row = $(`#transactionsTable tbody tr[data-id="${tx.id}"]`);
+  }
+  if (!row) return;
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('visit-highlight');
+  setTimeout(() => row.classList.remove('visit-highlight'), 3200);
+  setStatus(`Showing ${KIND_LABELS[tx.kind].toLowerCase()} #${tx.id} in ${formatMonth(monthOf(tx.date))}.`);
 }
 
 /** Rewrites a valid amount box as "1,234.50" once the user leaves it; anything unparseable is left for Save to report. */
@@ -371,6 +449,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   $('#txError').textContent = '';
   $('#txDeleteButton').hidden = !tx;
   $('#txArchiveButton').hidden = !tx;
+  $('#txViewButton').hidden = !tx;
   $('#txArchiveButton').textContent = tx?.archived ? 'Restore' : 'Archive';
   $('#txArchiveButton').title = tx?.archived
     ? 'Save and list this entry in the ledger and calendar again.'

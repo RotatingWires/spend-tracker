@@ -48,6 +48,8 @@
   --heat-2-text: var(--ink);
   --heat-3-text: #fff;
   --heat-4-text: #fff;
+  /* TaskList's visit highlight: an entry shown with View Entry in Time. */
+  --highlight: #fff4a8;
 }
 
 :root[data-theme-effective="dark"] {
@@ -98,4 +100,5 @@
   --heat-2-text: #fff;
   --heat-3-text: #fff;
   --heat-4-text: #101010;
+  --highlight: #5c4c00;
 }

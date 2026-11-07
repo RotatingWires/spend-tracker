@@ -510,6 +510,13 @@ function bindSearchForm(form, run) {
     apply();
   });
   input.addEventListener('change', apply);
+  return {
+    /** Empties the box without running a search (the caller resets what it searched for). */
+    clear() {
+      input.value = '';
+      applied = '';
+    }
+  };
 }
 
 function statCard(label, value, { sub = '', title = '' } = {}) {

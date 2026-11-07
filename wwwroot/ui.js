@@ -115,6 +115,9 @@ function renderTimeFrameSelect() {
   // ◀ / ▶ move the whole selection by a month, so they are off for All time.
   $('#previousMonthButton').disabled = state.timeFrame.all;
   $('#nextMonthButton').disabled = state.timeFrame.all;
+  // Today appears once the time frame is anything but this month, and goes back to it.
+  const thisMonth = monthOf(todayKey());
+  $('#todayButton').hidden = !state.timeFrame.all && state.timeFrame.months.length === 1 && state.timeFrame.months[0] === thisMonth;
 }
 
 /**
@@ -408,6 +411,7 @@ function startApp() {
   $('#logoutButton').addEventListener('click', logout);
   $('#previousMonthButton').addEventListener('click', () => shiftTimeFrame(-1));
   $('#nextMonthButton').addEventListener('click', () => shiftTimeFrame(1));
+  $('#todayButton').addEventListener('click', () => changeTimeFrame([monthOf(todayKey())]));
   $$('.tabs [role="tab"]').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   document.addEventListener('click', closeMenus);
   // Escape closes an open dropdown first, without also closing the dialog it sits in.

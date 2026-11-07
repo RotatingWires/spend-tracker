@@ -57,11 +57,13 @@
         <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month" title="Move the chosen months back one month"><span class="arrow arrow-left" aria-hidden="true"></span></button>
         <div id="timeFrameSelect" aria-labelledby="timeFrameLabel"></div>
         <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month"><span class="arrow arrow-right" aria-hidden="true"></span></button>
+        <button type="button" id="todayButton" title="Show this month" hidden>Today</button>
       </div>
       <div class="toolbar-group" id="ledgerFilterControls">
         <span class="toolbar-separator" aria-hidden="true"></span>
         <span class="toolbar-label" id="ledgerFilterLabel">Filters:</span>
         <div id="ledgerFilterSelect" aria-labelledby="ledgerFilterLabel"></div>
+        <button type="button" id="clearFiltersButton" hidden>Clear Filters</button>
       </div>
     </section>
 
@@ -276,6 +278,7 @@
       <div class="dialog-buttons">
         <button type="button" id="txDeleteButton">Delete</button>
         <button type="button" id="txArchiveButton">Archive</button>
+        <button type="button" id="txViewButton" title="Close this and show the entry in the ledger: its month, with filters and search cleared, highlighted">View Entry in Time</button>
         <span class="spacer"></span>
         <button type="button" id="txCancelButton">Cancel</button>
         <button type="submit" id="txSaveButton">Save</button>

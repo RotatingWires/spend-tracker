@@ -233,7 +233,7 @@ button.default-button { font-weight: 700; padding: 6px 16px; box-shadow: 0 0 0 1
 .toolbar-separator { width: 2px; height: 24px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--light-edge); margin: 0 3px; }
 .icon-button { min-width: 30px; padding: 4px 7px; }
 /* The month arrows match the Time frame dropdown between them exactly, in every browser. */
-#monthControls .icon-button, #monthControls .retro-select, #ledgerFilterControls .retro-select { box-sizing: border-box; height: 30px; }
+#monthControls .icon-button, #monthControls .retro-select, #ledgerFilterControls .retro-select, #todayButton, #clearFiltersButton { box-sizing: border-box; height: 30px; padding-top: 0; padding-bottom: 0; }
 /* No extra black edge on the dropdown, so it and its ◀ / ▶ buttons have the same bevel and bottom line. */
 #monthControls .retro-select, #ledgerFilterControls .retro-select { box-shadow: none; }
 #monthControls .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0; }
@@ -529,6 +529,10 @@ input[type="date"] { min-width: 0; max-width: 100%; }
 .arrow-left { border-right: 6px solid currentColor; }
 .arrow-right { border-left: 6px solid currentColor; }
 .scope-actions .row-actions button { padding: 5px 10px; }
+/* View Entry in Time: the entry's row lights up like TaskList's visited task, then fades back. */
+#transactionsTable tr.visit-highlight > td { background: var(--highlight) !important; transition: background 0.4s; }
+/* A linked entry (a refund's purchase, a purchase's refunds and paybacks): double-click it to open that entry. */
+.linked-entry { text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
 .ledger-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .ledger-more > span { margin-right: auto; }
 /* A note under a chart or heatmap gets room to breathe; a note right under a box's title stays close. */
@@ -817,6 +821,8 @@ button.calendar-day:active {
 .share-rows .share-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-footer { grid-column: 1 / -1; margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
 .form-hint { font-size: 12px; color: var(--muted); }
+/* The Refund of / For purchase hint sits a little below its dropdown. */
+#txLinkedHint { margin-top: 6px; }
 .form-error { min-height: 18px; margin-top: 8px; }
 /* Fresh Start copies NewsReview's Fresh start dialog: size, frame, title bar, footer, and Win95 check boxes. */
 .fresh-start-dialog {
