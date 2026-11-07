@@ -19,6 +19,16 @@ function openScopeList(scope, scopeId, { month = null } = {}) {
 function renderScopeList() {
   if (!scopeListTarget) return;
   const { scope, scopeId, month } = scopeListTarget;
+  // A merchant's dialog holds its Rename, Archive, and Delete buttons; deleting it closes the dialog.
+  const merchant = scope === 'merchant' ? state.model.merchants.get(scopeId) : null;
+  if (scope === 'merchant' && !merchant) {
+    scopeListTarget = null;
+    $('#scopeDialog').close();
+    return;
+  }
+  $('#scopeActions').replaceChildren(...(merchant
+    ? [manageButtons('merchants', merchant, state.model.transactions.filter(tx => merchantIdsOf(tx).includes(scopeId)).length)]
+    : []));
   const entries = state.model.transactions
     .filter(tx => !month || monthOf(tx.date) === month)
     .map(tx => ({ tx, number: numberIn(tx, scope, scopeId) }))

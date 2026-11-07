@@ -37,6 +37,22 @@ async function addManaged(path, form) {
   }
 }
 
+/** Asks for a name and adds a payment method, person, tag, merchant, or collection; resolves to it, or null. */
+async function addListItem(path) {
+  const config = MANAGED[path];
+  const name = await promptText(`New ${config.singular}`, 'Name', '', { maxLength: config.maxLength ?? 60 });
+  if (!name) return null;
+  try {
+    const created = await api(`/${path}`, { method: 'POST', body: { name } });
+    applyListItem(path, created);
+    setStatus(`Added ${config.singular} ${created.name}.`);
+    return created;
+  } catch (error) {
+    await confirmAction(`New ${config.singular}`, error.message, 'OK', { notice: true });
+    return null;
+  }
+}
+
 async function renameManaged(path, item) {
   const name = await promptText(`Rename ${MANAGED[path].singular}`, 'New name', item.name, { maxLength: MANAGED[path].maxLength ?? 60 });
   if (name == null || name === item.name) return;

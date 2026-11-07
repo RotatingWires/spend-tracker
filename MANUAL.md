@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.5 Manual
+# SpendTracker v1.2.6 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -177,11 +177,13 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. The dropdown names a single month and shows several as a count, such as *3 months*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
-The **search box** above the ledger, with its **Search** button (or Enter), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View → Show Archived** for archived entries).
+**Filters**, after Time frame on the Transactions tab, is a dropdown of check items grouped by **Type**, **Payment method**, **For who**, **Merchant**, **Tags**, and **Collections**; each group expands and collapses like the Time frame years. The ledger keeps entries matching any checked item in a group and every group with something checked (Cash and Credit Card with the tag *food* lists food bought with either). Refunds count under their purchase's merchant, tags, and collections. One filter shows its name and several show as a count.
+
+The **search box** above the ledger, with its **Search** button (or Enter, or leaving the box after changing it, as in NewsReview), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View → Show Archived** for archived entries).
 
 Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
-In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor.
+In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it.
 
 - **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
 - **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person, with **Split Evenly** and a running total; Save refuses shares that do not add up to the amount.
@@ -196,7 +198,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 
 ### Selecting several entries
 
-**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame.
+**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame. The **Tags**, **Collections**, **People**, and **Merchant** actions' dropdowns end with **Add New...**, which adds one and checks or chooses it.
 
 The split button's main action is **Archive** (or **Restore** when every selected entry is archived). Its ▼ menu has:
 
@@ -235,7 +237,7 @@ An **Add** form, then one row per person, you first (*(you)*, with no balance): 
 
 ### Payment Methods, Tags, Collections, and Merchants
 
-Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, the dates from its first to its last entry, and **Rename**, **Archive** / **Restore**, and **Delete** buttons. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row (not its buttons) for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, the dates from its first to its last entry, and **Rename**, **Archive** / **Restore**, and **Delete** (on the Merchants tab these sit in the dialog a merchant's row opens, not on the row) buttons. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row (not its buttons) for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### History
 
@@ -530,6 +532,15 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.6
+
+- **Filters** dropdown after Time frame on the Transactions tab: types, payment methods, people, merchants, tags, and collections, grouped and combinable.
+- Searches also run when you leave the box after changing it, as in NewsReview.
+- A merchant's Rename, Archive, and Delete buttons are in the dialog its row opens.
+- Bulk actions can add a new tag, collection, person, or merchant from their dropdowns.
+- Dropdowns in dialogs float over the page instead of being cut off by the dialog.
+- Phones: the Time frame arrows are drawn instead of characters shown as emoji, text boxes are 16px so focusing them does not zoom, and dialogs no longer scroll sideways.
 
 ### v1.2.5
 

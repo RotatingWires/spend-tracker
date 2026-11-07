@@ -54,9 +54,13 @@
       <div class="toolbar-group" id="monthControls">
         <span class="toolbar-separator" aria-hidden="true"></span>
         <span class="toolbar-label" id="timeFrameLabel">Time frame:</span>
-        <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month" title="Move the chosen months back one month">◀</button>
+        <button type="button" id="previousMonthButton" class="icon-button" aria-label="Previous month" title="Move the chosen months back one month"><span class="arrow arrow-left" aria-hidden="true"></span></button>
         <div id="timeFrameSelect" aria-labelledby="timeFrameLabel"></div>
-        <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month">▶</button>
+        <button type="button" id="nextMonthButton" class="icon-button" aria-label="Next month" title="Move the chosen months forward one month"><span class="arrow arrow-right" aria-hidden="true"></span></button>
+      </div>
+      <div class="toolbar-group" id="ledgerFilterControls">
+        <span class="toolbar-label" id="ledgerFilterLabel">Filters:</span>
+        <div id="ledgerFilterSelect" aria-labelledby="ledgerFilterLabel"></div>
       </div>
     </section>
 
@@ -298,7 +302,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="scopeDialogTitle">List</div>
       <div class="dialog-body"><div id="scopeSummary" class="note"></div><div class="table-wrap"><table id="scopeTable"></table></div></div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="submit">Close</button></div>
+      <div class="dialog-buttons"><span id="scopeActions" class="scope-actions"></span><span class="spacer"></span><button type="submit">Close</button></div>
     </form>
   </dialog>
 

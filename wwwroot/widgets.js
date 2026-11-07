@@ -12,7 +12,38 @@ function toggleMenu(button, menu) {
   closeMenus();
   menu.hidden = !open;
   button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) placeMenu(button, menu);
 }
+
+/**
+ * A dropdown inside a dialog floats over the page instead of being cut off by the dialog's scrolling body: it opens
+ * below its button, or above when there is more room there, as tall as the window allows. Scrolling or resizing closes
+ * it, so it never drifts away from its button.
+ */
+function placeMenu(button, menu) {
+  menu.classList.remove('floating-menu');
+  for (const property of ['position', 'left', 'top', 'bottom', 'minWidth', 'maxHeight']) menu.style[property] = '';
+  if (!button.closest('dialog')) return;
+  const rect = button.getBoundingClientRect();
+  const below = window.innerHeight - rect.bottom - 8;
+  const above = rect.top - 8;
+  const upward = below < 220 && above > below;
+  menu.classList.add('floating-menu');
+  menu.style.position = 'fixed';
+  menu.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 165) - 4))}px`;
+  menu.style.minWidth = `${rect.width}px`;
+  menu.style.maxHeight = `${Math.max(120, Math.min(480, upward ? above : below))}px`;
+  if (upward) menu.style.bottom = `${window.innerHeight - rect.top + 1}px`;
+  else menu.style.top = `${rect.bottom + 1}px`;
+}
+
+document.addEventListener('scroll', event => {
+  const floating = $$('.floating-menu').find(menu => !menu.hidden);
+  if (floating && !floating.contains(event.target)) closeMenus();
+}, true);
+window.addEventListener('resize', () => {
+  if ($$('.floating-menu').some(menu => !menu.hidden)) closeMenus();
+});
 
 function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
   const button = document.createElement('button');
@@ -53,7 +84,7 @@ function addNewItem(menu, onAdd) {
   menu.append(item);
 }
 
-function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
+function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -80,7 +111,7 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
   function render() {
     const selected = options.find(option => option.value === current);
     label.textContent = selected?.label ?? '—';
-    button.disabled = options.length === 0 && !onAdd;
+    button.disabled = options.length === 0 && !(onAdd && canAdd());
     menu.replaceChildren(...options.map(option => menuButton(option.label, {
       role: 'menuitemradio',
       checked: option.value === current,
@@ -94,7 +125,7 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
         onChange(current);
       }
     })));
-    addNewItem(menu, onAdd);
+    if (canAdd()) addNewItem(menu, onAdd);
   }
 
   button.addEventListener('click', event => {
@@ -122,7 +153,7 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null } = {}) {
  * ungrouped option), options are nested under group headings that expand and collapse in place, like the years of the
  * Time frame dropdown; a group holding a checked option starts expanded and shows how many are checked.
  */
-function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null } = {}) {
+function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = document.createElement('button');
   button.type = 'button';
@@ -178,7 +209,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
     const names = options.filter(option => selected.has(option.value)).map(option => option.label);
     label.textContent = names.length ? summary(names) : empty;
     button.title = label.textContent;
-    button.disabled = options.length === 0 && !onAdd;
+    button.disabled = options.length === 0 && !(onAdd && canAdd());
     const items = [];
     let lastGroup = null;
     for (const option of options) {
@@ -204,7 +235,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
       items.push(item);
     }
     menu.replaceChildren(...items);
-    addNewItem(menu, onAdd);
+    if (canAdd()) addNewItem(menu, onAdd);
   }
 
   const values = () => options.filter(option => selected.has(option.value)).map(option => option.value);
@@ -394,12 +425,24 @@ function tableRow(columns, row) {
   return tr;
 }
 
-/** A search box and its Search button: the search runs on the button or Enter, never while typing. */
+/**
+ * A search box and its Search button. As in NewsReview, the search runs on the button, Enter, or leaving the box after
+ * changing it, never while typing; running the same search again is skipped.
+ */
 function bindSearchForm(form, run) {
+  const input = form.querySelector('input');
+  let applied = input.value.trim();
+  const apply = () => {
+    const query = input.value.trim();
+    if (query === applied) return;
+    applied = query;
+    run(query);
+  };
   form.addEventListener('submit', event => {
     event.preventDefault();
-    run(form.querySelector('input').value.trim());
+    apply();
   });
+  input.addEventListener('change', apply);
 }
 
 function statCard(label, value, { sub = '', title = '' } = {}) {
@@ -508,15 +551,25 @@ function promptText(title, label, value = '', { maxLength = 60 } = {}) {
 /**
  * Asks the user to pick from a Win95 dropdown: one option, or with multiple: true any number of check items. With
  * modes (such as Add / Remove), a "Change" dropdown comes first. Resolves to the chosen value (an array of values
- * when multiple), or { value, mode } when modes are given; null if cancelled or nothing was checked.
+ * when multiple), or { value, mode } when modes are given; null if cancelled or nothing was checked. With addPath
+ * ("people", "tags", ...), the dropdown ends with "Add New...", which adds one and chooses it.
  */
 let choiceSelect = null;
 let choiceChecks = null;
 let modeSelect = null;
-function chooseOption(title, label, options, okLabel = 'OK', { modes = null, multiple = false } = {}) {
+let choiceAdd = null;
+function chooseOption(title, label, options, okLabel = 'OK', { modes = null, multiple = false, addPath = null } = {}) {
   const dialog = $('#chooseDialog');
-  choiceSelect ??= createSingleSelect($('#chooseSelect'));
-  choiceChecks ??= createMultiSelect($('#chooseMulti'), { empty: 'Choose one or more' });
+  const addOptions = { onAdd: () => choiceAdd?.(), canAdd: () => Boolean(choiceAdd) };
+  choiceSelect ??= createSingleSelect($('#chooseSelect'), addOptions);
+  choiceChecks ??= createMultiSelect($('#chooseMulti'), { empty: 'Choose one or more', ...addOptions });
+  choiceAdd = addPath ? async () => {
+    const created = await addListItem(addPath);
+    if (!created) return;
+    options = [...options, { value: created.id, label: created.name }];
+    if (multiple) choiceChecks.setOptions(options, [...choiceChecks.values, created.id]);
+    else choiceSelect.setOptions(options, created.id);
+  } : null;
   modeSelect ??= createSingleSelect($('#chooseMode'));
   $('#chooseTitle').textContent = title;
   $('#chooseLabel').textContent = label;
@@ -533,6 +586,7 @@ function chooseOption(title, label, options, okLabel = 'OK', { modes = null, mul
   return new Promise(resolve => {
     dialog.addEventListener('close', () => {
       const value = multiple ? choiceChecks.values : choiceSelect.value;
+      choiceAdd = null;
       if (dialog.returnValue !== 'ok' || value.length === 0) resolve(null);
       else resolve(modes ? { value, mode: modeSelect.value } : value);
     }, { once: true });

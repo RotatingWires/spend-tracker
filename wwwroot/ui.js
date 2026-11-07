@@ -80,6 +80,7 @@ function renderAll() {
   if (!state.model) return;
   renderTimeFrameSelect();
   $('#monthControls').hidden = !MONTH_TABS.has(state.activeTab);
+  $('#ledgerFilterControls').hidden = state.activeTab !== 'transactions';
   $('#titleScope').textContent = MONTH_TABS.has(state.activeTab)
     ? timeFrameLabel()
     : $(`.tabs [data-tab="${state.activeTab}"]`).textContent;

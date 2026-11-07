@@ -630,6 +630,19 @@ class BrowserTests(unittest.TestCase):
         page.click("#confirmOkButton")
         expect(page.locator("#selectedCount")).to_have_text("Selected: 1")
 
+        # The bulk dialogs can add a new item ("Add New..."), which is then checked.
+        page.click("#bulkActions .split-arrow")
+        page.locator("#bulkActions .split-dropdown button", has_text="Tags...").click()
+        page.click("#chooseMulti .retro-select")
+        page.locator("#chooseMulti .menu-dropdown button", has_text="Add New...").click()
+        page.fill("#promptInput", "errands")
+        page.keyboard.press("Enter")
+        expect(page.locator("#chooseMulti .retro-select")).to_have_text("errands▼")
+        page.click("#chooseOkButton")
+        page.click("#confirmOkButton")
+        expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("errands")
+        page.click(f'#transactionsTable tr[data-id="{third["id"]}"] .selection-check')  # changed entries are deselected
+
         # Merchant... chooses from a dropdown of merchants, like tags and people; the list fits without scrolling the dialog.
         page.click("#bulkActions .split-arrow")
         page.locator("#bulkActions .split-dropdown button", has_text="Merchant...").click()
@@ -659,12 +672,37 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#bulkControls")).to_be_hidden()
         expect(page.locator("#transactionsTable .selection-check")).to_have_count(0)
 
-        # The editor shows per-scope numbers, and searching the ledger for #ID finds that entry.
+        # Filters: any of the checked ones within a group, all groups together. Groups expand like the Time frame years.
+        ledger_rows = page.locator("#transactionsTable tbody tr:not(.empty-row)")
+        page.click("#ledgerFilterSelect .retro-select")
+        page.locator('#ledgerFilterSelect .menu-group[data-group="Merchant"]').click()
+        page.locator("#ledgerFilterSelect .menu-dropdown button", has_text="Bakery").click()
+        expect(ledger_rows).to_have_count(1)  # Garage's purchase is Bakery now too, but archived and hidden
+        expect(ledger_rows.first).to_contain_text(f"#{second['id']}")
+        page.locator("#ledgerFilterSelect .menu-dropdown button", has_text="Hardware").click()
+        expect(ledger_rows).to_have_count(2)
+        page.locator('#ledgerFilterSelect .menu-group[data-group="Type"]').click()
+        page.locator("#ledgerFilterSelect .menu-dropdown button", has_text="Payback").click()
+        expect(ledger_rows).to_have_count(0)  # the payback has no merchant of its own
+        expect(page.locator("#ledgerFilterSelect .retro-select")).to_have_text("3 filters▼")
+        for label in ("Payback", "Bakery", "Hardware"):
+            page.locator("#ledgerFilterSelect .menu-dropdown button", has_text=label).click()
+        page.keyboard.press("Escape")
+        expect(page.locator("#ledgerFilterSelect .retro-select")).to_have_text("None▼")
+        expect(page.locator("#previousMonthButton")).to_have_text("")  # drawn arrows, not characters a phone shows as emoji
+
+        # The editor shows per-scope numbers, and searching the ledger for #ID finds that entry. As in NewsReview, a
+        # search also runs when the box loses focus.
         page.fill("#ledgerSearch", f"#{first['id']}")
-        page.keyboard.press("Enter")
+        page.locator("#statusLeft").click()
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
         page.locator("#transactionsTable tbody tr").first.dblclick()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
+        # Dropdowns in the editor float over the page rather than being cut off by the dialog.
+        page.click("#txTags .retro-select")
+        expect(page.locator("#txTags .menu-dropdown")).to_have_class(re.compile(r"\bfloating-menu\b"))
+        expect(page.locator("#txTags .menu-dropdown")).to_be_in_viewport(ratio=1)
+        page.keyboard.press("Escape")
 
         # Each number opens that scope's numbered list; rows on each item's tab open the same list.
         page.locator("#txNumbers button", has_text="Hardware #1").click()
@@ -684,8 +722,15 @@ class BrowserTests(unittest.TestCase):
         expect(rows.nth(1)).to_contain_text("$150.00")  # her share of the split purchase
         page.locator("#personDialog button", has_text="Close").click()
         page.click('.tabs [data-tab="merchants"]')
+        # Merchant rows have no buttons; Rename, Archive, and Delete are in the dialog a row opens.
+        expect(page.locator("#merchantsTable button", has_text="Rename")).to_have_count(0)
         page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
+        expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
+        page.locator("#scopeActions button", has_text="Rename").click()
+        page.fill("#promptInput", "Bakery & Cafe")
+        page.keyboard.press("Enter")
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery & Cafe")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(2)  # #2 is the purchase moved here by Merchant...
         page.locator("#scopeTable tbody tr").last.click()
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")

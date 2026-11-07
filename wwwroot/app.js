@@ -17,6 +17,8 @@ const state = {
   heat: { measure: 'net', year: null, rows: 'tags' },
   // Searches applied with a Search button (or Enter), not while typing; empty means none.
   ledgerQuery: '',
+  // Ledger filters checked in the Filters dropdown, such as "method:2" or "tag:5".
+  ledgerFilters: [],
   merchantQuery: '',
   compare: { a: null, b: null },
   showArchived: readSetting('spend-tracker-show-archived') === 'true',

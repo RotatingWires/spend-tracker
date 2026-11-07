@@ -281,6 +281,8 @@ button:disabled { color: var(--shadow); cursor: default; }
   overflow-y: auto;
 }
 .single-select-dropdown .menu-label { white-space: normal; overflow-wrap: anywhere; }
+/* In a dialog, a dropdown floats (see placeMenu), which sets its height from the room it has. */
+.floating-menu { overflow-y: auto; }
 .inline-select-menu { min-width: 150px; }
 
 .retro-input {
@@ -510,6 +512,20 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
 /* Separate borders: with collapsed ones, browsers can place sticky cells a pixel or two off, so rows peek out. */
 #transactionsTable { border-collapse: separate; border-spacing: 0; }
 #transactionsTable tfoot td { position: sticky; bottom: 0; z-index: 1; border-bottom: 0; box-shadow: 0 8px 0 var(--surface-alt); }
+.scope-actions .row-actions { justify-content: flex-start; }
+/* Phones zoom into a text box whose text is under 16px, so touch screens get 16px boxes. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]), textarea { font-size: 16px; }
+}
+/* Safari gives date boxes a minimum width of their own, which pushed narrow dialogs sideways; dialogs never scroll
+   sideways. */
+input[type="date"] { min-width: 0; max-width: 100%; }
+.dialog-body { overflow-x: hidden; }
+/* ◀ and ▶ drawn with borders: phones would show the characters as emoji. */
+.arrow { display: inline-block; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; vertical-align: middle; }
+.arrow-left { border-right: 6px solid currentColor; }
+.arrow-right { border-left: 6px solid currentColor; }
+.scope-actions .row-actions button { padding: 5px 10px; }
 .ledger-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .ledger-more > span { margin-right: auto; }
 /* A note under a chart or heatmap gets room to breathe; a note right under a box's title stays close. */

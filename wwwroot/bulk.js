@@ -91,7 +91,7 @@ const BULK_ACTIONS = {
   people: {
     label: 'People',
     detail: 'Each changed purchase is split evenly again between everyone on it.',
-    choose: items => chooseWithMode('People', 'People',
+    choose: items => chooseWithMode('People', 'People', 'people',
       state.snapshot.people.filter(person => !person.archived || items.some(tx => tx.shares.some(share => share.personId === person.id)))),
     request: (tx, choice) => {
       if (tx.kind !== 'Purchase') return { skip: 'only purchases are split between people' };
@@ -107,8 +107,8 @@ const BULK_ACTIONS = {
   },
   merchant: {
     label: 'Merchant',
-    // Like tags and people, merchants are chosen from a list; they are added on the Merchants tab.
-    choose: () => chooseFrom('Merchant', 'Set merchant to', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set')
+    // Like tags and people, merchants are chosen from a list, which can add a new one.
+    choose: () => chooseFrom('Merchant', 'Set merchant to', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set', 'merchants')
       .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: `Set merchant to “${choice.label}”` }),
     request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
       : { body: transactionRequest(tx, { merchantId }) }
@@ -124,15 +124,14 @@ const BULK_ACTIONS = {
 
 const ADD_REMOVE = [{ value: 'add', label: 'Add to the selected entries' }, { value: 'remove', label: 'Remove from the selected entries' }];
 
-/** One action per kind: the dialog asks whether to add or remove, then which ones, as check items. */
-async function chooseWithMode(title, label, items) {
-  if (items.length === 0) {
-    await confirmAction(title, `There are no ${title.toLowerCase()} to choose from. Add them on the ${title} tab.`, 'OK', { notice: true });
-    return null;
-  }
-  const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE, multiple: true });
+/**
+ * One action per kind: the dialog asks whether to add or remove, then which ones, as check items. Its list can add
+ * a new one ("Add New..."), so an empty list still opens.
+ */
+async function chooseWithMode(title, label, path, items) {
+  const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE, multiple: true, addPath: path });
   if (choice == null) return null;
-  const chosen = items.filter(item => choice.value.includes(String(item.id)));
+  const chosen = state.snapshot[SNAPSHOT_LISTS[path]].filter(item => choice.value.includes(String(item.id)));
   return { value: { ids: chosen.map(item => item.id), mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} ${chosen.map(item => `“${item.name}”`).join(', ')}` };
 }
 
@@ -147,7 +146,7 @@ function labelAction(noun, list, field) {
   const title = `${noun[0].toUpperCase()}${noun.slice(1)}s`;
   return {
     label: title,
-    choose: items => chooseWithMode(title, title,
+    choose: items => chooseWithMode(title, title, list,
       state.snapshot[list].filter(item => !item.archived || items.some(tx => tx[field].includes(item.id)))),
     request: (tx, choice) => {
       if (choice.mode === 'add' && tx.kind !== 'Purchase') return { skip: `only purchases have ${noun}s` };
@@ -158,13 +157,15 @@ function labelAction(noun, list, field) {
   };
 }
 
-async function chooseFrom(title, label, items, okLabel) {
-  if (items.length === 0) {
+async function chooseFrom(title, label, items, okLabel, addPath = null) {
+  if (items.length === 0 && !addPath) {
     await confirmAction(title, `There is nothing to ${okLabel.toLowerCase()} for the selected entries.`, 'OK', { notice: true });
     return null;
   }
-  const value = await chooseOption(title, label, items.map(item => ({ value: item.id, label: item.name })), okLabel);
-  return value == null ? null : { value: Number(value), label: items.find(item => item.id === Number(value)).name };
+  const value = await chooseOption(title, label, items.map(item => ({ value: item.id, label: item.name })), okLabel, { addPath });
+  if (value == null) return null;
+  const known = [...items, ...(addPath ? state.snapshot[SNAPSHOT_LISTS[addPath]] : [])];
+  return { value: Number(value), label: known.find(item => item.id === Number(value)).name };
 }
 
 function selectionSummary(items) {

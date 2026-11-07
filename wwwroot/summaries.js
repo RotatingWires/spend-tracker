@@ -11,12 +11,13 @@ function merchantIdsOf(tx) {
   return source.merchantId == null ? [] : [source.merchantId];
 }
 
-function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, stats = false }) {
+/** With actionsInDialog, the row has no Rename/Archive/Delete buttons; they sit in the dialog the row opens. */
+function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, stats = false, actionsInDialog = false }) {
   const rows = items.map(item => {
     const entries = state.model.transactions.filter(tx => tx.kind !== 'Payback' && idsOf(tx).includes(item.id));
     const uses = state.model.transactions.filter(tx => idsOf(tx).includes(item.id)).length;
     const totals = monthTotals(entries);
-    const actions = manageButtons(path, item, uses, stats ? [['Stats', () => showCollectionStats(item), `Show stats for ${item.name}`]] : []);
+    const actions = actionsInDialog ? null : manageButtons(path, item, uses, stats ? [['Stats', () => showCollectionStats(item), `Show stats for ${item.name}`]] : []);
     return {
       onClick: () => openScopeList(scope, item.id),
       cells: [
@@ -27,7 +28,7 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
         { text: formatMoney(totals.refunded), num: true },
         { text: formatMoney(totals.net), num: true },
         entries.length ? formatDateRange(entries[0].date, entries.at(-1).date) : '—',
-        actions
+        ...(actions ? [actions] : [])
       ]
     };
   });
@@ -39,7 +40,7 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
     { label: 'Refunds', num: true, title: 'Refunds on these purchases, whenever they were refunded.' },
     { label: 'Net Spent', num: true, title: 'Spent minus refunds.' },
     { label: 'Dates', title: 'From the first to the last entry.' },
-    { label: '' }
+    ...(actionsInDialog ? [] : [{ label: '' }])
   ], rows, { empty });
 }
 
@@ -64,6 +65,7 @@ function renderMerchantsTab() {
   const merchants = query ? state.snapshot.merchants.filter(merchant => merchant.name.toLowerCase().includes(query)) : state.snapshot.merchants;
   renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', merchants, merchantIdsOf, {
     label: 'Merchant',
+    actionsInDialog: true,
     empty: query ? `No merchant matches “${state.merchantQuery}”.` : 'No merchants yet. Add one above, then choose it in the editor.'
   });
 }

@@ -28,7 +28,10 @@ function renderTransactions() {
   const monthRows = timeFrameTransactions();
   // Newest first: the highest ID on top, as in TaskList. A search keeps only the entries it matches.
   const query = state.ledgerQuery;
-  const rows = timeFrameTransactions({ listed: true }).filter(tx => !query || matchesSearch(tx, query)).sort((a, b) => b.id - a.id);
+  renderLedgerFilters();
+  const visible = tx => (!query || matchesSearch(tx, query)) && matchesLedgerFilters(tx);
+  const narrowed = Boolean(query || state.ledgerFilters.length);
+  const rows = timeFrameTransactions({ listed: true }).filter(visible).sort((a, b) => b.id - a.id);
   // The Collections column appears once you have created a collection.
   const showCollections = state.snapshot.collections.length > 0;
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
@@ -109,12 +112,12 @@ function renderTransactions() {
     ]
   };
 
-  const matching = query ? monthRows.filter(tx => matchesSearch(tx, query)) : monthRows;
+  const matching = narrowed ? monthRows.filter(visible) : monthRows;
   const hidden = matching.length - rows.length;
   const empty = monthRows.length === 0
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
-    : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches “${query}”. Search with an empty box to list them all.`
-      : rows.length === 0 ? `Every ${query ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
+    : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches ${query ? `“${query}”` : ''}${query && state.ledgerFilters.length ? ' and ' : ''}${state.ledgerFilters.length ? 'the filters' : ''}.`
+      : rows.length === 0 ? `Every ${narrowed ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer, onSort: () => renderTransactions() });
   const more = rows.length - shown.length;
   $('#ledgerMore').hidden = more === 0;
@@ -145,6 +148,62 @@ function tagList(tagIds) {
     list.append(tag);
   });
   return list;
+}
+
+// ---------------------------------------------------------------- ledger filters
+/*
+ * The Filters dropdown after Time frame: check any number of types, payment methods, people, merchants, tags, and
+ * collections, grouped by kind. Within a group an entry needs any of the checked ones; across groups, all of them.
+ * Refunds count under their purchase's merchant, tags, and collections, as elsewhere.
+ */
+const LEDGER_FILTER_GROUPS = { kind: 'Type', method: 'Payment method', person: 'For who', merchant: 'Merchant', tag: 'Tags', collection: 'Collections' };
+let ledgerFilterSelect = null;
+
+function ledgerFilterOptions() {
+  const list = (prefix, items) => items.map(item => ({ value: `${prefix}:${item.id}`, label: archivedLabel(item) }));
+  return [
+    ...Object.entries(KIND_LABELS).map(([kind, label]) => ({ value: `kind:${kind}`, label })),
+    ...list('method', state.snapshot.paymentMethods),
+    ...list('person', state.snapshot.people),
+    ...list('merchant', state.snapshot.merchants),
+    ...list('tag', state.snapshot.tags),
+    ...list('collection', state.snapshot.collections)
+  ];
+}
+
+function renderLedgerFilters() {
+  ledgerFilterSelect ??= createMultiSelect($('#ledgerFilterSelect'), {
+    empty: 'None',
+    groupOf: value => LEDGER_FILTER_GROUPS[value.split(':')[0]],
+    summary: names => (names.length > 1 ? `${names.length} filters` : names[0]),
+    onChange: values => {
+      state.ledgerFilters = values;
+      ledgerLimit = LEDGER_PAGE;
+      renderTransactions();
+    }
+  });
+  ledgerFilterSelect.setOptions(ledgerFilterOptions(), state.ledgerFilters);
+  // A filter whose item was deleted drops out.
+  state.ledgerFilters = ledgerFilterSelect.values;
+}
+
+function matchesLedgerFilters(tx) {
+  const wanted = new Map();
+  for (const value of state.ledgerFilters) {
+    const [group, id] = value.split(':');
+    if (!wanted.has(group)) wanted.set(group, new Set());
+    wanted.get(group).add(group === 'kind' ? id : Number(id));
+  }
+  const valuesOf = {
+    kind: () => [tx.kind],
+    method: () => [tx.paymentMethodId],
+    person: () => peopleOf(tx),
+    merchant: () => merchantIdsOf(tx),
+    tag: () => tagIdsOf(tx),
+    collection: () => collectionIdsOf(tx)
+  };
+  for (const [group, ids] of wanted) if (!valuesOf[group]().some(value => ids.has(value))) return false;
+  return true;
 }
 
 /** What one entry adds to net spent: a purchase its amount, a refund minus its amount, a payback nothing (null). */
@@ -290,18 +349,10 @@ function formatAmountInput(input) {
 
 /** "Add New..." in an editor dropdown: asks for a name, adds the item, reloads the data, and lets choose() pick it. */
 async function addFromEditor(path, choose) {
-  const config = MANAGED[path];
-  const name = await promptText(`New ${config.singular}`, 'Name', '', { maxLength: config.maxLength ?? 60 });
-  if (!name) return;
-  try {
-    const created = await api(`/${path}`, { method: 'POST', body: { name } });
-    applyListItem(path, created);
-    choose(created.id);
-    $('#txError').textContent = '';
-    setStatus(`Added ${config.singular} ${created.name}.`);
-  } catch (error) {
-    $('#txError').textContent = error.message;
-  }
+  const created = await addListItem(path);
+  if (!created) return;
+  choose(created.id);
+  $('#txError').textContent = '';
 }
 
 function editorKind() {
