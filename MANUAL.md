@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.2 Manual
+# SpendTracker v1.2.1 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -87,10 +87,6 @@ tests/
   server.py             starts a real server on a temporary data folder
   test_api.py           API, validation, history, backup/restore, and Fresh start tests
   test_browser.py       optional Playwright browser tests
-  test_import_tool.py   spreadsheet importer tests (no server needed)
-
-tools/
-  import_spreadsheet.py imports a month-by-month spending spreadsheet (.xlsx) through the API
 ```
 
 ## Version handling
@@ -325,25 +321,6 @@ Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show
 - The ledger draws 200 rows at a time (about 4 ms instead of about 75 ms for 5,000 rows).
 - The server compresses its responses with Brotli or gzip. With 2,000 entries the data download is 139 KB instead of 938 KB, and scripts and styles shrink about threefold. (Only plain HTTP is compressed, ASP.NET's default; behind an HTTPS reverse proxy, let the proxy compress.)
 
-### Importing a spreadsheet
-
-`tools/import_spreadsheet.py` imports a spending spreadsheet kept one block per month, each block a header row (**When**, **For Who**, **What**, then one column per payment method holding the amount) and a **Total:** row. It needs only Python 3 and talks to a running SpendTracker through its API.
-
-```bash
-python3 tools/import_spreadsheet.py ~/Desktop/Spending.xlsx                      # preview: nothing is written
-python3 tools/import_spreadsheet.py ~/Desktop/Spending.xlsx --map "Bank/Debit=Debit Card" --map "Rewards Card=Credit Card" --apply
-```
-
-It asks for the SpendTracker password (or reads `SPENDTRACKER_PASSWORD`) and uses `http://127.0.0.1:8715` unless `--url` or `SPENDTRACKER_URL` says otherwise. Before anything is written, each month's column sums are checked against its Total row. Rows become entries like this:
-
-- **A positive amount** is a purchase for the people in For Who (**Me** is you), split evenly, the first person listed taking any leftover cent. Bought for someone else with *gift* in the description, their share is a gift.
-- **A negative amount for someone else** is a payback from them, and so is one for Me that names who (*Alex paid me back*).
-- **A negative amount for Me that reads like a return or refund** (*Returned…*, *Refund for…*) is a refund of the earlier purchase sharing words with it and covering the amount; when two or three such purchases add up exactly, it is split across them.
-- **Any other negative amount for Me** (a settlement, a sign-up bonus, a gift to you) is money received, which SpendTracker does not record; it is listed and skipped.
-- **"Merchant: description"** puts a short leading name (up to three words, without digits) into the Merchant field.
-
-People, merchants, and payment methods are matched by name ignoring case and created when missing; `--map SHEET=APP` sends a sheet's method column to another name. Entries already in SpendTracker with the same type, date, amount, method, and description are skipped, so running it again imports nothing twice. Nothing is tagged; add tags afterwards, or with **File → Select...**.
-
 ## Data and backups
 
 All persistent data is in the `data/` folder of the folder SpendTracker runs from (the project folder when started with `dotnet run`):
@@ -548,13 +525,9 @@ python3 -m unittest discover -s tests -p "test_browser.py"
 
 They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, check the Fresh Start dialog's choices, confirmation, and phone-width fit while clearing only history, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
-GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` and `test_import_tool.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
+GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
-
-### v1.2.2
-
-- New `tools/import_spreadsheet.py` imports a month-by-month spending spreadsheet (.xlsx) through the API, with a preview, Total-row checks, refunds matched to their purchases, and no duplicates when run again. See [Importing a spreadsheet](#importing-a-spreadsheet).
 
 ### v1.2.1
 

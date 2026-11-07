@@ -12,4 +12,3 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet build SpendTracker.csproj --nologo
       - run: python3 -m unittest discover -s tests -p "test_api.py" -v
-      - run: python3 -m unittest discover -s tests -p "test_import_tool.py" -v
