@@ -34,7 +34,8 @@ function renderTransactions() {
   visibleLedgerIds = shown.map(tx => tx.id);
   pruneSelection();
   const usedMethodIds = new Set(rows.map(tx => tx.paymentMethodId));
-  const methods = state.snapshot.paymentMethods.filter(method => !method.archived || usedMethodIds.has(method.id));
+  // Only the methods used in the time frame get a column; with nothing listed, the active ones stand in.
+  const methods = state.snapshot.paymentMethods.filter(method => (rows.length ? usedMethodIds.has(method.id) : !method.archived));
 
   const columns = [
     { label: 'ID', title: 'The permanent ID of each entry. Search #12 to find entry #12.' },

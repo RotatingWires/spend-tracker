@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.1 Manual
+# SpendTracker v1.2.2 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -174,7 +174,7 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method, and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
 **File → Search...** opens a search dialog, as in TaskList, from any tab, with **Keyword** and **Date** tabs. Both search every transaction, in any time frame and archived or not. **Date** takes one date or a range, as month/day or month/day/year (`9/14`, `9/1/26 - 10/1/26`; no year means this year), and lists entries dated in it. **Keyword** searches what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`), and lists the matches newest first; select one to edit it. Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. Searching runs when you press **Search** or Enter, as in TaskList and NewsReview, not on every keystroke. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*.
 
@@ -528,6 +528,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.2
+
+- The ledger only has columns for the payment methods used in the time frame.
+- The Time frame dropdown lists months under their years, which expand and collapse in place; you can still check several months, across years.
+- The ledger's Totals row covers the few pixels below it, so rows no longer show through underneath at some display scalings.
 
 ### v1.2.1
 

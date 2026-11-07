@@ -322,6 +322,8 @@ function startApp() {
   timeFrameSelect = createMultiSelect($('#timeFrameSelect'), {
     empty: 'Choose months',
     onChange: changeTimeFrame,
+    // Months sit under their year, which expands and collapses; All time stays at the top on its own.
+    groupOf: value => (value === 'all' ? null : value.slice(0, 4)),
     summary: names => (names.length > 3 ? `${names.length} months` : names.join(', '))
   });
   initializeTransactionEditor();

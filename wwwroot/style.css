@@ -154,6 +154,23 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
 .menu-dropdown button[role="menuitemcheckbox"][aria-checked="true"] .menu-check::before { content: "✓"; }
 .multi-select-dropdown button[role="menuitemcheckbox"] .menu-check::before { border: 0; width: auto; height: auto; font-size: 13px; }
 .menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Year headings in the Time frame dropdown: an arrow instead of a check box, and their months indented under them. */
+.menu-group { font-weight: 700; }
+/* Drawn with borders, since Tahoma has no small triangles: ▶ when collapsed, ▼ when expanded. */
+.menu-group-arrow { display: grid; place-items: center; }
+.menu-group-arrow::before {
+  content: "";
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+}
+.menu-group[aria-expanded="true"] .menu-group-arrow::before {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  border-bottom: 0;
+}
+.menu-dropdown button.menu-grouped { padding-left: 22px; }
 .menu-heading {
   padding: 4px 8px 2px 24px;
   color: var(--muted);
@@ -497,7 +514,7 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
    as TaskList's task table does. */
 .tab-panel[data-panel="transactions"] { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .tab-panel[data-panel="transactions"] > .table-wrap { flex: 0 1 auto; min-height: 0; }
-#transactionsTable tfoot td { position: sticky; bottom: 0; z-index: 1; }
+#transactionsTable tfoot td { position: sticky; bottom: 0; z-index: 1; box-shadow: 0 8px 0 var(--surface-alt); }
 .ledger-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .ledger-more > span { margin-right: auto; }
 /* A note under a chart or heatmap gets room to breathe; a note right under a box's title stays close. */

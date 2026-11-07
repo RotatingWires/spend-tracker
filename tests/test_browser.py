@@ -92,13 +92,21 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Escape")
 
     def choose_time_frame(self, page, labels):
+        """Months sit under their year in the dropdown, so the wanted years are expanded first."""
+        page.click("#timeFrameSelect .retro-select")
+        for year in sorted({label.split()[-1] for label in labels if label != "All time"}):
+            heading = page.locator(f'#timeFrameSelect .menu-group[data-group="{year}"]')
+            if heading.get_attribute("aria-expanded") == "false":
+                heading.click()
+        page.keyboard.press("Escape")
         self.choose_checks(page, "#timeFrameSelect", labels)
 
     def choose_checks(self, page, host, labels):
         """Checks exactly these entries of a dropdown that keeps at least one checked, checking the wanted ones first.
         The menu re-renders after each click, so items are found again each time."""
         page.click(f"{host} .retro-select")
-        items = page.locator(f"{host} .menu-dropdown button")
+        # Year headings (whose text changes with the count) are not choices.
+        items = page.locator(f"{host} .menu-dropdown button:not(.menu-group)")
         for label in labels:
             item = items.filter(has_text=re.compile(f"^{re.escape(label)}$"))
             if item.get_attribute("aria-checked") != "true":
@@ -466,6 +474,17 @@ class BrowserTests(unittest.TestCase):
         # Several months show together, and All time shows everything.
         self.choose_time_frame(page, ["January 2024", "February 2024"])
         expect(page.locator("#titleScope")).to_have_text("Jan 2024, Feb 2024")
+        # The dropdown nests months under their year; a year with checked months shows how many and starts open.
+        page.click("#timeFrameSelect .retro-select")
+        heading = page.locator('#timeFrameSelect .menu-group[data-group="2024"]')
+        expect(heading).to_have_text("2024 (2)")
+        heading.click()
+        expect(heading).to_have_attribute("aria-expanded", "false")
+        expect(page.locator("#timeFrameSelect .menu-dropdown button", has_text="January 2024")).to_have_count(0)
+        expect(page.locator("#timeFrameSelect .menu-dropdown")).to_be_visible()  # expanding or collapsing keeps it open
+        heading.click()
+        expect(page.locator("#timeFrameSelect .menu-dropdown button", has_text="January 2024")).to_have_attribute("aria-checked", "true")
+        page.keyboard.press("Escape")
         expect(page.locator("#timeFrameSelect .retro-select")).to_have_text("February 2024, January 2024▼")
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(3)
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$1,200.00")  # $600 + $700 − $100 refund
@@ -579,6 +598,10 @@ class BrowserTests(unittest.TestCase):
         # Newest first, as in TaskList: the highest ID is on top.
         expect(page.locator("#transactionsTable tbody tr").first).to_contain_text(f"#{third['id']}")
         expect(page.locator("#transactionsTable tbody tr").last).to_contain_text(f"#{first['id']}")
+        # Only payment methods used in the time frame get a column: everything in June 2024 is cash.
+        expect(page.locator("#transactionsTable thead")).to_contain_text("Cash")
+        expect(page.locator("#transactionsTable thead")).not_to_contain_text("Credit Card")
+        expect(page.locator("#transactionsTable thead")).not_to_contain_text("Debit Card")
 
         page.click("#fileMenuButton")
         page.click("#selectModeButton")
