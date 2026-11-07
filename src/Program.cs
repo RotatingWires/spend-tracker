@@ -43,7 +43,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             if (context.Request.Path.StartsWithSegments("/api"))
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             else
-                context.Response.Redirect(context.RedirectUri);
+                context.Response.Redirect(LoginRedirect(context));
             return Task.CompletedTask;
         };
         options.Events.OnRedirectToAccessDenied = context =>
@@ -451,6 +451,10 @@ static async Task SignInOwner(HttpContext context)
             ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
         });
 }
+
+// Signing in from the home page goes to plain /login.html, like NewsReview; only a deep link keeps a ReturnUrl.
+static string LoginRedirect(RedirectContext<CookieAuthenticationOptions> context) =>
+    (context.Request.Path.Value is null or "/" or "/index.html") && !context.Request.QueryString.HasValue ? "/login.html" : context.RedirectUri;
 
 record LoginRequest(string? Password);
 record FreshStartRequest(string? Confirmation, Dictionary<string, bool>? Selections);

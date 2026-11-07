@@ -168,7 +168,8 @@ function plural(count, singular, pluralForm = `${singular}s`) {
 
 function loginUrl() {
   const returnUrl = `${location.pathname}${location.search}${location.hash}`;
-  return `/login.html?returnUrl=${encodeURIComponent(returnUrl || '/')}`;
+  // The home page needs no return address: plain /login.html, like NewsReview.
+  return !returnUrl || returnUrl === '/' ? '/login.html' : `/login.html?returnUrl=${encodeURIComponent(returnUrl)}`;
 }
 
 async function api(path, { method = 'GET', body } = {}) {
