@@ -1,7 +1,7 @@
 // Network-first shell cache: the latest files are always used when the server is reachable; the cache is only an offline fallback.
 const CACHE = 'spend-tracker-shell';
 const STATIC = [
-  '/', '/index.html', '/login.html', '/login.js', '/version.json', '/manifest.webmanifest', '/icons/spend.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png',
+  '/', '/index.html', '/login.html', '/login.js', '/version.json', '/manifest.webmanifest', '/icons/spend.svg', '/icons/home-180.png', '/icons/home-192.png', '/icons/home-512.png',
   '/theme.css', '/style.css', '/auth.css', '/theme.js',
   '/app.js', '/widgets.js', '/charts.js', '/transactions.js', '/calendar.js', '/stats.js', '/heatmaps.js', '/insights.js', '/counts.js',
   '/people.js', '/summaries.js', '/history.js', '/manage.js', '/bulk.js', '/scopes.js', '/fresh-start.js', '/ui.js'
