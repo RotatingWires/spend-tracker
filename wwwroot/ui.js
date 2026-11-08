@@ -177,6 +177,14 @@ function populateViewMenu() {
       }
     }));
   }
+  menu.append(menuSeparator(), menuButton('Use Retro Font', {
+    role: 'menuitemcheckbox',
+    checked: window.SpendTheme.getRetroFont(),
+    onClick: () => {
+      window.SpendTheme.setRetroFont(!window.SpendTheme.getRetroFont());
+      closeMenus();
+    }
+  }));
 }
 
 function menuSeparator() {

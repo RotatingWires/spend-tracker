@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.21
+# SpendTracker v1.2.22
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -44,3 +44,7 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 - **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).
+
+## Credits
+
+**View → Use Retro Font** uses [W95FA](https://fontsarena.com/w95fa-by-alina-sava/) by Alina Sava, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).

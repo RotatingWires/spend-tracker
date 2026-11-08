@@ -1,5 +1,8 @@
 'use strict';
 
+/** The page font (Tahoma, or W95FA with View → Use Retro Font) for text drawn on charts. */
+const chartFont = () => getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim() || 'Tahoma, Arial, sans-serif';
+
 /*
  * Minimal canvas bar chart with hover/tap tooltips. Several series stack into one bar per day or month, each section
  * in its own theme color (--chart-series-1 to -8); negative values stack below the zero line. Money series use the
@@ -93,7 +96,7 @@ const Charts = (() => {
     const y = (value, axis) => padding.top + plotHeight * (axis.max - value) / (axis.max - axis.min);
     const axisOf = s => (right && s.count ? right : left);
 
-    context.font = '11px Tahoma, Arial, sans-serif';
+    context.font = `11px ${chartFont()}`;
     context.textBaseline = 'middle';
     context.lineWidth = 1;
     const leftFormat = (money[0] ?? counts[0])?.format ?? String;
@@ -213,7 +216,7 @@ const Charts = (() => {
     const slot = labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
     const x = index => padding.left + (labels.length > 1 ? slot * index : plotWidth / 2);
 
-    context.font = '11px Tahoma, Arial, sans-serif';
+    context.font = `11px ${chartFont()}`;
     context.textBaseline = 'middle';
     context.lineWidth = 1;
     const format = (money[0] ?? counts[0])?.format ?? String;

@@ -48,5 +48,34 @@ window.addEventListener('storage', event => {
 });
 
 applyTheme(readPreference(), false);
-window.SpendTheme = { getPreference, setPreference };
+// View → Use Retro Font: the bundled W95FA font, off until chosen, saved per app like the theme.
+const RETRO_FONT_KEY = 'spend-tracker-retro-font';
+
+function readRetroFont() {
+  try {
+    return localStorage.getItem(RETRO_FONT_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+function applyRetroFont(on, persist = false) {
+  if (persist) {
+    try { localStorage.setItem(RETRO_FONT_KEY, on ? 'on' : 'off'); } catch {}
+  }
+  document.documentElement.toggleAttribute('data-retro-font', on);
+  // Canvas charts draw with the page font, so they redraw once it has loaded.
+  if (persist) document.fonts.load('13px W95FA').finally(() => window.dispatchEvent(new CustomEvent('spend-theme-change')));
+  return on;
+}
+
+const getRetroFont = () => document.documentElement.hasAttribute('data-retro-font');
+const setRetroFont = on => applyRetroFont(on, true);
+
+window.addEventListener('storage', event => {
+  if (event.key === RETRO_FONT_KEY) applyRetroFont(readRetroFont());
+});
+applyRetroFont(readRetroFont());
+
+window.SpendTheme = { getPreference, setPreference, getRetroFont, setRetroFont };
 })();
