@@ -44,29 +44,37 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
   ], rows, { empty });
 }
 
+/** The tab's search (applied with its Search button) narrows its list by name, ignoring case. */
+function searchedItems(tab, items) {
+  const query = state.listQueries[tab].toLowerCase();
+  return query ? items.filter(item => item.name.toLowerCase().includes(query)) : items;
+}
+
+/** The empty-table message: what the search missed, or how to add the first one. */
+function searchEmpty(tab, singular, emptyText) {
+  return state.listQueries[tab] ? `No ${singular} matches "${state.listQueries[tab]}".` : emptyText;
+}
+
 function renderMethodsTab() {
-  renderLabelSummary($('#methodsTable'), 'method', 'payment-methods', state.snapshot.paymentMethods, tx => [tx.paymentMethodId],
-    { label: 'Payment Method', empty: 'No payment methods yet. Add one above.' });
+  renderLabelSummary($('#methodsTable'), 'method', 'payment-methods', searchedItems('methods', state.snapshot.paymentMethods), tx => [tx.paymentMethodId],
+    { label: 'Payment Method', empty: searchEmpty('methods', 'payment method', 'No payment methods yet. Add one above.') });
 }
 
 function renderTagsTab() {
-  renderLabelSummary($('#tagsTable'), 'tag', 'tags', state.snapshot.tags, tagIdsOf,
-    { label: 'Tag', empty: 'No tags yet. Add one above, then choose it on purchases in the editor.' });
+  renderLabelSummary($('#tagsTable'), 'tag', 'tags', searchedItems('tags', state.snapshot.tags), tagIdsOf,
+    { label: 'Tag', empty: searchEmpty('tags', 'tag', 'No tags yet. Add one above, then choose it on purchases in the editor.') });
 }
 
 function renderCollectionsTab() {
-  renderLabelSummary($('#collectionsTable'), 'collection', 'collections', state.snapshot.collections, collectionIdsOf,
-    { label: 'Collection', empty: 'No collections yet. Add one above, then choose it on purchases in the editor.', stats: true });
+  renderLabelSummary($('#collectionsTable'), 'collection', 'collections', searchedItems('collections', state.snapshot.collections), collectionIdsOf,
+    { label: 'Collection', empty: searchEmpty('collections', 'collection', 'No collections yet. Add one above, then choose it on purchases in the editor.'), stats: true });
 }
 
 function renderMerchantsTab() {
-  // A search (applied with its Search button) narrows the list by name, ignoring case.
-  const query = state.merchantQuery.toLowerCase();
-  const merchants = query ? state.snapshot.merchants.filter(merchant => merchant.name.toLowerCase().includes(query)) : state.snapshot.merchants;
-  renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', merchants, merchantIdsOf, {
+  renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', searchedItems('merchants', state.snapshot.merchants), merchantIdsOf, {
     label: 'Merchant',
     actionsInDialog: true,
-    empty: query ? `No merchant matches “${state.merchantQuery}”.` : 'No merchants yet. Add one above, then choose it in the editor.'
+    empty: searchEmpty('merchants', 'merchant', 'No merchants yet. Add one above, then choose it in the editor.')
   });
 }
 

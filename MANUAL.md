@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.19 Manual
+# SpendTracker v1.2.20 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -171,7 +171,7 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 
 ### Merchants
 
-Merchants are managed like tags and people (the Merchants tab has a search box at the right of its Add row that narrows the list by name when you press **Search**): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
+Merchants are managed like tags and people (the People, Payment Methods, Tags, Collections, and Merchants tabs each have a search box at the right of their Add row that narrows the list by name when you press **Search**): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
 
 ### Collections
 
@@ -195,7 +195,7 @@ The default tab is the ledger for the **Time frame** chosen in the toolbar: **Al
 
 **Filters**, after Time frame on the Transactions tab, is a dropdown of check items grouped by **Type**, **Payment method**, **For who**, **Merchant**, **Tags**, and **Collections**; each group expands and collapses like the Time frame years. The ledger keeps entries matching any checked item in a group and every group with something checked (Cash and Credit Card with the tag *food* lists food bought with either). Refunds count under their purchase's merchant, tags, and collections. One filter shows its name and several show as a count. **Clear Filters** appears beside it while a filter is checked.
 
-The **search box** above the ledger, with its **Search** button (or Enter, or leaving the box after changing it, as in NewsReview), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View → Show Archived** for archived entries).
+The **search box** at the right above the ledger, like the other tabs', with its **Search** button (or Enter, or leaving the box after changing it, as in NewsReview), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View → Show Archived** for archived entries).
 
 Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. When an entry in the list is linked to another, a **Linked To** column shows it: a refund's or payback's purchase, or a purchase's refunds and paybacks. Double-click one there to open that entry instead. In the editor, **View Entry in Time** closes it and shows the entry in the ledger: its month, with filters and search cleared (and View → Show Archived turned on for an archived entry), scrolled to and briefly highlighted, as TaskList does for a visited task. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
@@ -549,6 +549,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.20
+
+- The ledger and History search boxes sit at the right, like Merchants'.
+- People, Payment Methods, Tags, and Collections have a search box at the right of their Add row, like Merchants.
+- On phones the Add and Search rows stack with boxes and buttons the same size.
 
 ### v1.2.19
 

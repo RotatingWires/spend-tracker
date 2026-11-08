@@ -371,6 +371,13 @@ form.panel-actions[data-add], form.search-form { align-items: stretch; }
 .tab-actions { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 18px; }
 .tab-actions > .panel-actions { flex: 1 1 280px; max-width: 460px; }
 .tab-actions > .search-form { margin-left: auto; justify-content: flex-end; }
+/* Phones stack the Add and Search rows, so their boxes and buttons line up at the same size. */
+@media (max-width: 650px) {
+  .tab-actions { flex-direction: column; align-items: stretch; }
+  .tab-actions > .panel-actions { flex: 0 0 auto; max-width: none; margin-left: 0; justify-content: flex-start; flex-wrap: nowrap; }
+  .tab-actions > .panel-actions .retro-input { flex: 1 1 auto; max-width: none; }
+  .tab-actions > .panel-actions button { flex: 0 0 76px; }
+}
 
 .stat-grid {
   display: grid;

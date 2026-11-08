@@ -41,7 +41,7 @@ function outstandingText(cents) {
 
 /** Everyone, you first: balances for other people, plus Rename/Archive/Delete on each row. */
 function renderPeople() {
-  const rows = state.snapshot.people
+  const rows = searchedItems('people', state.snapshot.people)
     .map(person => ({ person, ledger: personLedger(person.id) }))
     // Me first, then A–Z, like the dropdowns; the Balance heading sorts by balance.
     .sort((a, b) => b.person.isSelf - a.person.isSelf || a.person.name.localeCompare(b.person.name, undefined, { sensitivity: 'base' }))
@@ -72,7 +72,7 @@ function renderPeople() {
     { label: 'Balance', num: true, title: 'Their shares, minus refunds on those purchases, minus everything they paid back. Gifts and refunds on them are left out unless Include gifts is checked.' },
     { label: 'Last Payback' },
     { label: '' }
-  ], rows);
+  ], rows, { empty: searchEmpty('people', 'person', 'No people yet.') });
 }
 
 function openPersonDialog(personId) {

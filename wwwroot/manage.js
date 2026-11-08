@@ -93,8 +93,9 @@ function initializeManage() {
     event.preventDefault();
     addManaged(form.dataset.add, form);
   }));
-  bindSearchForm($('#merchantSearchForm'), query => {
-    state.merchantQuery = query;
-    renderMerchantsTab();
-  });
+  const renderers = { people: renderPeople, methods: renderMethodsTab, tags: renderTagsTab, collections: renderCollectionsTab, merchants: renderMerchantsTab };
+  $$('form[data-search]').forEach(form => bindSearchForm(form, query => {
+    state.listQueries[form.dataset.search] = query;
+    renderers[form.dataset.search]();
+  }));
 }

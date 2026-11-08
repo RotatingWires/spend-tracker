@@ -31,7 +31,8 @@ const state = {
   ledgerQuery: '',
   // Ledger filters checked in the Filters dropdown, such as "method:2" or "tag:5".
   ledgerFilters: [],
-  merchantQuery: '',
+  // Each list tab's search, applied with its Search button: people, methods, tags, collections, merchants.
+  listQueries: { people: '', methods: '', tags: '', collections: '', merchants: '' },
   compare: { a: null, b: null },
   showArchived: readSetting('spend-tracker-show-archived') === 'true',
   includeGifts: readSetting('spend-tracker-include-gifts') === 'true',
