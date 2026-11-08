@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.17 Manual
+# SpendTracker v1.2.18 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -101,7 +101,21 @@ dotnet run
 | Setting | Default | How to change |
 |---|---|---|
 | Listen address | `http://127.0.0.1:8715` (TCP, loopback only) | `dotnet run --urls "http://0.0.0.0:8715"`, the `ASPNETCORE_URLS` environment variable, or a `urls` value in an `appsettings.json` |
-| Data folder | `data/` inside the folder SpendTracker runs from (the project folder for `dotnet run`) | not configurable |
+| Data folder | `data/` inside the folder SpendTracker runs from (the project folder for `dotnet run`) | `--data-dir PATH`, a `SpendTracker:DataDirectory` value in an `appsettings.json`, or the `SPENDTRACKER_DATA_DIR` environment variable |
+
+| Environment variable | Purpose |
+| --- | --- |
+| `SPENDTRACKER_DATA_DIR` | Data folder, overridden by `--data-dir` |
+| `ASPNETCORE_URLS` | Listening address, like `--urls`; default `http://127.0.0.1:8715` |
+
+| Command-line option | Purpose |
+| --- | --- |
+| `--urls URL` | Listening address, for example `http://0.0.0.0:8715` for LAN access |
+| `--data-dir PATH` | Data folder (database, password, sign-in keys, recovery backups) |
+| `--version` | Print the version and exit |
+| `backup --output FILE [--database FILE]` | Consistent SQLite copy of `data/spendtracker.db` (or `--database`), checked with `PRAGMA integrity_check`; refuses to overwrite an existing file |
+
+Releases before v1.2.18 named the database `spend-tracker.db`; SpendTracker renames it on its first start, and backups made before v1.2.18 still restore.
 
 There are no other settings. To keep SpendTracker running in the background, start `dotnet run` (or a published build) from the service manager you already use, with the project folder as the working directory and write access to `data/` and `logs/`.
 
@@ -332,7 +346,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 
 ```text
 data/
-  spend-tracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
+  spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
   keys/                 sign-in cookie keys when there is no Windows profile key ring (Linux, Task Scheduler)
   backups/              recovery copies written automatically before each restore (File → Fresh Start can remove them)
@@ -346,7 +360,7 @@ logs/
 
 **Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
 
-- `spend-tracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
+- `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
 
 It never contains `auth.json` or the password hash. Treat it like your bank statements.
@@ -357,7 +371,7 @@ It never contains `auth.json` or the password hash. Treat it like your bank stat
 
 The upload is verified before any live data changes. It is rejected when:
 
-- it is not a ZIP with exactly `manifest.json` and `spend-tracker.db`, or a member is encrypted or too large;
+- it is not a ZIP with exactly `manifest.json` and `spendtracker.db`, or a member is encrypted or too large;
 - the manifest is not a SpendTracker backup, or came from a newer SpendTracker version or schema;
 - the database does not match the manifest's checksum or row counts, or fails SQLite's integrity check;
 - the database has different tables or columns than this version, or contains triggers, views, or virtual tables.
@@ -393,7 +407,7 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 
 ### Schema and migrations
 
-The database records its schema version in `PRAGMA user_version` (currently 6). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spend-tracker.db`.
+The database records its schema version in `PRAGMA user_version` (currently 6). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spendtracker.db`.
 
 Schema 6 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares` (with `gift`), `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
 
@@ -495,13 +509,13 @@ No password exists yet (or `data/auth.json` was removed). Enter the setup token 
 
 Setup and login allow 5 attempts per IP per minute. Wait a minute.
 
-### "spend-tracker.db uses schema version N"
+### "spendtracker.db uses schema version N"
 
 The database was created by a newer SpendTracker. Update SpendTracker; it will not modify a newer database.
 
-### "spend-tracker.db was created by an earlier SpendTracker"
+### "spendtracker.db was created by an earlier SpendTracker"
 
-This version stores merchants, numbers, and split purchases differently and does not upgrade databases from 0.2, 0.3, or 0.4. Stop SpendTracker, move or delete `data/spend-tracker.db`, and start it again to create a new database.
+This version stores merchants, numbers, and split purchases differently and does not upgrade databases from 0.2, 0.3, or 0.4. Stop SpendTracker, move or delete `data/spendtracker.db`, and start it again to create a new database.
 
 ### A save is refused
 
@@ -535,6 +549,11 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.18
+
+- The database is now `spendtracker.db` (no hyphen). An existing `spend-tracker.db` is renamed on first start; backups made before this release still restore.
+- Command-line options like NewsReview: `--data-dir PATH`, `--version`, and `backup --output FILE`. The data folder can also come from `SpendTracker:DataDirectory` or `SPENDTRACKER_DATA_DIR`.
 
 ### v1.2.17
 

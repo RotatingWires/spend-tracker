@@ -51,7 +51,7 @@ sealed class Store
 
         var version = Convert.ToInt32(Scalar(connection, null, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
         if (version > SchemaVersion)
-            throw new InvalidOperationException($"spend-tracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
+            throw new InvalidOperationException($"spendtracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
         if (version == SchemaVersion)
         {
             // Gives existing entries their numbers in any scope added to NumberedScopes since they were saved.
@@ -61,7 +61,7 @@ sealed class Store
             return journalMode;
         }
         if (version != 0)
-            throw new InvalidOperationException($"spend-tracker.db was created by an earlier SpendTracker (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
+            throw new InvalidOperationException($"spendtracker.db was created by an earlier SpendTracker (schema {version}), which this version cannot upgrade. Stop SpendTracker, move or delete data/spend-tracker.db, and start again to create a new database.");
 
         using var transaction = connection.BeginTransaction();
         Execute(connection, transaction, """

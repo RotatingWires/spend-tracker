@@ -9,7 +9,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from server import ApiError, Server, build
+from server import PASSWORD, ApiError, Server, build
 
 
 def setUpModule():
@@ -297,9 +297,9 @@ class SpendTrackerApiTests(unittest.TestCase):
         archive = self.api.download("/api/backup")
 
         with zipfile.ZipFile(io.BytesIO(archive)) as backup:
-            self.assertEqual(sorted(backup.namelist()), ["manifest.json", "spend-tracker.db"])
+            self.assertEqual(sorted(backup.namelist()), ["manifest.json", "spendtracker.db"])
             manifest = json.loads(backup.read("manifest.json"))
-            database = backup.read("spend-tracker.db")
+            database = backup.read("spendtracker.db")
         self.assertEqual(manifest["format"], "spendtracker-backup")
         self.assertEqual(manifest["sha256"], hashlib.sha256(database).hexdigest())
         self.assertEqual(manifest["totals"]["transactions"], 4)
@@ -449,7 +449,7 @@ class SpendTrackerApiTests(unittest.TestCase):
             "schema 3 from v0.4": rebuild(archive, manifest={"schemaVersion": 3}),
             "schema 2 from v0.3": rebuild(archive, manifest={"schemaVersion": 2}),
             "extra member": rebuild(archive, extra={"notes.txt": b"hi"}),
-            "missing database": rebuild(archive, drop="spend-tracker.db"),
+            "missing database": rebuild(archive, drop="spendtracker.db"),
             "old JSON backup": json.dumps({"format": "spendtracker-backup", "formatVersion": 1}).encode(),
             "random bytes": b"PK\x03\x04 definitely not a zip",
         }
@@ -573,12 +573,55 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertGreater(result["freedBytes"], after["databaseBytes"])
 
 
+class DataFolderTests(unittest.TestCase):
+    """The data folder can move, and files from before the spendtracker.db rename keep working."""
+
+    def backup_with_purchase(self):
+        server = Server()
+        self.addCleanup(server.stop)
+        api = server.logged_in_client()
+        api.post("/api/tags", {"name": "Kept tag"})
+        return api.download("/api/backup")
+
+    def test_restore_accepts_backups_with_the_old_database_name(self):
+        archive = self.backup_with_purchase()
+        output = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(archive)) as source, zipfile.ZipFile(output, "w") as target:
+            target.writestr("manifest.json", source.read("manifest.json"))
+            target.writestr("spend-tracker.db", source.read("spendtracker.db"))
+        server = Server()
+        self.addCleanup(server.stop)
+        api = server.logged_in_client()
+        api.upload_zip("/api/restore", output.getvalue())
+        self.assertIn("Kept tag", [tag["name"] for tag in api.get("/api/snapshot")["tags"]])
+
+    def test_startup_renames_the_old_database_file(self):
+        with zipfile.ZipFile(io.BytesIO(self.backup_with_purchase())) as source:
+            database = source.read("spendtracker.db")
+        server = Server(prepare=lambda data: (data / "spend-tracker.db").write_bytes(database))
+        self.addCleanup(server.stop)
+        api = server.logged_in_client()
+        self.assertIn("Kept tag", [tag["name"] for tag in api.get("/api/snapshot")["tags"]])
+        self.assertTrue((server.data_dir / "spendtracker.db").exists())
+        self.assertFalse((server.data_dir / "spend-tracker.db").exists())
+
+    def test_data_dir_option_moves_the_data_folder(self):
+        folder = tempfile.TemporaryDirectory(prefix="spend-tracker-data-")
+        self.addCleanup(folder.cleanup)
+        server = Server(args=["--data-dir", folder.name])
+        self.addCleanup(server.stop)
+        api = server.client()
+        api.post("/api/auth/setup", {"setupToken": server.token, "password": PASSWORD, "confirmPassword": PASSWORD})
+        self.assertTrue((Path(folder.name) / "spendtracker.db").exists())
+        self.assertTrue((Path(folder.name) / "auth.json").exists())
+        self.assertFalse(server.data_dir.exists())
+
 def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True):
     """Repackages a real backup ZIP after changing its database or manifest."""
     with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory) / "spend-tracker.db"
+        path = Path(directory) / "spendtracker.db"
         with zipfile.ZipFile(io.BytesIO(archive)) as source:
-            path.write_bytes(source.read("spend-tracker.db"))
+            path.write_bytes(source.read("spendtracker.db"))
             fields = json.loads(source.read("manifest.json"))
         if sql:
             with sqlite3.connect(path) as connection:
@@ -593,7 +636,7 @@ def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True
         fields.update(manifest or {})
         output = io.BytesIO()
         with zipfile.ZipFile(output, "w") as target:
-            members = {"manifest.json": json.dumps(fields).encode(), "spend-tracker.db": database, **(extra or {})}
+            members = {"manifest.json": json.dumps(fields).encode(), "spendtracker.db": database, **(extra or {})}
             for member, content in members.items():
                 if member != drop:
                     target.writestr(member, content)

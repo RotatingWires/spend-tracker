@@ -6,7 +6,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 /// <summary>
-/// Backup ZIPs: manifest.json plus an online copy of spend-tracker.db, the same layout as TaskList and NewsReview.
+/// Backup ZIPs: manifest.json plus an online copy of spendtracker.db, the same layout as TaskList and NewsReview.
 /// Restores are bounded and verified before any live row changes. The password file is never included.
 /// </summary>
 static class Transfer
@@ -16,7 +16,8 @@ static class Transfer
     const int MaxManifestBytes = 64 * 1024;
     const string Format = "spendtracker-backup";
     const int FormatVersion = 1;
-    const string DatabaseEntry = "spend-tracker.db";
+    const string DatabaseEntry = "spendtracker.db";
+    const string LegacyDatabaseEntry = "spend-tracker.db"; // Backups before v1.2.18
     const string ManifestEntry = "manifest.json";
 
     static readonly JsonSerializerOptions ManifestJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -104,7 +105,8 @@ static class Transfer
             using (var archive = ZipFile.OpenRead(uploadPath))
             {
                 var names = archive.Entries.Select(entry => entry.FullName).ToHashSet();
-                if (archive.Entries.Count != 2 || !names.SetEquals([ManifestEntry, DatabaseEntry]))
+                var databaseEntry = names.Contains(LegacyDatabaseEntry) ? LegacyDatabaseEntry : DatabaseEntry;
+                if (archive.Entries.Count != 2 || !names.SetEquals([ManifestEntry, databaseEntry]))
                     throw RequestException.Invalid($"Choose a SpendTracker backup ZIP containing only {ManifestEntry} and {DatabaseEntry}.");
                 foreach (var entry in archive.Entries)
                 {
@@ -123,7 +125,7 @@ static class Transfer
                 if (manifest.SchemaVersion != Store.SchemaVersion)
                     throw RequestException.Invalid($"This backup uses database schema {manifest.SchemaVersion}, which this version cannot restore.");
 
-                using var source = archive.GetEntry(DatabaseEntry)!.Open();
+                using var source = archive.GetEntry(databaseEntry)!.Open();
                 using var destination = File.Create(databasePath);
                 CopyLimited(source, destination, MaxDatabaseBytes);
             }

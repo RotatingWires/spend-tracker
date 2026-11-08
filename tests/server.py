@@ -30,15 +30,19 @@ def build():
 class Server:
     """One running server with its own content root. `client()` returns a logged-out HTTP client."""
 
-    def __init__(self):
+    def __init__(self, prepare=None, args=()):
+        """`prepare(data_dir)` can put files in the data folder before the server starts; `args` are extra options."""
         self.data_root = tempfile.TemporaryDirectory(prefix="spend-tracker-test-")
+        if prepare:
+            self.data_dir.mkdir(parents=True)
+            prepare(self.data_dir)
         self.port = free_port()
         self.url = f"http://127.0.0.1:{self.port}"
         self.output = []
         self.token = None
         dll = ROOT / "bin" / "Debug" / "net10.0" / "SpendTracker.dll"
         self.process = subprocess.Popen(
-            ["dotnet", str(dll), "--urls", self.url, "--contentRoot", self.data_root.name, "--webroot", str(ROOT / "wwwroot")],
+            ["dotnet", str(dll), "--urls", self.url, "--contentRoot", self.data_root.name, "--webroot", str(ROOT / "wwwroot"), *args],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             env={**os.environ, "ASPNETCORE_ENVIRONMENT": "Production"})
         threading.Thread(target=self._read_output, daemon=True).start()

@@ -13,7 +13,32 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args);
+// SpendTracker options are read here; everything else (such as --urls) goes to ASP.NET Core. Same as NewsReview.
+if (args is ["--version"])
+{
+    Console.WriteLine(Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0");
+    return;
+}
+if (args is ["backup", .. var backupArgs])
+{
+    var defaultDatabase = File.Exists(Path.Combine("data", "spendtracker.db")) || !File.Exists(Path.Combine("data", "spend-tracker.db"))
+        ? Path.Combine("data", "spendtracker.db") : Path.Combine("data", "spend-tracker.db");
+    Environment.ExitCode = DatabaseFiles.BackupCommand("SpendTracker", defaultDatabase, backupArgs);
+    return;
+}
+var hostArgs = new List<string>();
+string? dataDirectoryArgument = null;
+for (var i = 0; i < args.Length; i++)
+{
+    if (args[i] == "--data-dir" && i + 1 < args.Length) dataDirectoryArgument = args[++i];
+    else hostArgs.Add(args[i]);
+}
+
+var builder = WebApplication.CreateBuilder(hostArgs.ToArray());
+// --data-dir, then the SpendTracker:DataDirectory setting, then SPENDTRACKER_DATA_DIR, then data/ next to the app.
+var dataDir = Path.GetFullPath(dataDirectoryArgument ?? builder.Configuration["SpendTracker:DataDirectory"]
+    ?? Environment.GetEnvironmentVariable("SPENDTRACKER_DATA_DIR") ?? Path.Combine(builder.Environment.ContentRootPath, "data"));
+Directory.CreateDirectory(dataDir);
 var consoleLogPath = Path.Combine(builder.Environment.ContentRootPath, "logs", "console.log");
 builder.Logging.AddProvider(new SingleFileLoggerProvider(consoleLogPath, 10 * 1024 * 1024));
 
@@ -33,7 +58,7 @@ builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadReq
 // (signed in and started from a terminal), they stay in that profile's ASP.NET key ring. Otherwise (Linux, including
 // services under systemd ProtectHome, and Windows Task Scheduler without a loaded profile) they live in data/keys;
 // Windows then uses machine-scope DPAPI, since user-scope DPAPI fails when the profile isn't loaded. Same as NewsReview.
-var keysDirectory = Path.Combine(builder.Environment.ContentRootPath, "data", "keys");
+var keysDirectory = Path.Combine(dataDir, "keys");
 var profileKeyRing = OperatingSystem.IsWindows()
     && Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) is { Length: > 0 } localAppData
     && Directory.Exists(localAppData);
@@ -102,12 +127,10 @@ var app = builder.Build();
 app.UseResponseCompression();
 var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
-var dataDir = Path.Combine(app.Environment.ContentRootPath, "data");
-Directory.CreateDirectory(dataDir);
 var authPath = Path.Combine(dataDir, "auth.json");
 const int PasswordIterations = 600_000;
 
-var store = new Store(Path.Combine(dataDir, "spend-tracker.db"));
+var store = new Store(DatabaseFiles.Locate(dataDir, "spendtracker.db", "spend-tracker.db", app.Logger));
 string journalMode;
 try
 {
