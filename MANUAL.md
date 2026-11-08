@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.16 Manual
+# SpendTracker v1.2.17 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -334,6 +334,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 data/
   spend-tracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
+  keys/                 sign-in cookie keys when there is no Windows profile key ring (Linux, Task Scheduler)
   backups/              recovery copies written automatically before each restore (File → Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
@@ -534,6 +535,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.17
+
+- Startup logs the version and data folder, the database settings, and where the sign-in keys are, in the same three lines as the other apps.
+- Without a Windows profile key ring (Linux, Task Scheduler), sign-in keys now live in data/keys like NewsReview, so a systemd service with ProtectHome stays signed in. Expect to log in once after updating.
+- The login page words wrong-password and too-many-attempts messages itself; setup conflicts say "A password is already configured."
 
 ### v1.2.16
 

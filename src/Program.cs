@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.Sqlite;
@@ -27,6 +28,22 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.RespectNullableAnnotations = true;
 });
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+
+// Session-cookie keys must outlive restarts, or every restart signs you out. On Windows with a loaded user profile
+// (signed in and started from a terminal), they stay in that profile's ASP.NET key ring. Otherwise (Linux, including
+// services under systemd ProtectHome, and Windows Task Scheduler without a loaded profile) they live in data/keys;
+// Windows then uses machine-scope DPAPI, since user-scope DPAPI fails when the profile isn't loaded. Same as NewsReview.
+var keysDirectory = Path.Combine(builder.Environment.ContentRootPath, "data", "keys");
+var profileKeyRing = OperatingSystem.IsWindows()
+    && Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) is { Length: > 0 } localAppData
+    && Directory.Exists(localAppData);
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("SpendTracker");
+if (!profileKeyRing)
+{
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
+    if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+}
+var keyLocation = profileKeyRing ? "this Windows profile's ASP.NET key ring" : keysDirectory;
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -103,7 +120,9 @@ catch (InvalidOperationException error)
     Environment.ExitCode = 1;
     return;
 }
-app.Logger.LogInformation("SpendTracker v{Version} database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", appVersion, journalMode);
+app.Logger.LogInformation("SpendTracker v{Version}, data folder {DataDirectory}.", appVersion, dataDir);
+app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", journalMode);
+app.Logger.LogInformation("Sign-in keys: {Location}.", keyLocation);
 
 string? setupToken = PasswordConfigured(authPath) ? null : GenerateSetupToken();
 if (setupToken is not null)
@@ -216,7 +235,7 @@ app.MapGet("/api/auth/status", (HttpContext context) => Results.Ok(new
 app.MapPost("/api/auth/setup", async (SetupRequest request, HttpContext context) =>
 {
     if (PasswordConfigured(authPath))
-        return Results.Conflict(new { error = "A password has already been configured." });
+        return Results.Conflict(new { error = "A password is already configured." });
 
     if (setupToken is null)
         return Results.Conflict(new { error = "No setup token is active. Restart SpendTracker to generate a new one." });

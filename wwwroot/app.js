@@ -199,7 +199,7 @@ async function api(path, { method = 'GET', body } = {}) {
     let message = `${response.status} ${response.statusText}`;
     try {
       const error = await response.json();
-      message = error.error || error.detail || error.title || message;
+      message = error.error || message;
     } catch {}
     throw new Error(message);
   }
