@@ -1,5 +1,17 @@
 'use strict';
 
+const REQUEST_TIMEOUT_MS = 30000;
+
+/** fetch that gives up after 30 seconds, like NewsReview, instead of waiting forever on a stopped server. */
+async function timedFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  try {
+    return await fetch(url, timeoutMs ? { ...options, signal: AbortSignal.timeout(timeoutMs) } : options);
+  } catch (error) {
+    if (error.name === 'TimeoutError') throw new Error('The server did not respond within 30 seconds. Check that it is running.');
+    throw error;
+  }
+}
+
 /* Shared state, money/date helpers, the API client, and the derived model every view reads from. */
 
 const state = {
@@ -178,7 +190,7 @@ async function api(path, { method = 'GET', body } = {}) {
     options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
-  const response = await fetch(`/api${path}`, options);
+  const response = await timedFetch(`/api${path}`, options);
   if (response.status === 401) {
     window.location.replace(loginUrl());
     throw new Error('Your session ended. Log in again.');

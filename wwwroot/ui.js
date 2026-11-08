@@ -195,7 +195,7 @@ function applyReleaseLabel(version) {
 
 async function frontendReleaseVersion(fallback = '') {
   try {
-    const response = await fetch('/version.json', { cache: 'no-store', credentials: 'same-origin' });
+    const response = await timedFetch('/version.json', { cache: 'no-store', credentials: 'same-origin' });
     if (!response.ok) return fallback;
     const body = await response.json();
     return body.version || fallback;
@@ -207,7 +207,7 @@ async function frontendReleaseVersion(fallback = '') {
 async function logout() {
   closeMenus();
   try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+    await timedFetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
   } finally {
     window.location.replace('/login.html');
   }
