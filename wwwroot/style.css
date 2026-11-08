@@ -303,7 +303,6 @@ button:disabled { color: var(--shadow); cursor: default; }
   outline: none;
 }
 .retro-input::placeholder { color: var(--muted); opacity: 1; }
-:root[data-theme-effective="dark"] input[type="date"] { color-scheme: dark; }
 
 /* ---------- tabs and workspace ---------- */
 
@@ -540,6 +539,8 @@ input[type="date"] { min-width: 0; max-width: 100%; }
 .scope-actions .row-actions button { padding: 5px 10px; }
 /* View Entry in Time: the entry's row lights up like TaskList's visited task, then fades back. */
 #transactionsTable tr.visit-highlight > td { background: var(--highlight) !important; transition: background 0.4s; }
+/* No fade when the system asks for less motion, like TaskList and NewsReview. */
+@media (prefers-reduced-motion: reduce) { #transactionsTable tr.visit-highlight > td { transition: none; } }
 /* A linked entry (a refund's purchase, a purchase's refunds and paybacks): double-click it to open that entry. */
 .linked-entry { text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
 .ledger-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }

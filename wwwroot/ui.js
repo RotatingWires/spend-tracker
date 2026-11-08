@@ -166,22 +166,22 @@ function populateViewMenu() {
   heading.className = 'menu-heading';
   heading.textContent = 'Theme';
   menu.append(menuSeparator(), heading);
-  const preference = window.SpendTheme.getPreference();
+  const preference = window.AppTheme.getPreference();
   for (const [value, label] of [['light', 'Light'], ['dark', 'Dark']]) {
     menu.append(menuButton(label, {
       role: 'menuitemradio',
       checked: value === preference,
       onClick: () => {
-        window.SpendTheme.setPreference(value);
+        window.AppTheme.setPreference(value);
         closeMenus();
       }
     }));
   }
   menu.append(menuSeparator(), menuButton('Use Retro Font', {
     role: 'menuitemcheckbox',
-    checked: window.SpendTheme.getRetroFont(),
+    checked: window.AppTheme.getRetroFont(),
     onClick: () => {
-      window.SpendTheme.setRetroFont(!window.SpendTheme.getRetroFont());
+      window.AppTheme.setRetroFont(!window.AppTheme.getRetroFont());
       closeMenus();
     }
   }));
@@ -428,7 +428,7 @@ function startApp() {
     event.preventDefault();
     closeMenus();
   }, true);
-  window.addEventListener('spend-theme-change', () => {
+  window.addEventListener('theme-change', () => {
     if (state.activeTab === 'stats' && statsLoaded) renderStats();
   });
   let resizeTimer;
@@ -467,4 +467,6 @@ function defaultEntryDate() {
 }
 
 startApp();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+// No offline copy, like NewsReview: remove the service worker and cache that earlier releases installed.
+navigator.serviceWorker?.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister())).catch(() => {});
+window.caches?.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});

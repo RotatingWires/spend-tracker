@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.22 Manual
+# SpendTracker v1.2.23 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -44,7 +44,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - SQLite through `Microsoft.Data.Sqlite` (no ORM)
 - Plain HTML, CSS, and JavaScript; no frontend framework or build step
 - Canvas API for the chart; no chart library
-- Service worker and web manifest for PWA install
+- Web manifest for adding to a phone's home screen (no offline copy, like NewsReview)
 
 ## Project layout
 
@@ -79,7 +79,7 @@ wwwroot/
   theme.js / theme.css  Light/Dark preference and color tokens
   style.css             Windows 95-style layout and components
   login.html / login.js / auth.css   login and first-run setup
-  sw.js                 network-first service worker
+  sw.js                 removes the offline cache earlier releases installed
   manifest.webmanifest, icons/spend.svg, version.json
 
 tests/
@@ -90,7 +90,7 @@ tests/
 
 ## Version handling
 
-`SpendTracker.csproj` holds the single version number in `<Version>`. The build regenerates `wwwroot/version.json` from it for the browser title, rewriting the file only when the version changes. The service worker cache name is stable: it fetches from the network first with `cache: 'no-store'` and uses its cache only when offline, so new releases never need a cache-version bump.
+`SpendTracker.csproj` holds the single version number in `<Version>`. The build regenerates `wwwroot/version.json` from it for the browser title, rewriting the file only when the version changes. The server marks pages and scripts `Cache-Control: no-cache`, so the browser checks each with the server on every load and always runs the current release.
 
 ## Configuration and running
 
@@ -489,7 +489,7 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 - **Network exposure:** loopback by default. Expose it to a LAN only deliberately with `--urls`, behind a firewall. Use HTTPS (for example a private reverse proxy) across untrusted networks; plain HTTP does not protect passwords, cookies, or data in transit.
 - **At rest:** the database and backups are not encrypted. Protect the `data/` folder, downloaded backups, and CSV exports with filesystem permissions.
 - **Least privilege:** the account running SpendTracker needs read access to the project files and write access to `data/` and `logs/` only.
-- **No outbound traffic:** SpendTracker does not contact any external service. The service worker caches only the app's static files, never `/api` responses.
+- **No outbound traffic:** SpendTracker does not contact any external service. It keeps no offline copy of its pages; without a connection the browser shows its own offline page, which makes a connection problem obvious instead of opening a stale app that cannot reach its data. It can still be added to a phone's home screen from the web manifest. `sw.js` only removes the service worker and cache that releases before v1.2.23 installed.
 - **Logs:** `logs/console.log` contains startup, restore, and error messages, never passwords, the setup token, or request bodies.
 
 ## Known limitations
@@ -551,6 +551,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.23
+
+- No offline copy, like NewsReview: without a connection the browser shows its own offline page instead of a stale app. The old service worker and its cache are removed automatically.
+- One `theme.js` shared word for word with the other three apps: the page marks its theme with `data-theme`, and it loads at the top of every page, login included, so it never flashes the wrong theme.
+- The ledger's row highlight no longer fades when the system asks for reduced motion.
 
 ### v1.2.22
 

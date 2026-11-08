@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.22
+# SpendTracker v1.2.23
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -40,7 +40,7 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 
 - **Passwords:** salted PBKDF2-HMAC-SHA256 with 600,000 iterations in `data/auth.json`; the plaintext password is never stored. The setup token is printed to the console only and is not written to the log file.
 - **Sessions:** HttpOnly, SameSite=Strict cookies lasting up to 30 days, marked Secure when the request uses HTTPS. Setup/login allow 5 attempts per source IP per minute.
-- **No third parties:** SpendTracker makes no outbound network requests. The service worker never caches API responses.
+- **No third parties:** SpendTracker makes no outbound network requests. Nothing is cached for offline use, like NewsReview.
 - **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).

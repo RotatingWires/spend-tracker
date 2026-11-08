@@ -165,9 +165,9 @@ class BrowserTests(unittest.TestCase):
         for option in ("archivedEntries", "allEntries", "unusedLabels"):
             expect(dialog.locator(f'[data-fresh-start="{option}"]')).not_to_be_checked()
         self.shot(page, "fresh-start-dialog")
-        page.evaluate("document.documentElement.dataset.themeEffective = 'dark'")
+        page.evaluate("document.documentElement.dataset.theme = 'dark'")
         self.shot(page, "fresh-start-dialog-dark")
-        page.evaluate("document.documentElement.dataset.themeEffective = 'light'")
+        page.evaluate("document.documentElement.dataset.theme = 'light'")
         page.click("#freshStartButton")
         expect(page.locator("#freshStartError")).to_have_text("Type RESET SELECTED to confirm.")
         expect(dialog).to_be_visible()
@@ -294,7 +294,7 @@ class BrowserTests(unittest.TestCase):
             if theme == "dark":
                 page.click("#viewMenuButton")
                 page.locator("#viewMenu button", has_text="Dark").click()
-                expect(page.locator("html")).to_have_attribute("data-theme-effective", "dark")
+                expect(page.locator("html")).to_have_attribute("data-theme", "dark")
             for tab in TABS:
                 page.click(f'.tabs button:text-is("{tab}")')
                 panel = page.locator(".tabs button", has_text=re.compile(f"^{tab}$")).get_attribute("data-tab")

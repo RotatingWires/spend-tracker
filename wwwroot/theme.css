@@ -57,7 +57,7 @@
   --highlight: #fff4a8;
 }
 
-:root[data-theme-effective="dark"] {
+:root[data-theme="dark"] {
   --face: #303030;
   --light-edge: #666;
   --shadow: #181818;
