@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.18 Manual
+# SpendTracker v1.2.19 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -373,7 +373,7 @@ The upload is verified before any live data changes. It is rejected when:
 
 - it is not a ZIP with exactly `manifest.json` and `spendtracker.db`, or a member is encrypted or too large;
 - the manifest is not a SpendTracker backup, or came from a newer SpendTracker version or schema;
-- the database does not match the manifest's checksum or row counts, or fails SQLite's integrity check;
+- the database does not match the manifest's checksum or row counts, fails SQLite's integrity check, or has links to missing rows (`PRAGMA foreign_key_check`);
 - the database has different tables or columns than this version, or contains triggers, views, or virtual tables.
 
 SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
@@ -549,6 +549,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.19
+
+- Restores also run `PRAGMA foreign_key_check`, like TaskList and NewsReview, and refuse a backup with links to missing rows.
 
 ### v1.2.18
 

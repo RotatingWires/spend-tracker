@@ -450,6 +450,7 @@ class SpendTrackerApiTests(unittest.TestCase):
             "schema 2 from v0.3": rebuild(archive, manifest={"schemaVersion": 2}),
             "extra member": rebuild(archive, extra={"notes.txt": b"hi"}),
             "missing database": rebuild(archive, drop="spendtracker.db"),
+            "broken links": rebuild(archive, sql="PRAGMA foreign_keys=OFF; INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (9999, 9999);"),
             "old JSON backup": json.dumps({"format": "spendtracker-backup", "formatVersion": 1}).encode(),
             "random bytes": b"PK\x03\x04 definitely not a zip",
         }

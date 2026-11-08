@@ -136,6 +136,9 @@ static class Transfer
             using var imported = OpenReadOnly(databasePath);
             if (Convert.ToString(Scalar(imported, "PRAGMA integrity_check;"), CultureInfo.InvariantCulture) != "ok")
                 throw RequestException.Invalid("The backup database failed SQLite's integrity check.");
+            // Like TaskList and NewsReview: every link must point at a row that exists.
+            if (Scalar(imported, "PRAGMA foreign_key_check;") is not null)
+                throw RequestException.Invalid("The backup database has links to missing rows.");
             if (Convert.ToInt64(Scalar(imported, "PRAGMA user_version;"), CultureInfo.InvariantCulture) != manifest.SchemaVersion)
                 throw RequestException.Invalid("The backup database schema does not match its manifest.");
             VerifySchema(store, imported);
