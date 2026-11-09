@@ -101,29 +101,25 @@ function renderYearHeatmap() {
   const start = addDays(first, -weekdayOf(first));
   const weeks = Math.ceil((dayNumber(`${year}-12-31`) - dayNumber(start) + 1) / 7);
 
-  const grid = document.createElement('div');
-  grid.className = 'heatmap-grid';
+  const grid = el('div', 'heatmap-grid');
   grid.style.gridTemplateColumns = `42px repeat(${weeks}, 24px)`;
   grid.append(document.createElement('div'));
   for (let week = 0; week < weeks; week++) {
     const key = addDays(start, week * 7);
-    const label = document.createElement('div');
-    label.className = 'heat-month';
+    const label = el('div', 'heat-month');
     // A month's name sits over the week holding its 1st (or the first week, for January).
     const firstOfMonth = Array.from({ length: 7 }, (_, offset) => addDays(key, offset)).find(day => day.endsWith('-01') && day.startsWith(`${year}-`));
     label.textContent = firstOfMonth ? MONTH_NAMES[Number(firstOfMonth.slice(5, 7)) - 1].slice(0, 3) : '';
     grid.append(label);
   }
   for (let weekday = 0; weekday < 7; weekday++) {
-    const label = document.createElement('div');
-    label.className = 'heat-label';
+    const label = el('div', 'heat-label');
     label.textContent = WEEKDAYS[weekday];
     grid.append(label);
     for (let week = 0; week < weeks; week++) {
       const key = addDays(start, week * 7 + weekday);
       if (!key.startsWith(`${year}-`)) {
-        const blank = document.createElement('span');
-        blank.className = 'heat h0 heat-outside';
+        const blank = el('span', 'heat h0 heat-outside');
         grid.append(blank);
         continue;
       }
@@ -151,19 +147,16 @@ function renderMonthYearHeatmap() {
   const years = [...new Set([...months.keys()].map(month => month.slice(0, 4)))].sort();
   const max = heatScale([...months.values()].map(measure.of));
 
-  const grid = document.createElement('div');
-  grid.className = 'month-year-grid';
+  const grid = el('div', 'month-year-grid');
   grid.style.gridTemplateColumns = '58px repeat(12, 56px)';
   grid.append(document.createElement('div'));
   for (const name of MONTH_NAMES) {
-    const head = document.createElement('div');
-    head.className = 'month-year-head';
+    const head = el('div', 'month-year-head');
     head.textContent = name.slice(0, 3);
     grid.append(head);
   }
   for (const year of years) {
-    const label = document.createElement('div');
-    label.className = 'month-year-year';
+    const label = el('div', 'month-year-year');
     label.textContent = year;
     grid.append(label);
     for (let index = 1; index <= 12; index++) {
@@ -215,28 +208,23 @@ function renderLabelMonthHeatmap(stats) {
   }
   const ids = [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || compareNames(SCOPE_NAMES[scope](a), SCOPE_NAMES[scope](b)));
   if (!ids.length || !months.length) {
-    const empty = document.createElement('div');
-    empty.className = 'note';
+    const empty = el('div', 'note');
     empty.textContent = byMerchant ? 'No purchases at a merchant in this period.' : 'No tagged purchases in this period.';
     $('#labelMonthHeatmap').replaceChildren(empty);
     return;
   }
   const max = heatScale([...cells.values()].map(measure.of));
 
-  const grid = document.createElement('div');
-  grid.className = 'month-year-grid label-month-grid';
+  const grid = el('div', 'month-year-grid label-month-grid');
   grid.style.gridTemplateColumns = `minmax(90px, max-content) repeat(${months.length}, 56px)`;
   grid.append(document.createElement('div'));
   for (const month of months) {
-    const head = document.createElement('div');
-    head.className = 'month-year-head';
-    head.textContent = `${MONTH_NAMES[Number(month.slice(5)) - 1].slice(0, 3)} ${month.slice(2, 4)}`;
+    const head = el('div', 'month-year-head', `${MONTH_NAMES[Number(month.slice(5)) - 1].slice(0, 3)} ${month.slice(2, 4)}`);
     grid.append(head);
   }
   for (const id of ids) {
     const name = SCOPE_NAMES[scope](id);
-    const label = document.createElement('div');
-    label.className = 'month-year-year label-month-name';
+    const label = el('div', 'month-year-year label-month-name');
     label.textContent = name;
     label.title = name;
     grid.append(label);
@@ -268,19 +256,16 @@ function renderWeekHeatmap(stats) {
   const max = heatScale(averages.flat());
   const weekLabels = ['1–7', '8–14', '15–21', '22–28', '29–31'];
 
-  const grid = document.createElement('div');
-  grid.className = 'month-year-grid';
+  const grid = el('div', 'month-year-grid');
   grid.style.gridTemplateColumns = '58px repeat(5, 64px)';
   grid.append(document.createElement('div'));
   for (const label of weekLabels) {
-    const head = document.createElement('div');
-    head.className = 'month-year-head week-head';
+    const head = el('div', 'month-year-head week-head');
     head.textContent = label;
     grid.append(head);
   }
   WEEKDAYS.forEach((name, weekday) => {
-    const label = document.createElement('div');
-    label.className = 'month-year-year';
+    const label = el('div', 'month-year-year');
     label.textContent = name;
     grid.append(label);
     averages[weekday].forEach((value, week) => {

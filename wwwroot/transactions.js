@@ -61,23 +61,18 @@ function renderTransactions() {
   pruneSelection();
 
   const tableRows = shown.map(tx => {
-    const what = document.createElement('span');
+    const what = el('span');
     if (tx.kind !== 'Purchase') {
-      const badge = document.createElement('span');
-      badge.className = 'kind-badge money-in';
-      badge.textContent = `${KIND_LABELS[tx.kind]}:`;
+      const badge = el('span', 'kind-badge money-in', `${KIND_LABELS[tx.kind]}:`);
       what.append(badge);
     }
     what.append(describeTransaction(tx) || '(no description)');
     if (tx.archived) {
-      const badge = document.createElement('span');
-      badge.className = 'archived-badge';
-      badge.textContent = '(archived)';
+      const badge = el('span', 'archived-badge', '(archived)');
       what.append(' ', badge);
     }
     if (tx.note) {
-      const note = document.createElement('span');
-      note.className = 'cell-sub';
+      const note = el('span', 'cell-sub');
       note.textContent = tx.note;
       what.append(note);
     }
@@ -144,12 +139,10 @@ function renderTransactions() {
 
 /** The ledger's Tags cell: wraps between tags, never inside one, so a long list does not widen the column. */
 function tagList(tagIds) {
-  const list = document.createElement('span');
-  list.className = 'tag-list';
+  const list = el('span', 'tag-list');
   tagIds.forEach((id, index) => {
     if (index) list.append(TAG_SEPARATOR);
-    const tag = document.createElement('span');
-    tag.className = 'tag-name';
+    const tag = el('span', 'tag-name');
     tag.textContent = tagName(id);
     list.append(tag);
   });
@@ -221,10 +214,7 @@ function linkedEntries(tx) {
 
 /** The entry's ID as a link that opens it with one click, like TaskList's task ID links. */
 function idLink(tx) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'id-link';
-  button.textContent = `#${tx.id}`;
+  const button = el('button', 'id-link', `#${tx.id}`);
   button.title = `Open ${KIND_LABELS[tx.kind].toLowerCase()} #${tx.id}`;
   button.addEventListener('click', () => openTransactionEditor(tx));
   return button;
@@ -237,11 +227,10 @@ function idLink(tx) {
 function linkedCell(tx) {
   const entries = linkedEntries(tx);
   if (!entries.length) return '';
-  const cell = document.createElement('span');
+  const cell = el('span');
   entries.forEach((entry, index) => {
     if (index) cell.append(', ');
-    const link = document.createElement('span');
-    link.className = 'linked-entry';
+    const link = el('span', 'linked-entry');
     const what = tx.linkedId != null ? ` · ${describeTransaction(entry) || formatMoney(entry.amountCents)}` : '';
     link.textContent = `${KIND_LABELS[entry.kind]} #${entry.id}${what}`;
     link.title = `Double-click to open ${KIND_LABELS[entry.kind].toLowerCase()} #${entry.id} (${formatDate(entry.date)}, ${formatMoney(entry.amountCents)})`;
@@ -302,7 +291,7 @@ function csvField(value) {
 
 function downloadFile(name, type, content) {
   const url = URL.createObjectURL(new Blob([content], { type }));
-  const link = document.createElement('a');
+  const link = el('a');
   link.href = url;
   link.download = name;
   link.click();
@@ -490,9 +479,7 @@ function renderEditorNumbers(tx) {
   if (!tx) return;
   if (tx.archived) line.append('Archived. ');
   for (const entry of scopeNumbers(tx)) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'number-chip';
+    const button = el('button', 'number-chip');
     button.textContent = entry.label;
     button.title = `List every entry numbered in ${entry.label.replace(/ #\d+$/, '')}`;
     button.addEventListener('click', () => {
@@ -591,8 +578,7 @@ function renderShareRows() {
   if (container.hidden) return;
 
   for (const personId of people) {
-    const name = document.createElement('label');
-    name.className = 'share-name';
+    const name = el('label', 'share-name');
     name.htmlFor = split ? `txShare${personId}` : `txGift${personId}`;
     name.textContent = personName(personId);
     const amount = document.createElement(split ? 'input' : 'span');
@@ -613,10 +599,9 @@ function renderShareRows() {
       amountBox.className = 'money-input';
       amountBox.append(amount);
     }
-    const gift = document.createElement('label');
-    gift.className = 'share-gift';
+    const gift = el('label', 'share-gift');
     if (personId !== state.model.self.id) {
-      const box = document.createElement('input');
+      const box = el('input');
       box.type = 'checkbox';
       box.className = 'retro-check';
       box.id = `txGift${personId}`;
@@ -626,20 +611,16 @@ function renderShareRows() {
       gift.append(box, 'Gift');
     }
     // Each person is a row with a divider under it, like TaskList's task rows.
-    const row = document.createElement('div');
-    row.className = 'share-row';
+    const row = el('div', 'share-row');
     row.append(name, amountBox, gift);
     container.append(row);
   }
   if (!split) return;
 
-  const footer = document.createElement('div');
-  footer.className = 'share-footer';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = 'Split Evenly';
+  const footer = el('div', 'share-footer');
+  const button = el('button', '', 'Split Evenly');
   button.addEventListener('click', () => splitEvenly());
-  const total = document.createElement('span');
+  const total = el('span');
   total.id = 'txShareTotal';
   total.className = 'form-hint';
   footer.append(button, total);

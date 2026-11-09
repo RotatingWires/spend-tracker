@@ -43,27 +43,22 @@ function renderMonthGrid(month) {
   const max = Math.max(0, ...[...days.values()].map(day => day.net));
   const today = todayKey();
 
-  const box = document.createElement('fieldset');
-  box.className = 'groupbox';
-  const legend = document.createElement('legend');
+  const box = el('fieldset', 'groupbox');
+  const legend = el('legend');
   legend.textContent = formatMonth(month);
-  const wrap = document.createElement('div');
-  wrap.className = 'calendar-wrap';
-  const grid = document.createElement('div');
-  grid.className = 'month-calendar';
+  const wrap = el('div', 'calendar-wrap');
+  const grid = el('div', 'month-calendar');
   grid.dataset.month = month;
   wrap.append(grid);
   box.append(legend, wrap);
 
   for (const name of WEEKDAYS) {
-    const head = document.createElement('div');
-    head.className = 'calendar-head';
+    const head = el('div', 'calendar-head');
     head.textContent = name;
     grid.append(head);
   }
   for (let blank = 0; blank < weekdayOf(monthStart(month)); blank++) {
-    const empty = document.createElement('div');
-    empty.className = 'calendar-day empty';
+    const empty = el('div', 'calendar-day empty');
     empty.setAttribute('aria-hidden', 'true');
     grid.append(empty);
   }
@@ -83,18 +78,15 @@ function renderMonthGrid(month) {
       cell.classList.add('collection-focus');
     }
 
-    const date = document.createElement('span');
-    date.className = 'calendar-date';
+    const date = el('span', 'calendar-date');
     date.textContent = String(dayOfMonth);
     cell.append(date);
 
     const summary = [`${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`];
     if (day) {
-      const amount = document.createElement('span');
-      amount.className = 'calendar-amount';
+      const amount = el('span', 'calendar-amount');
       amount.textContent = formatMoney(day.net);
-      const meta = document.createElement('span');
-      meta.className = 'calendar-meta';
+      const meta = el('span', 'calendar-meta');
       meta.textContent = plural(day.entries, 'entry', 'entries');
       cell.append(amount, meta);
       summary.push(`net spent ${formatMoney(day.net)}`, plural(day.entries, 'entry', 'entries'));
@@ -102,8 +94,7 @@ function renderMonthGrid(month) {
       summary.push('no entries');
     }
     for (const name of collections) {
-      const label = document.createElement('span');
-      label.className = 'calendar-collection';
+      const label = el('span', 'calendar-collection');
       label.textContent = name;
       cell.append(label);
       summary.push(`collection ${name}`);
@@ -137,8 +128,7 @@ function renderDayDialog() {
   collectionIds.forEach((id, index) => {
     if (index) line.append(', ');
     // A plain click shows the collection here in the calendar; opened in a new tab, the link goes to its Collections entry.
-    const link = document.createElement('a');
-    link.className = 'collection-link';
+    const link = el('a', 'collection-link');
     link.href = collectionLink(id);
     link.textContent = collectionName(id);
     link.title = `Show every day of ${collectionName(id)} in the calendar. Open in a new tab for its entries on the Collections tab.`;

@@ -65,10 +65,8 @@ function renderRunningTotal(stats) {
   }
   const titles = keys.map((key, index) => formatDate(key) + (previousKeys[index] ? ` · ${formatDate(previousKeys[index])}` : ''));
   $('#runningKey').replaceChildren(...series.map(s => {
-    const item = document.createElement('span');
-    item.className = 'chart-key-item';
-    const swatch = document.createElement('span');
-    swatch.className = `chart-swatch series-${s.color}${s.dashed ? ' dashed' : ''}`;
+    const item = el('span', 'chart-key-item');
+    const swatch = el('span', `chart-swatch series-${s.color}${s.dashed ? ' dashed' : ''}`);
     item.append(swatch, s.label);
     return item;
   }));
@@ -259,10 +257,8 @@ function renderBalancesOverTime(stats) {
   const charted = [...rows].sort((x, y) => Math.max(...y.balances.map(Math.abs)) - Math.max(...x.balances.map(Math.abs))).slice(0, 8);
   const series = charted.map((row, index) => ({ label: row.person.name, color: index + 1, format: money, values: row.balances }));
   $('#balanceKey').replaceChildren(...series.map(s => {
-    const item = document.createElement('span');
-    item.className = 'chart-key-item';
-    const swatch = document.createElement('span');
-    swatch.className = `chart-swatch series-${s.color}`;
+    const item = el('span', 'chart-key-item');
+    const swatch = el('span', `chart-swatch series-${s.color}`);
     item.append(swatch, s.label);
     return item;
   }));

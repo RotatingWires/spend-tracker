@@ -301,7 +301,7 @@ function renderOverview(stats) {
     statCard('Net spent', formatMoney(stats.net), { title: 'Spent minus refunds.' }),
     statCard('Paid back to you', formatMoney(stats.paidBack), { title: 'Paybacks other people made to you in this period.' }),
     statCard('Net after paybacks', formatMoney(stats.net - stats.paidBack), { title: 'Net spent minus paybacks received in this period.' }),
-    statCard('Spent for others', formatMoney(stats.forOthers), { sub: share(stats.forOthers, stats.spent) + ' of spent', title: 'The shares of purchases that belong to people other than you.' }),
+    statCard('Spent for others', formatMoney(stats.forOthers), { sub: `${share(stats.forOthers, stats.spent)} of spent`, title: 'The shares of purchases that belong to people other than you.' }),
     statCard('Average purchase', averageMoney(stats.spent, stats.purchases.length), { title: 'Spent divided by the number of purchases.' }),
     statCard('Largest purchase', stats.largest ? formatMoney(stats.largest.amountCents) : '—', {
       sub: stats.largest ? `${describeTransaction(stats.largest)} · ${formatDate(stats.largest.date)}` : '',
@@ -413,12 +413,10 @@ function renderStatsChart(stats) {
     };
   });
   $('#statsChartKey').replaceChildren(...metrics.map(metric => {
-    const item = document.createElement('span');
-    item.className = 'chart-key-item has-tooltip';
+    const item = el('span', 'chart-key-item has-tooltip');
     item.title = metric.title;
     item.tabIndex = 0;
-    const swatch = document.createElement('span');
-    swatch.className = `chart-swatch series-${metric.color}`;
+    const swatch = el('span', `chart-swatch series-${metric.color}`);
     item.append(swatch, metric.label);
     return item;
   }));

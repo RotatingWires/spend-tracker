@@ -21,7 +21,7 @@ let statsLoaded = false;
 
 function loadStatsScripts() {
   statsLoading ??= Promise.all(STATS_SCRIPTS.map(src => new Promise((resolve, reject) => {
-    const script = document.createElement('script');
+    const script = el('script');
     script.src = src;
     script.async = false; // Run in the listed order, while downloading together.
     script.onload = resolve;
@@ -144,8 +144,7 @@ function shiftTimeFrame(delta) {
 function populateViewMenu() {
   const menu = $('#viewMenu');
   // A heading over each group, like TaskList's View menu.
-  const tabsHeading = document.createElement('div');
-  tabsHeading.className = 'menu-heading';
+  const tabsHeading = el('div', 'menu-heading');
   tabsHeading.setAttribute('role', 'presentation');
   tabsHeading.textContent = 'Tabs';
   menu.replaceChildren(tabsHeading);
@@ -167,9 +166,7 @@ function populateViewMenu() {
       setStatus(state.showArchived ? 'Showing archived entries in the ledger and calendar.' : 'Archived entries are hidden from the ledger and calendar.');
     }
   }));
-  const heading = document.createElement('div');
-  heading.className = 'menu-heading';
-  heading.textContent = 'Theme';
+  const heading = el('div', 'menu-heading', 'Theme');
   menu.append(menuSeparator(), heading);
   const preference = window.AppTheme.getPreference();
   for (const [value, label] of [['light', 'Light'], ['dark', 'Dark']]) {
@@ -193,8 +190,7 @@ function populateViewMenu() {
 }
 
 function menuSeparator() {
-  const separator = document.createElement('div');
-  separator.className = 'menu-separator';
+  const separator = el('div', 'menu-separator');
   separator.setAttribute('role', 'separator');
   return separator;
 }
@@ -311,8 +307,7 @@ function initializeRowHover() {
 
 function initializeTooltips() {
   // Touch screens have no hover, so tapping an underlined label shows its definition.
-  const popup = document.createElement('div');
-  popup.className = 'help-tooltip';
+  const popup = el('div', 'help-tooltip');
   popup.hidden = true;
   document.body.append(popup);
   const show = target => {

@@ -33,13 +33,12 @@ function setSelectionMode(enabled) {
 }
 
 function selectionCell(tx) {
-  const checkbox = document.createElement('input');
+  const checkbox = el('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'selection-check retro-check';
   checkbox.checked = selectedIds.has(tx.id);
   checkbox.setAttribute('aria-label', `Select #${tx.id}: ${describeTransaction(tx) || KIND_LABELS[tx.kind]}`);
-  const wrap = document.createElement('span');
-  wrap.className = 'selection-id';
+  const wrap = el('span', 'selection-id');
   wrap.append(checkbox, `#${tx.id}`);
   return wrap;
 }
@@ -253,25 +252,18 @@ function updateBulkControls() {
   const none = bulkBusy || selected.length === 0;
   const primary = selected.length > 0 && selected.every(tx => tx.archived) ? 'restore' : 'archive';
 
-  const group = document.createElement('div');
-  group.className = 'split-group';
-  const main = document.createElement('button');
-  main.type = 'button';
-  main.className = 'split-primary';
+  const group = el('div', 'split-group');
+  const main = el('button', 'split-primary');
   main.textContent = BULK_ACTIONS[primary].label;
   main.disabled = none;
   main.addEventListener('click', () => runBulkAction(primary));
 
-  const arrow = document.createElement('button');
-  arrow.type = 'button';
-  arrow.className = 'split-arrow';
-  arrow.textContent = '▼';
+  const arrow = el('button', 'split-arrow', '▼');
   arrow.setAttribute('aria-label', 'More actions for selected entries');
   arrow.setAttribute('aria-haspopup', 'menu');
   arrow.setAttribute('aria-expanded', 'false');
   arrow.disabled = none;
-  const menu = document.createElement('div');
-  menu.className = 'menu-dropdown split-dropdown';
+  const menu = el('div', 'menu-dropdown split-dropdown');
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
   const items = ['archive', 'restore', null, 'tags', 'collections', 'people', 'merchant', null, 'delete'];

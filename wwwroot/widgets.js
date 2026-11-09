@@ -26,15 +26,12 @@ function toggleMenu(button, menu) {
 }
 
 function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
-  const button = document.createElement('button');
-  button.type = 'button';
+  const button = el('button');
   button.setAttribute('role', role);
   if (role !== 'menuitem') button.setAttribute('aria-checked', checked ? 'true' : 'false');
-  const check = document.createElement('span');
-  check.className = 'menu-check';
+  const check = el('span', 'menu-check');
   check.setAttribute('aria-hidden', 'true');
-  const text = document.createElement('span');
-  text.className = 'menu-label';
+  const text = el('span', 'menu-label');
   text.textContent = label;
   button.append(check, text);
   button.addEventListener('click', onClick);
@@ -72,17 +69,15 @@ function addNewItem(menu, onAdd) {
 const MENU_SEARCH_OVER = 10;
 
 function menuSearch(menu, render) {
-  const box = document.createElement('div');
-  box.className = 'menu-search';
-  const input = document.createElement('input');
+  const box = el('div', 'menu-search');
+  const input = el('input');
   input.type = 'search';
   input.className = 'retro-input';
   input.placeholder = 'Search';
   input.autocomplete = 'off';
   input.setAttribute('aria-label', 'Search this list');
   box.append(input);
-  const list = document.createElement('div');
-  list.className = 'menu-list';
+  const list = el('div', 'menu-list');
   menu.replaceChildren(box, list);
   box.addEventListener('click', event => event.stopPropagation());
   input.addEventListener('input', () => render());
@@ -107,21 +102,17 @@ function menuSearch(menu, render) {
 
 function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'retro-select';
+  const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   const labelledBy = host.getAttribute('aria-labelledby');
   if (labelledBy) button.setAttribute('aria-labelledby', labelledBy);
-  const label = document.createElement('span');
-  const arrow = document.createElement('span');
-  arrow.className = 'select-arrow';
+  const label = el('span');
+  const arrow = el('span', 'select-arrow');
   arrow.setAttribute('aria-hidden', 'true');
   arrow.textContent = '▼';
   button.append(label, arrow);
-  const menu = document.createElement('div');
-  menu.className = 'menu-dropdown single-select-dropdown';
+  const menu = el('div', 'menu-dropdown single-select-dropdown');
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
   host.replaceChildren(button, menu);
@@ -185,21 +176,17 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = 
  */
 function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'retro-select';
+  const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   const labelledBy = host.getAttribute('aria-labelledby');
   if (labelledBy) button.setAttribute('aria-labelledby', labelledBy);
-  const label = document.createElement('span');
-  const arrow = document.createElement('span');
-  arrow.className = 'select-arrow';
+  const label = el('span');
+  const arrow = el('span', 'select-arrow');
   arrow.setAttribute('aria-hidden', 'true');
   arrow.textContent = '▼';
   button.append(label, arrow);
-  const menu = document.createElement('div');
-  menu.className = 'menu-dropdown single-select-dropdown multi-select-dropdown';
+  const menu = el('div', 'menu-dropdown single-select-dropdown multi-select-dropdown');
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
   host.replaceChildren(button, menu);
@@ -216,17 +203,13 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
   function groupHeading(group) {
     const inGroup = options.filter(option => groupOf(option.value) === group);
     const checked = inGroup.filter(option => selected.has(option.value)).length;
-    const heading = document.createElement('button');
-    heading.type = 'button';
-    heading.className = 'menu-group';
+    const heading = el('button', 'menu-group');
     heading.setAttribute('role', 'menuitem');
     heading.setAttribute('aria-expanded', String(expanded.has(group) || Boolean(search.query())));
     heading.dataset.group = group;
-    const arrow = document.createElement('span');
-    arrow.className = 'menu-group-arrow';
+    const arrow = el('span', 'menu-group-arrow');
     arrow.setAttribute('aria-hidden', 'true');
-    const text = document.createElement('span');
-    text.className = 'menu-label';
+    const text = el('span', 'menu-label');
     text.textContent = checked ? `${group} (${checked})` : group;
     heading.append(arrow, text);
     heading.addEventListener('click', event => {
@@ -370,10 +353,10 @@ function renderTable(table, columns, rows, options = {}) {
   if (sort && !columns[sort.index]) tableSorts.delete(sortKey);
   const drawn = sort && columns[sort.index] && !onSort ? sortByValue(rows, row => cellSortValue(row.cells[sort.index]), sort.direction) : rows;
 
-  const head = document.createElement('thead');
-  const headRow = document.createElement('tr');
+  const head = el('thead');
+  const headRow = el('tr');
   columns.forEach((column, index) => {
-    const th = document.createElement('th');
+    const th = el('th');
     th.scope = 'col';
     th.textContent = column.label;
     if (column.num) th.className = 'num';
@@ -402,11 +385,10 @@ function renderTable(table, columns, rows, options = {}) {
   });
   head.append(headRow);
 
-  const body = document.createElement('tbody');
+  const body = el('tbody');
   if (rows.length === 0) {
-    const tr = document.createElement('tr');
-    tr.className = 'empty-row';
-    const td = document.createElement('td');
+    const tr = el('tr', 'empty-row');
+    const td = el('td');
     td.colSpan = columns.length;
     td.append(Object.assign(document.createElement('span'), { textContent: empty }));
     tr.append(td);
@@ -416,19 +398,19 @@ function renderTable(table, columns, rows, options = {}) {
 
   table.replaceChildren(head, body);
   if (footer) {
-    const foot = document.createElement('tfoot');
+    const foot = el('tfoot');
     foot.append(tableRow(columns, footer));
     table.append(foot);
   }
 }
 
 function tableRow(columns, row) {
-  const tr = document.createElement('tr');
+  const tr = el('tr');
   if (row.className) tr.className = row.className;
   if (row.id != null) tr.dataset.id = String(row.id);
   if (row.selected !== undefined) tr.setAttribute('aria-selected', String(row.selected));
   row.cells.forEach((cell, index) => {
-    const td = document.createElement('td');
+    const td = el('td');
     const spec = cell instanceof Node || typeof cell !== 'object' || cell === null ? { content: cell } : cell;
     if (columns[index]?.num || spec.num) td.classList.add('num');
     if (spec.className) td.classList.add(...spec.className.split(' '));
@@ -491,23 +473,19 @@ function bindSearchForm(form, run) {
 }
 
 function statCard(label, value, { sub = '', title = '' } = {}) {
-  const card = document.createElement('div');
-  card.className = 'stat-card';
-  const labelElement = document.createElement('div');
-  labelElement.className = 'label';
+  const card = el('div', 'stat-card');
+  const labelElement = el('div', 'label');
   labelElement.textContent = label;
   if (title) {
     labelElement.title = title;
     labelElement.classList.add('has-tooltip');
     labelElement.tabIndex = 0;
   }
-  const valueElement = document.createElement('div');
-  valueElement.className = 'value';
+  const valueElement = el('div', 'value');
   valueElement.textContent = value;
   card.append(labelElement, valueElement);
   if (sub) {
-    const subElement = document.createElement('div');
-    subElement.className = 'sub';
+    const subElement = el('div', 'sub');
     subElement.textContent = sub;
     card.append(subElement);
   }
@@ -518,16 +496,14 @@ function statCard(label, value, { sub = '', title = '' } = {}) {
 function renderMetrics(container, metrics) {
   container.replaceChildren();
   for (const [label, value, title] of metrics) {
-    const labelElement = document.createElement('div');
-    labelElement.className = 'metric-label';
+    const labelElement = el('div', 'metric-label');
     labelElement.textContent = label;
     if (title) {
       labelElement.title = title;
       labelElement.classList.add('has-tooltip');
       labelElement.tabIndex = 0;
     }
-    const valueElement = document.createElement('div');
-    valueElement.className = 'metric-value';
+    const valueElement = el('div', 'metric-value');
     valueElement.textContent = value;
     container.append(labelElement, valueElement);
   }
@@ -539,11 +515,9 @@ function moneyCell(cents, { direction = 'out', className = '' } = {}) {
 }
 
 function rowActionButtons(actions) {
-  const wrap = document.createElement('div');
-  wrap.className = 'row-actions';
+  const wrap = el('div', 'row-actions');
   for (const [label, onClick, ariaLabel] of actions) {
-    const button = document.createElement('button');
-    button.type = 'button';
+    const button = el('button');
     button.textContent = label;
     if (ariaLabel) button.setAttribute('aria-label', ariaLabel);
     button.addEventListener('click', event => {

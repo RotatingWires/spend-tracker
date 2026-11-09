@@ -19,10 +19,8 @@ function emptyCounts() {
 /** A key above a chart: one colored square and label per series. */
 function renderChartKey(container, series) {
   container.replaceChildren(...series.map(s => {
-    const item = document.createElement('span');
-    item.className = 'chart-key-item';
-    const swatch = document.createElement('span');
-    swatch.className = `chart-swatch series-${s.color}`;
+    const item = el('span', 'chart-key-item');
+    const swatch = el('span', `chart-swatch series-${s.color}`);
     item.append(swatch, s.label);
     return item;
   }));

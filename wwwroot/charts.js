@@ -30,11 +30,10 @@ const Charts = (() => {
       document.body.append(tooltip);
     }
     tooltip.replaceChildren(...lines.map(line => {
-      const row = document.createElement('div');
+      const row = el('div');
       if (line.strong) row.className = 'chart-tooltip-strong';
       if (line.series != null) {
-        const swatch = document.createElement('span');
-        swatch.className = `chart-swatch series-${line.series}`;
+        const swatch = el('span', `chart-swatch series-${line.series}`);
         row.append(swatch);
       }
       row.append(line.text);
