@@ -71,6 +71,11 @@ class BrowserTests(unittest.TestCase):
             page.fill("#password", PASSWORD)
             page.fill("#confirmPassword", PASSWORD)
             page.click("#loginButton")
+            # A new database asks to restore a backup first, in the same box as TaskList: Cancel-like first.
+            expect(page.locator("#firstRunDialog")).to_be_visible()
+            expect(page.locator("#firstRunDialog .dialog-buttons button")).to_have_text(["Start Fresh", "Import/Export..."])
+            page.click("#firstRunContinue")
+            expect(page.locator("#firstRunDialog")).not_to_be_visible()
         else:
             page.context.add_cookies([{"name": cookie.name, "value": cookie.value, "url": self.server.url} for cookie in self.api_client().cookies])
             page.goto(self.server.url + "/")

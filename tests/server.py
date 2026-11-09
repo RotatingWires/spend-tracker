@@ -81,6 +81,8 @@ class Server:
         client = self.client()
         if not (self.data_dir / "auth.json").exists():
             client.post("/api/auth/setup", {"setupToken": self.token, "password": PASSWORD, "confirmPassword": PASSWORD})
+            # Answer the first-start backup prompt, so pages opened with this session go straight to the app.
+            client.post("/api/onboarding/acknowledge", {})
         else:
             client.post("/api/auth/login", {"password": PASSWORD})
         return client

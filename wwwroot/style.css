@@ -922,3 +922,8 @@ textarea:focus-visible,
 @media (max-width: 650px) {
   .title-version { display: none; }
 }
+
+/* The first-start backup prompt, the same box as TaskList's. */
+.first-run-dialog { width: min(460px, calc(100vw - 24px)); font-size: 16px; }
+.first-run-body { line-height: 1.5; }
+.first-run-body p { margin: 0; }

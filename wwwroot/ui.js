@@ -439,7 +439,13 @@ function startApp() {
     }, 150);
   });
 
-  loadSnapshot().then(openLinkedPage);
+  loadSnapshot().then(openLinkedPage).then(showImportReminder);
+  $('#firstRunImport').addEventListener('click', () => dismissImportReminder(true));
+  $('#firstRunContinue').addEventListener('click', () => dismissImportReminder(false));
+  $('#firstRunDialog').addEventListener('cancel', event => {
+    event.preventDefault();
+    dismissImportReminder(false);
+  });
 }
 
 /** A collection's deep link, like TaskList's /task/{id}: the server answers it with the app, which opens it. */
@@ -470,3 +476,31 @@ startApp();
 // No offline copy, like NewsReview: remove the service worker and cache that earlier releases installed.
 navigator.serviceWorker?.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister())).catch(() => {});
 window.caches?.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
+
+/** "Restore a Backup Before Starting" on a brand-new database, the same box as TaskList's. */
+async function showImportReminder() {
+  let onboarding;
+  try {
+    onboarding = await api('/onboarding');
+  } catch {
+    return;
+  }
+  if (!onboarding.importReminderPending) return;
+  $('#firstRunError').textContent = '';
+  $('#firstRunDialog').showModal();
+  $('#firstRunImport').focus();
+}
+
+async function dismissImportReminder(openImport) {
+  const buttons = [$('#firstRunImport'), $('#firstRunContinue')];
+  buttons.forEach(button => { button.disabled = true; });
+  try {
+    await api('/onboarding/acknowledge', { method: 'POST' });
+    $('#firstRunDialog').close();
+    if (openImport) $('#transferDialog').showModal();
+  } catch (error) {
+    $('#firstRunError').textContent = error.message;
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}

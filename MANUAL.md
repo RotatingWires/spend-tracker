@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.24 Manual
+# SpendTracker v1.2.25 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -342,6 +342,14 @@ Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show
 - The ledger draws 200 rows at a time (about 4 ms instead of about 75 ms for 5,000 rows).
 - The server compresses its responses with Brotli or gzip. With 2,000 entries the data download is 139 KB instead of 938 KB, and scripts and styles shrink about threefold. (Only plain HTTP is compressed, ASP.NET's default; behind an HTTPS reverse proxy, let the proxy compress.)
 
+## First-run backup reminder
+
+When SpendTracker creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
+
+> If you have a SpendTracker backup ZIP, restore it before adding entries. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
+
+**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
+
 ## Data and backups
 
 All persistent data is in the `data/` folder of the folder SpendTracker runs from (the project folder when started with `dotnet run`):
@@ -551,6 +559,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.25
+
+- A brand-new database shows **Restore a Backup Before Starting** after the first login, the same box as TaskList's: **Start Fresh** or **Import/Export...**. Updating an existing installation does not show it.
 
 ### v1.2.24
 

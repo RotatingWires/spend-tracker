@@ -347,6 +347,17 @@
     </form>
   </dialog>
 
+  <dialog id="firstRunDialog" class="retro-dialog first-run-dialog" aria-labelledby="firstRunTitle" aria-describedby="firstRunMessage">
+    <div class="dialog-window">
+      <div class="dialog-title" id="firstRunTitle">Restore a Backup Before Starting</div>
+      <div class="dialog-body first-run-body">
+        <p id="firstRunMessage">If you have a SpendTracker backup ZIP, restore it before adding entries. Use File &gt; Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.</p>
+        <div id="firstRunError" class="form-error" role="alert"></div>
+      </div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" id="firstRunContinue">Start Fresh</button><button type="button" id="firstRunImport">Import/Export...</button></div>
+    </div>
+  </dialog>
+
   <dialog id="transferDialog" class="retro-dialog transfer-dialog" aria-labelledby="transferTitle">
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="transferTitle">Import/Export</div>

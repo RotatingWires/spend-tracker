@@ -130,7 +130,9 @@ var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) 
 var authPath = Path.Combine(dataDir, "auth.json");
 const int PasswordIterations = 600_000;
 
-var store = new Store(DatabaseFiles.Locate(dataDir, "spendtracker.db", "spend-tracker.db", app.Logger));
+var databasePath = DatabaseFiles.Locate(dataDir, "spendtracker.db", "spend-tracker.db", app.Logger);
+Onboarding.Initialize(dataDir, databasePath);
+var store = new Store(databasePath);
 string journalMode;
 try
 {
@@ -301,6 +303,14 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
 
 var api = app.MapGroup("/api").RequireAuthorization();
 
+// The first-start "Restore a Backup Before Starting" prompt, like TaskList's.
+api.MapGet("/onboarding", () => Results.Ok(new { importReminderPending = Onboarding.Pending(dataDir) }));
+api.MapPost("/onboarding/acknowledge", () =>
+{
+    Onboarding.Acknowledge(dataDir);
+    return Results.NoContent();
+});
+
 api.MapGet("/snapshot", () => Results.Ok(store.ReadSnapshot(appVersion)));
 api.MapGet("/history", (long? beforeId, int? limit, string? query) => Results.Ok(store.ReadHistory(beforeId, limit ?? 200, query)));
 
@@ -382,6 +392,7 @@ api.MapPost("/restore", async (HttpRequest request) =>
         var uploadPath = Path.Combine(workDirectory.FullName, "upload.zip");
         await Transfer.SaveUpload(request.Body, uploadPath, request.HttpContext.RequestAborted);
         var result = Transfer.RestoreArchive(store, uploadPath, Path.Combine(dataDir, "backups"), appVersion);
+        Onboarding.Acknowledge(dataDir);
         app.Logger.LogInformation("Restored a backup with {Transactions} transactions. Previous data saved to data/backups/{RecoveryFile}.", result.Transactions, result.RecoveryFile);
         return Results.Ok(result);
     }
