@@ -361,7 +361,7 @@ button:disabled { color: var(--shadow); cursor: default; }
   border-right: 2px solid var(--light-edge);
   border-bottom: 2px solid var(--light-edge);
 }
-.error-panel, .form-error { color: var(--error); font-weight: 700; }
+.form-error { color: var(--error); font-weight: 700; }
 .panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .panel-actions .retro-input { min-width: 0; flex: 1 1 200px; max-width: 360px; }
 /* Add forms: the name box is exactly as tall as its Add button. */
@@ -887,12 +887,12 @@ textarea:focus-visible,
   .workspace { padding: 5px; }
   .groupbox { padding-left: 5px; padding-right: 5px; }
   .statusbar {
-    grid-template-columns: 1fr;
+    /* Both sides stay on phones, like TaskList: the right side shortens with an ellipsis. */
+    grid-template-columns: auto minmax(0, 1fr);
     margin-left: max(5px, env(safe-area-inset-left));
     margin-right: max(5px, env(safe-area-inset-right));
     margin-bottom: max(var(--ios-bottom-offset), env(safe-area-inset-bottom));
   }
-  .statusbar #statusRight { display: none; }
   .form-grid { grid-template-columns: 1fr; gap: 4px; }
   .form-grid > label, .form-grid > .form-label { margin-top: 6px; }
   /* One column: the label sits on its field, so only the field gets the line. */

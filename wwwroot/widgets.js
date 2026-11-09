@@ -661,12 +661,19 @@ function chooseOption(title, label, options, okLabel = 'OK', { modes = null, mul
   });
 }
 
+/** Errors show in the status bar, like TaskList's; an empty message clears an error still showing there. */
 function showError(message) {
-  const panel = $('#errorPanel');
-  panel.textContent = message;
-  panel.hidden = !message;
+  const status = $('#statusLeft');
+  if (message) {
+    status.textContent = `Error: ${message}`;
+    status.dataset.error = '';
+  } else if ('error' in status.dataset) {
+    setStatus('Ready');
+  }
 }
 
 function setStatus(message) {
-  $('#statusLeft').textContent = message;
+  const status = $('#statusLeft');
+  status.textContent = message;
+  delete status.dataset.error;
 }
