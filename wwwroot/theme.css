@@ -3,31 +3,35 @@
 :root { --ui-font: Tahoma, "MS Sans Serif", Arial, sans-serif; }
 :root[data-retro-font] { --ui-font: "W95FA", Tahoma, "MS Sans Serif", Arial, sans-serif; }
 
-/* Light/Dark Win95 theme tokens for SpendTracker. Every color in style.css comes from here. */
+/* Light/Dark Windows 95 theme tokens for SpendTracker. Every color in the other stylesheets comes from here. */
 :root {
-  --link: #000080;
-  --link-hover: #0000d0;
+  color-scheme: light;
+  /* The shared palette: the same names and values in TaskList, TaskList Stats, NewsReview, and SpendTracker. */
+  --ink: #000;
+  --desktop: #008080;
   --face: #c0c0c0;
+  --surface: #fff;
+  --surface-alt: #f4f4f4;
   --light-edge: #fff;
+  --mid-edge: #dfdfdf;
   --shadow: #808080;
   --dark-edge: #404040;
   --black: #000;
-  --desktop: #008080;
-
-  --ink: #000;
-  --surface: #fff;
-  --surface-alt: #f4f4f4;
-  --divider: #c8c8c8;
-  --muted: #555;
-  --note: #ffffe1;
-  --row-hover: #e5ecf8;
   --title: #000080;
   --title-text: #fff;
+  --divider: #c8c8c8;
+  --divider-subtle: #d0d0d0;
+  --muted: #555;
+  --link: #000080;
+  --link-hover: #0000d0;
+  --note: #ffffe1;
+  --highlight: #fff4a8; /* An item just jumped to, like a TaskList deep link. */
+  --row-hover: #e5ecf8;
   --error: #800000;
+  --backdrop: #0007;
+  /* Colors only SpendTracker uses. */
   --money-in: #006000;
   --collection: #6a2c91;
-  --backdrop: #0007;
-
   --chart-surface: #fff;
   --chart-text: #222;
   --chart-axis: #808080;
@@ -44,7 +48,6 @@
   --chart-tooltip-text: #fff;
   --chart-tooltip-light-edge: #555;
   --chart-tooltip-dark-edge: #000;
-
   --heat-0: #d7d7d7;
   --heat-1: #b7cbd8;
   --heat-2: #6f9bb5;
@@ -55,33 +58,35 @@
   --heat-2-text: var(--ink);
   --heat-3-text: #fff;
   --heat-4-text: #fff;
-  /* TaskList's visit highlight: an entry shown with View Entry in Time. */
-  --highlight: #fff4a8;
 }
 
 :root[data-theme="dark"] {
-  --link: #91adff;
-  --link-hover: #c0ceff;
+  color-scheme: dark;
+  /* The shared palette. */
+  --ink: #f1f1f1;
+  --desktop: #002f2f;
   --face: #303030;
+  --surface: #191919;
+  --surface-alt: #242424;
   --light-edge: #666;
+  --mid-edge: #494949;
   --shadow: #181818;
   --dark-edge: #0e0e0e;
   --black: #000;
-  --desktop: #002f2f;
-
-  --ink: #f1f1f1;
-  --surface: #191919;
-  --surface-alt: #242424;
-  --divider: #3d3d3d;
-  --muted: #b8b8b8;
-  --note: #3b3825;
-  --row-hover: #2d3850;
   --title: #111858;
   --title-text: #fff;
+  --divider: #3d3d3d;
+  --divider-subtle: #414141;
+  --muted: #b8b8b8;
+  --link: #91adff;
+  --link-hover: #c0ceff;
+  --note: #3b3825;
+  --highlight: #5c4c00;
+  --row-hover: #2d3850;
   --error: #ff9c9c;
+  /* Colors only SpendTracker uses. */
   --money-in: #69d37d;
   --collection: #d2a8ff;
-
   --chart-surface: #191919;
   --chart-text: #eeeeee;
   --chart-axis: #777;
@@ -98,7 +103,6 @@
   --chart-tooltip-text: #111;
   --chart-tooltip-light-edge: #fff;
   --chart-tooltip-dark-edge: #777;
-
   --heat-0: #242424;
   --heat-1: #30485a;
   --heat-2: #3f6f8d;
@@ -109,5 +113,4 @@
   --heat-2-text: #fff;
   --heat-3-text: #fff;
   --heat-4-text: #101010;
-  --highlight: #5c4c00;
 }
