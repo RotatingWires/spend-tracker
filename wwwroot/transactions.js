@@ -91,7 +91,7 @@ function renderTransactions() {
       onClick: selectionMode ? event => toggleSelection(tx.id, event.shiftKey) : null,
       onDoubleClick: selectionMode ? null : () => openTransactionEditor(tx),
       cells: [
-        selectionMode ? selectionCell(tx) : `#${tx.id}`,
+        selectionMode ? selectionCell(tx) : idLink(tx),
         formatDate(tx.date),
         whoLabel(tx),
         what,
@@ -217,6 +217,17 @@ function matchesLedgerFilters(tx) {
 function linkedEntries(tx) {
   if (tx.linkedId != null) return [state.model.byId.get(tx.linkedId)].filter(Boolean);
   return state.model.linked.get(tx.id) ?? [];
+}
+
+/** The entry's ID as a link that opens it with one click, like TaskList's task ID links. */
+function idLink(tx) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'id-link';
+  button.textContent = `#${tx.id}`;
+  button.title = `Open ${KIND_LABELS[tx.kind].toLowerCase()} #${tx.id}`;
+  button.addEventListener('click', () => openTransactionEditor(tx));
+  return button;
 }
 
 /**

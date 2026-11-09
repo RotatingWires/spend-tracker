@@ -57,7 +57,7 @@ async function loadSnapshot() {
   state.loading = (async () => {
     try {
       const snapshot = await api('/snapshot');
-      state.snapshot = snapshot;
+      state.snapshot = sortSnapshotLists(snapshot);
       state.model = buildModel(snapshot);
       applyReleaseLabel(await frontendReleaseVersion(snapshot.version));
       showError('');

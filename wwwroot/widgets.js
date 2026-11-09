@@ -438,7 +438,7 @@ function renderTable(table, columns, rows, options = {}) {
     tr.className = 'empty-row';
     const td = document.createElement('td');
     td.colSpan = columns.length;
-    td.textContent = empty;
+    td.append(Object.assign(document.createElement('span'), { textContent: empty }));
     tr.append(td);
     body.append(tr);
   }

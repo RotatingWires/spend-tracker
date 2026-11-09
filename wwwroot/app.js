@@ -239,6 +239,24 @@ function buildModel(snapshot) {
  */
 const SNAPSHOT_LISTS = { 'payment-methods': 'paymentMethods', people: 'people', tags: 'tags', merchants: 'merchants', collections: 'collections' };
 
+/** Names sort one way everywhere: A–Z in the browser's language, ignoring capitals and accents, so "Émile" sits with the Es. */
+const nameCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+function compareNames(a, b) {
+  return nameCollator.compare(a, b);
+}
+
+/** Me first, then everyone by name, like tags, merchants, and collections; payment methods keep the order they were added in. */
+function sortSnapshotList(path, list) {
+  const byName = (a, b) => compareNames(a.name, b.name) || a.id - b.id;
+  return list.sort(path === 'people' ? (a, b) => b.isSelf - a.isSelf || byName(a, b) : path === 'payment-methods' ? (a, b) => a.id - b.id : byName);
+}
+
+/** Sorts every list in a freshly loaded snapshot, so names never show in the server's A–Z-only order. */
+function sortSnapshotLists(snapshot) {
+  for (const [path, key] of Object.entries(SNAPSHOT_LISTS)) sortSnapshotList(path, snapshot[key]);
+  return snapshot;
+}
+
 /** The server's order: by date, then ID. */
 function compareTransactions(a, b) {
   return a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id;
@@ -262,19 +280,12 @@ function applyTransactionChanges({ saved = [], deleted = [] }) {
   refreshModel();
 }
 
-/** Adds or replaces one payment method, person, tag, merchant, or collection, in the server's order. */
+/** Adds or replaces one payment method, person, tag, merchant, or collection, keeping the list's order. */
 function applyListItem(path, item) {
   const key = SNAPSHOT_LISTS[path];
   const list = state.snapshot[key].filter(entry => entry.id !== item.id);
   list.push(item);
-  const byName = (a, b) => {
-    const left = a.name.toLowerCase();
-    const right = b.name.toLowerCase();
-    return left < right ? -1 : left > right ? 1 : a.id - b.id;
-  };
-  // Me first, then everyone by name, like tags and merchants; payment methods keep their order.
-  list.sort(path === 'people' ? (a, b) => b.isSelf - a.isSelf || byName(a, b) : path === 'payment-methods' ? (a, b) => a.id - b.id : byName);
-  state.snapshot[key] = list;
+  state.snapshot[key] = sortSnapshotList(path, list);
   // Entries carry their merchant's name too.
   if (path === 'merchants') for (const tx of state.snapshot.transactions) if (tx.merchantId === item.id) tx.merchant = item.name;
   refreshModel();
@@ -456,5 +467,5 @@ function matchesSearch(tx, query) {
 /** The collections of the given entries, each once, by name. */
 function collectionsOf(transactions) {
   const ids = new Set(transactions.flatMap(collectionIdsOf));
-  return [...ids].map(collectionName).sort((a, b) => a.localeCompare(b));
+  return [...ids].map(collectionName).sort(compareNames);
 }

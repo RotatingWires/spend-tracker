@@ -5,6 +5,8 @@
 
 /* Light/Dark Win95 theme tokens for SpendTracker. Every color in style.css comes from here. */
 :root {
+  --link: #000080;
+  --link-hover: #0000d0;
   --face: #c0c0c0;
   --light-edge: #fff;
   --shadow: #808080;
@@ -58,6 +60,8 @@
 }
 
 :root[data-theme="dark"] {
+  --link: #91adff;
+  --link-hover: #c0ceff;
   --face: #303030;
   --light-edge: #666;
   --shadow: #181818;

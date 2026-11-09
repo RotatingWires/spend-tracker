@@ -213,7 +213,7 @@ function renderLabelMonthHeatmap(stats) {
     const id = Number(key.split('|')[0]);
     totals.set(id, (totals.get(id) ?? 0) + measure.of(bucket));
   }
-  const ids = [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || SCOPE_NAMES[scope](a).localeCompare(SCOPE_NAMES[scope](b)));
+  const ids = [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || compareNames(SCOPE_NAMES[scope](a), SCOPE_NAMES[scope](b)));
   if (!ids.length || !months.length) {
     const empty = document.createElement('div');
     empty.className = 'note';

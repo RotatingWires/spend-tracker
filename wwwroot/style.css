@@ -457,7 +457,12 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--dark-edge); background:
 tr.clickable { cursor: pointer; }
 tr.clickable:focus-visible { outline: 1px dotted currentColor; outline-offset: -3px; }
 html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
-.empty-row td { color: var(--muted); text-align: center; padding: 16px; }
+/* Entry IDs open the entry, like TaskList's task ID links. */
+.id-link { padding: 0; border: 0; background: transparent; color: var(--link); text-decoration: underline; font-weight: 700; cursor: pointer; }
+.id-link:hover { color: var(--link-hover); }
+.empty-row td { color: var(--muted); padding: 0; }
+/* Empty messages are centered in what you can see, like TaskList's, even when a wide table scrolls sideways on a phone. */
+.empty-row td > span { display: block; position: sticky; left: 0; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 24px 12px; text-align: center; white-space: normal; }
 .money-in { color: var(--money-in); }
 .kind-badge { font-weight: 700; margin-right: 4px; }
 .cell-sub { display: block; font-size: 12px; color: var(--muted); }
@@ -618,7 +623,7 @@ button.heat:active {
   font: 13px var(--ui-font);
   line-height: 1.4;
   white-space: pre-line;
-  pointer-collections: none;
+  pointer-events: none;
 }
 .help-tooltip { background: var(--note); color: var(--ink); }
 .chart-tooltip {

@@ -129,7 +129,7 @@ function renderDayDialog() {
   $('#dayDialogTitle').textContent = `${WEEKDAY_NAMES[weekdayOf(key)]}, ${formatDate(key)}`;
   // Each collection name opens that collection in the calendar.
   const collectionIds = [...new Set(rows.flatMap(collectionIdsOf))]
-    .sort((a, b) => collectionName(a).localeCompare(collectionName(b)));
+    .sort((a, b) => compareNames(collectionName(a), collectionName(b)));
   const line = $('#dayDialogCollections');
   line.replaceChildren();
   line.hidden = collectionIds.length === 0;

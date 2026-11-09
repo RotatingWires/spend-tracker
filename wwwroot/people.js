@@ -44,7 +44,7 @@ function renderPeople() {
   const rows = searchedItems('people', state.snapshot.people)
     .map(person => ({ person, ledger: personLedger(person.id) }))
     // Me first, then A–Z, like the dropdowns; the Balance heading sorts by balance.
-    .sort((a, b) => b.person.isSelf - a.person.isSelf || a.person.name.localeCompare(b.person.name, undefined, { sensitivity: 'base' }))
+    .sort((a, b) => b.person.isSelf - a.person.isSelf || compareNames(a.person.name, b.person.name))
     .map(({ person, ledger }) => ({
       onClick: () => openPersonDialog(person.id),
       cells: [
