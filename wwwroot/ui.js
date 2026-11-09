@@ -1,6 +1,14 @@
-'use strict';
-
 /* Startup, data loading, tab navigation, toolbar, menus, backup/restore, and session handling. */
+import { $, $$, allMonths, api, buildModel, el, fileStamp, formatMonth, monthOf, monthStart, plural, shiftMonth, singleTimeFrameMonth, sortSnapshotLists, state, timeFrameLabel, timedFetch, todayKey, writeSetting } from './app.js';
+import { closeMenus, confirmAction, createMultiSelect, menuButton, setStatus, showError, toggleMenu } from './widgets.js';
+import { LEDGER_PAGE, downloadFile, exportTransactionsCsv, initializeTransactionEditor, ledgerLimit, openTransactionEditor, renderTransactions, setLedgerLimit } from './transactions.js';
+import { calendarCollectionId, initializeCalendar, renderCalendar, renderDayDialog, setCalendarCollectionId } from './calendar.js';
+import { initializePeople, renderPeople, renderPersonDialog } from './people.js';
+import { renderCollectionsTab, renderMerchantsTab, renderMethodsTab, renderTagsTab } from './summaries.js';
+import { initializeHistory, loadHistory } from './history.js';
+import { initializeManage } from './manage.js';
+import { initializeBulk, updateBulkControls } from './bulk.js';
+import { openScopeList, renderScopeList } from './scopes.js';
 
 const TAB_RENDERERS = {
   transactions: renderTransactions,
@@ -18,17 +26,14 @@ const MONTH_TABS = new Set(['transactions', 'calendar']);
 const STATS_SCRIPTS = ['/charts.js', '/stats.js', '/heatmaps.js', '/insights.js', '/counts.js'];
 let statsLoading = null;
 let statsLoaded = false;
+/** The Stats modules' exports (renderStats, Charts, ...), filled in when the Stats tab first opens. */
+const statsModules = {};
 
 function loadStatsScripts() {
-  statsLoading ??= Promise.all(STATS_SCRIPTS.map(src => new Promise((resolve, reject) => {
-    const script = el('script');
-    script.src = src;
-    script.async = false; // Run in the listed order, while downloading together.
-    script.onload = resolve;
-    script.onerror = () => reject(new Error(`Could not load ${src}.`));
-    document.body.append(script);
-  }))).then(() => {
-    initializeStats();
+  // The Stats modules load together the first time the tab opens; their exports are kept in statsModules.
+  statsLoading ??= Promise.all(STATS_SCRIPTS.map(src => import(src).catch(() => { throw new Error(`Could not load ${src}.`); }))).then(modules => {
+    Object.assign(statsModules, ...modules);
+    statsModules.initializeStats();
     statsLoaded = true;
   }).catch(error => {
     statsLoading = null; // Try again next time the tab opens.
@@ -39,20 +44,20 @@ function loadStatsScripts() {
 
 function showStats() {
   if (statsLoaded) {
-    renderStats();
+    statsModules.renderStats();
     return;
   }
   setStatus('Loading...');
   loadStatsScripts()
     .then(() => {
       setStatus('Ready');
-      if (state.activeTab === 'stats') renderStats();
+      if (state.activeTab === 'stats') statsModules.renderStats();
     })
     .catch(error => showError(error.message));
 }
 let timeFrameSelect = null;
 
-async function loadSnapshot() {
+export async function loadSnapshot() {
   if (state.loading) return state.loading;
   state.loading = (async () => {
     try {
@@ -76,7 +81,7 @@ async function loadSnapshot() {
   }
 }
 
-function renderAll() {
+export function renderAll() {
   if (!state.model) return;
   renderTimeFrameSelect();
   $('#monthControls').hidden = !MONTH_TABS.has(state.activeTab);
@@ -96,13 +101,13 @@ function renderAll() {
   if ($('#statusLeft').textContent === 'Loading...') setStatus('Ready');
 }
 
-function switchTab(name) {
+export function switchTab(name) {
   state.activeTab = name;
-  calendarCollectionId = null;
+  setCalendarCollectionId(null);
   $$('.tabs [role="tab"]').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.tab === name ? 'true' : 'false'));
   $$('.tab-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
   closeMenus();
-  if (statsLoaded) Charts.hideTooltip();
+  if (statsLoaded) statsModules.Charts.hideTooltip();
   $('#workspace').scrollTop = 0;
   renderAll();
 }
@@ -128,16 +133,16 @@ function changeTimeFrame(values) {
   const months = values.filter(value => value !== 'all');
   if (values.includes('all') && !state.timeFrame.all) state.timeFrame = { all: true, months: [] };
   else if (months.length) state.timeFrame = { all: false, months };
-  calendarCollectionId = null;
-  ledgerLimit = LEDGER_PAGE;
+  setCalendarCollectionId(null);
+  setLedgerLimit(LEDGER_PAGE);
   renderAll();
 }
 
 function shiftTimeFrame(delta) {
   if (state.timeFrame.all) return;
   state.timeFrame = { all: false, months: state.timeFrame.months.map(month => shiftMonth(month, delta)) };
-  calendarCollectionId = null;
-  ledgerLimit = LEDGER_PAGE;
+  setCalendarCollectionId(null);
+  setLedgerLimit(LEDGER_PAGE);
   renderAll();
 }
 
@@ -189,7 +194,7 @@ function populateViewMenu() {
   }));
 }
 
-function menuSeparator() {
+export function menuSeparator() {
   const separator = el('div', 'menu-separator');
   separator.setAttribute('role', 'separator');
   return separator;
@@ -429,13 +434,13 @@ function startApp() {
     closeMenus();
   }, true);
   window.addEventListener('theme-change', () => {
-    if (state.activeTab === 'stats' && statsLoaded) renderStats();
+    if (state.activeTab === 'stats' && statsLoaded) statsModules.renderStats();
   });
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (state.activeTab === 'stats' && state.model && statsLoaded) renderStats();
+      if (state.activeTab === 'stats' && state.model && statsLoaded) statsModules.renderStats();
     }, 150);
   });
 
@@ -449,7 +454,7 @@ function startApp() {
 }
 
 /** A collection's deep link, like TaskList's /task/{id}: the server answers it with the app, which opens it. */
-function collectionLink(collectionId) {
+export function collectionLink(collectionId) {
   return `/collection/${collectionId}`;
 }
 
@@ -472,7 +477,8 @@ function defaultEntryDate() {
   return MONTH_TABS.has(state.activeTab) && month && monthOf(today) !== month ? monthStart(month) : today;
 }
 
-startApp();
+// Start once every module has run: module scripts all finish before DOMContentLoaded.
+document.addEventListener('DOMContentLoaded', startApp);
 // No offline copy, like NewsReview: remove the service worker and cache that earlier releases installed.
 navigator.serviceWorker?.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister())).catch(() => {});
 window.caches?.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});

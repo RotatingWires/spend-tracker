@@ -1,11 +1,16 @@
-'use strict';
-
 /*
  * Stats > Heatmaps, drawn like TaskList Stats' heatmaps: a year of days, months by year, tags or merchants by month,
  * and weekdays by week of the month. One Show choice applies to all four. Darker cells hold more; the darkest shade
  * starts at the 90th percentile of the heatmap's cells, so one huge purchase does not wash out every other day. A net
  * of zero or less (refunds only) is the lightest.
  */
+import { $, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, addDays, compareNames, dayNumber, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthOf, numberFormat, pad2, plural, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf } from './app.js';
+import { createSingleSelect } from './widgets.js';
+import { dailyNet, openDayDialog } from './calendar.js';
+import { merchantIdsOf } from './summaries.js';
+import { openScopeList } from './scopes.js';
+import { switchTab } from './ui.js';
+import { renderStats } from './stats.js';
 
 const HEAT_MEASURES = [
   { value: 'net', label: 'Net spent', of: bucket => bucket.net },
@@ -74,7 +79,7 @@ function heatYears() {
   return Array.from({ length: end - first + 1 }, (_, index) => end - index);
 }
 
-function renderHeatmaps(stats) {
+export function renderHeatmaps(stats) {
   heatMeasureSelect.setOptions(HEAT_MEASURES, state.heat.measure);
   heatRowsSelect.setOptions(HEAT_ROWS, state.heat.rows);
   const years = heatYears();
@@ -277,7 +282,7 @@ function renderWeekHeatmap(stats) {
   $('#weekHeatmap').replaceChildren(grid);
 }
 
-function initializeHeatmaps() {
+export function initializeHeatmaps() {
   heatMeasureSelect = createSingleSelect($('#heatMeasure'), {
     onChange: value => {
       state.heat.measure = value;

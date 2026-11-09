@@ -1,12 +1,16 @@
-'use strict';
-
 /* Calendar tab: a month grid of daily net spending for each month in the time frame, and a per-day detail dialog. */
+import { $, $$, WEEKDAYS, WEEKDAY_NAMES, collectionIdsOf, collectionName, collectionsOf, compareNames, daysInMonth, describeTransaction, el, formatDate, formatMoney, formatMonth, listedTransactions, methodName, monthEnd, monthOf, monthStart, pad2, plural, shiftMonth, state, timeFrameMonths, todayKey, weekdayOf, whoLabel } from './app.js';
+import { moneyCell, renderTable, setStatus } from './widgets.js';
+import { KIND_LABELS, monthTotals, openTransactionEditor } from './transactions.js';
+import { collectionLink, switchTab } from './ui.js';
 
 let calendarDialogDay = null;
 // A collection opened from a day's dialog: its days are outlined until the time frame or tab changes.
-let calendarCollectionId = null;
+export let calendarCollectionId = null;
+/** Other modules change calendarCollectionId through this; an imported binding is read-only. */
+export function setCalendarCollectionId(value) { return (calendarCollectionId = value); }
 
-function dailyNet(transactions) {
+export function dailyNet(transactions) {
   const days = new Map();
   for (const tx of transactions) {
     const day = days.get(tx.date) ?? { net: 0, entries: 0, purchases: 0, spent: 0, refunded: 0, paidBack: 0 };
@@ -32,7 +36,7 @@ function heatLevel(net, max) {
 }
 
 /** One month grid per month in the time frame, newest first. */
-function renderCalendar() {
+export function renderCalendar() {
   const months = timeFrameMonths().reverse();
   $('#calendarMonths').replaceChildren(...months.map(renderMonthGrid));
 }
@@ -106,13 +110,13 @@ function renderMonthGrid(month) {
   return box;
 }
 
-function openDayDialog(key) {
+export function openDayDialog(key) {
   calendarDialogDay = key;
   renderDayDialog();
   $('#dayDialog').showModal();
 }
 
-function renderDayDialog() {
+export function renderDayDialog() {
   const key = calendarDialogDay;
   if (!key) return;
   const rows = listedTransactions(key, key);
@@ -181,7 +185,7 @@ function showCollectionCalendar(collectionId) {
   setStatus(`Showing ${collectionName(collectionId)} in the calendar: ${plural(days.length, 'day')} outlined.`);
 }
 
-function initializeCalendar() {
+export function initializeCalendar() {
   $('#dayAddButton').addEventListener('click', () => {
     const key = calendarDialogDay;
     $('#dayDialog').close();

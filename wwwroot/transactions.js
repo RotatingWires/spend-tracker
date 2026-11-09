@@ -1,15 +1,23 @@
-'use strict';
-
 /* Transactions tab (the monthly ledger) and the shared transaction editor dialog. */
+import { $, TAG_SEPARATOR, api, applyTransactionChanges, centsToInput, collectionIdsOf, collectionName, describeTransaction, el, evenShares, fileStamp, formatAmount, formatDate, formatMoney, formatMonth, matchesSearch, methodName, monthOf, numberFormat, othersShare, parseMoney, parseTypedDate, peopleOf, personName, plural, purchaseRemaining, scopeNumbers, shareOf, shareRemaining, state, tagIdsOf, tagName, timeFrameLabel, timeFrameTransactions, todayKey, typedDate, whoLabel, writeSetting } from './app.js';
+import { bindSearchForm, confirmAction, createMultiSelect, createSingleSelect, moneyCell, renderTable, setStatus, sortByValue, tableSorts } from './widgets.js';
+import { calendarCollectionId, setCalendarCollectionId } from './calendar.js';
+import { merchantIdsOf } from './summaries.js';
+import { addListItem } from './manage.js';
+import { pruneSelection, selectedIds, selectionCell, selectionMode, setVisibleLedgerIds, toggleSelection, updateBulkControls, visibleLedgerIds } from './bulk.js';
+import { openScopeList } from './scopes.js';
+import { switchTab } from './ui.js';
 
-const KIND_LABELS = { Purchase: 'Purchase', Refund: 'Refund', Payback: 'Payback' };
+export const KIND_LABELS = { Purchase: 'Purchase', Refund: 'Refund', Payback: 'Payback' };
 // The ledger draws 200 rows at first and more on request, so a long time frame stays quick. A new time frame starts
 // over at 200.
-const LEDGER_PAGE = 200;
-let ledgerLimit = LEDGER_PAGE;
+export const LEDGER_PAGE = 200;
+export let ledgerLimit = LEDGER_PAGE;
+/** Other modules change ledgerLimit through this; an imported binding is read-only. */
+export function setLedgerLimit(value) { return (ledgerLimit = value); }
 let ledgerSearch = null;
 
-function monthTotals(transactions) {
+export function monthTotals(transactions) {
   const totals = { spent: 0, refunded: 0, paidBack: 0, purchases: 0 };
   for (const tx of transactions) {
     if (tx.kind === 'Purchase') {
@@ -25,7 +33,7 @@ function monthTotals(transactions) {
   return totals;
 }
 
-function renderTransactions() {
+export function renderTransactions() {
   const monthRows = timeFrameTransactions();
   // Newest first: the highest ID on top, as in TaskList. A search keeps only the entries it matches.
   const query = state.ledgerQuery;
@@ -57,7 +65,7 @@ function renderTransactions() {
   const sort = tableSorts.get('transactionsTable');
   const ordered = sort && columns[sort.index]?.sortValue ? sortByValue(rows, columns[sort.index].sortValue, sort.direction) : rows;
   const shown = ordered.slice(0, ledgerLimit);
-  visibleLedgerIds = shown.map(tx => tx.id);
+  setVisibleLedgerIds(shown.map(tx => tx.id));
   pruneSelection();
 
   const tableRows = shown.map(tx => {
@@ -255,7 +263,7 @@ function netOf(transactions) {
   return transactions.reduce((sum, tx) => sum + (tx.kind === 'Purchase' ? tx.amountCents : tx.kind === 'Refund' ? -tx.amountCents : 0), 0);
 }
 
-function exportTransactionsCsv() {
+export function exportTransactionsCsv() {
   const header = ['ID', 'Date', 'Type', 'For Who', 'Merchant', 'Description', 'Tags', 'Collections', 'Payment Method', 'Amount', 'Linked To', 'Note', 'Archived'];
   const lines = [header];
   for (const tx of state.model.transactions) {
@@ -289,7 +297,7 @@ function csvField(value) {
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-function downloadFile(name, type, content) {
+export function downloadFile(name, type, content) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const link = el('a');
   link.href = url;
@@ -321,7 +329,7 @@ const editor = {
   gifts: new Set()
 };
 
-function initializeTransactionEditor() {
+export function initializeTransactionEditor() {
   editor.kind = createSingleSelect($('#txKind'), { onChange: () => applyEditorKind() });
   editor.kind.setOptions(KIND_OPTIONS, 'Purchase');
   // Each list's "Add New..." adds an item as its tab's Add form would, then chooses it here.
@@ -401,7 +409,7 @@ function viewEntryInTime(tx) {
     writeSetting('spend-tracker-show-archived', 'true');
   }
   state.timeFrame = { all: false, months: [monthOf(tx.date)] };
-  calendarCollectionId = null;
+  setCalendarCollectionId(null);
   ledgerLimit = LEDGER_PAGE;
   switchTab('transactions');
   let row = $(`#transactionsTable tbody tr[data-id="${tx.id}"]`);
@@ -436,7 +444,7 @@ function editorKind() {
   return editor.kind.value;
 }
 
-function openTransactionEditor(tx = null, defaults = {}) {
+export function openTransactionEditor(tx = null, defaults = {}) {
   editor.transaction = tx;
   editor.kind.value = tx?.kind ?? defaults.kind ?? 'Purchase';
   $('#transactionDialogTitle').textContent = tx ? `Edit ${KIND_LABELS[tx.kind]} #${tx.id}` : 'New Transaction';
@@ -530,7 +538,7 @@ function methodOptions(currentId) {
 }
 
 /** Archived choices are offered only when the transaction already uses them. */
-function archivedLabel(item) {
+export function archivedLabel(item) {
   return item.archived ? `${item.name} (archived)` : item.name;
 }
 

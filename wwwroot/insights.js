@@ -1,10 +1,16 @@
-'use strict';
-
 /*
  * Stats > Trends (running total, average by month of year, purchase sizes, months), Compare (two periods side by side),
  * and People & Places (breakdowns, balances over time, merchant loyalty, recurring purchases). Like the rest of
  * Stats, everything comes from recorded entries; recurring purchases are found from exact repeats only.
  */
+import { $, MONTH_NAMES, SCOPE_NAMES, addDays, dayNumber, daysInMonth, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthEnd, monthOf, numberFormat, pad2, percentFormat, plural, shiftMonth, state, todayKey, transactionsInRange } from './app.js';
+import { createSingleSelect, renderMetrics, renderTable } from './widgets.js';
+import { openTransactionEditor } from './transactions.js';
+import { dailyNet } from './calendar.js';
+import { openPersonDialog, outstandingText, personLedger } from './people.js';
+import { openScopeList } from './scopes.js';
+import { Charts } from './charts.js';
+import { averageMoney, computeStats, drawTimeChart, periodRange, renderBreakdowns, renderMonthsTable, renderStatsChart, share, statsPeriodOptions } from './stats.js';
 
 // ---------------------------------------------------------------- Trends
 
@@ -36,7 +42,7 @@ function runningTotals(keys, days, stopAfter = null) {
   });
 }
 
-function renderTrends(stats) {
+export function renderTrends(stats) {
   renderStatsChart(stats);
   renderRunningTotal(stats);
   renderSeasonChart(stats);
@@ -104,7 +110,7 @@ function renderSeasonChart(stats) {
   });
 }
 
-const SIZE_BUCKETS = [
+export const SIZE_BUCKETS = [
   { label: 'Under $10', below: 1000 },
   { label: '$10 – $25', below: 2500 },
   { label: '$25 – $50', below: 5000 },
@@ -162,7 +168,7 @@ function changeText(a, b) {
   return `${change > 0 ? '+' : change < 0 ? '−' : ''}${percentFormat.format(Math.abs(change))}`;
 }
 
-function renderCompare() {
+export function renderCompare() {
   const options = statsPeriodOptions();
   const has = value => options.some(option => option.value === value);
   const thisMonth = monthOf(todayKey());
@@ -217,7 +223,7 @@ function renderCompareGroups(table, label, scope, groupsA, groupsB, none) {
     { empty: 'No purchases or refunds in either period.' });
 }
 
-function initializeCompare() {
+export function initializeCompare() {
   compareASelect = createSingleSelect($('#compareA'), {
     onChange: value => {
       state.compare.a = value;
@@ -234,7 +240,7 @@ function initializeCompare() {
 
 // ---------------------------------------------------------------- People & Places
 
-function renderPlaces(stats) {
+export function renderPlaces(stats) {
   renderBreakdowns(stats);
   renderBalancesOverTime(stats);
   renderLoyalty(stats);

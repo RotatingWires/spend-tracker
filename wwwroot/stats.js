@@ -1,21 +1,30 @@
-'use strict';
-
 /*
  * Stats tab. Every number is computed only from recorded entries; nothing is estimated or categorized
  * automatically. Refunds count on their own date and under the person, tags, collections, and merchant of their purchase.
  */
+import { $, $$, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, addDays, collectionIdsOf, dayNumber, daysInMonth, describeTransaction, el, formatDate, formatDateRange, formatMoney, formatMonth, keyFromDayNumber, methodName, monthEnd, monthOf, monthStart, numberFormat, othersShare, pad2, percentFormat, plural, shiftMonth, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf, writeSetting } from './app.js';
+import { createMultiSelect, createSingleSelect, renderMetrics, renderTable, statCard } from './widgets.js';
+import { monthTotals } from './transactions.js';
+import { dailyNet } from './calendar.js';
+import { merchantIdsOf } from './summaries.js';
+import { openScopeList } from './scopes.js';
+import { switchTab } from './ui.js';
+import { Charts } from './charts.js';
+import { initializeHeatmaps, renderHeatmaps } from './heatmaps.js';
+import { initializeCompare, renderCompare, renderPlaces, renderTrends } from './insights.js';
+import { renderCounts } from './counts.js';
 
 let statsPeriodSelect = null;
 let chartStyleSelect = null;
 const CHART_STYLES = [{ value: 'bars', label: 'Bars' }, { value: 'lines', label: 'Lines' }];
 
 /** Charts over time follow the Charts choice (bars or lines); charts of categories are always bars. */
-function drawTimeChart(canvas, data) {
+export function drawTimeChart(canvas, data) {
   if (state.chartStyle === 'lines') Charts.lines(canvas, data);
   else Charts.bars(canvas, data);
 }
 
-function statsPeriodOptions() {
+export function statsPeriodOptions() {
   const transactions = state.model.transactions;
   const today = todayKey();
   const first = transactions[0]?.date ?? today;
@@ -51,7 +60,7 @@ function statsRange(periods) {
   };
 }
 
-function periodRange(period) {
+export function periodRange(period) {
   const today = todayKey();
   if (period.startsWith('y:')) {
     const year = period.slice(2);
@@ -76,7 +85,7 @@ function periodRange(period) {
   return { start: first < today ? first : today, end: last > today ? last : today, label: 'All time' };
 }
 
-function computeStats(range) {
+export function computeStats(range) {
   const today = todayKey();
   const transactions = transactionsInRange(range.start, range.end).filter(range.filter ?? (() => true));
   const purchases = transactions.filter(tx => tx.kind === 'Purchase');
@@ -260,15 +269,15 @@ function addToBucket(bucket, tx) {
   }
 }
 
-function share(part, whole) {
+export function share(part, whole) {
   return whole > 0 ? percentFormat.format(part / whole) : '—';
 }
 
-function averageMoney(total, count) {
+export function averageMoney(total, count) {
   return count > 0 ? formatMoney(Math.round(total / count)) : '—';
 }
 
-function renderStats() {
+export function renderStats() {
   const options = statsPeriodOptions();
   statsPeriodSelect.setOptions(options, state.statsPeriod);
   // A period that no longer exists (a deleted collection, say) drops out; with nothing left, All time.
@@ -388,7 +397,7 @@ const CHART_METRICS = [
 ];
 let statsChartSelect = null;
 
-function renderStatsChart(stats) {
+export function renderStatsChart(stats) {
   const metrics = CHART_METRICS.filter(metric => state.statsChart.includes(metric.value));
   const empty = { net: 0, spent: 0, refunded: 0, paidBack: 0, purchases: 0, entries: 0 };
   const byDay = stats.countedDays <= 62;
@@ -443,14 +452,14 @@ function renderStatsTables(stats) {
 }
 
 /** People, tags, collections, and merchants on the People & Places sub-tab. */
-function renderBreakdowns(stats) {
+export function renderBreakdowns(stats) {
   renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true });
   renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged' });
   renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection' });
   renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits' });
 }
 
-function renderMonthsTable(stats) {
+export function renderMonthsTable(stats) {
   renderTable($('#statsMonthsTable'),
     [{ label: 'Month' }, { label: 'Purchases', num: true }, { label: 'Spent', num: true }, { label: 'Refunds', num: true }, { label: 'Net', num: true }, { label: 'Change', num: true, title: 'Net compared with the month before.' }, { label: 'Paid Back', num: true }],
     [...stats.months].reverse().map((month, index, list) => {
@@ -492,7 +501,7 @@ function renderBreakdown(table, label, scope, groups, { none = null, countLabel 
   ], rows, { empty: 'No purchases or refunds.' });
 }
 
-function initializeStats() {
+export function initializeStats() {
   // Check any number of measures; unchecking the last one is ignored so the chart always shows something.
   statsChartSelect = createMultiSelect($('#statsChartMetric'), {
     onChange: values => {

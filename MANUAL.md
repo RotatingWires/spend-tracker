@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.40
+# SpendTracker v1.2.41
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -46,6 +46,8 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - Plain HTML, CSS, and JavaScript; no frontend framework or build step
 - Canvas API for the chart; no chart library
 - Web manifest for adding to a phone's home screen (no offline copy, like NewsReview)
+
+The frontend is plain HTML, CSS, and JavaScript modules (`<script type="module">`) with no build step, the same in all four apps. Two small files stay classic scripts and are the same word for word in every app: `theme.js`, which has to run before the page draws so it never flashes the wrong theme, and `dropdown.js`.
 
 ## Project layout
 
@@ -574,7 +576,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.40**.
+Current release: **v1.2.41**.
+
+### v1.2.41
+
+- Code: the scripts are JavaScript modules (`<script type="module">`) with imports and exports, like NewsReview's, instead of classic scripts sharing globals; the app starts once every module has loaded. `theme.js` and `dropdown.js` stay classic scripts, the same in every app, so the theme is applied before the page draws. The Stats tab's modules still load only when it first opens.
 
 ### v1.2.40
 

@@ -1,18 +1,22 @@
-'use strict';
-
 /*
  * Selection mode and bulk actions for the ledger, as in TaskList: File > Select... adds a checkbox to every row,
  * Shift-click selects a range, and Escape (or File > Select... again) leaves selection mode. Each action runs one ordinary API call per entry,
  * so the server applies the same rules as a single edit. Entries a rule refuses are skipped and listed afterwards.
  */
+import { $, SNAPSHOT_LISTS, api, applyTransactionChanges, describeTransaction, el, evenShares, formatDate, formatMoney, personName, plural, readSetting, state, transactionRequest, writeSetting } from './app.js';
+import { chooseOption, closeMenus, confirmAction, menuButton, setStatus, toggleMenu } from './widgets.js';
+import { KIND_LABELS, archivedLabel, renderTransactions } from './transactions.js';
+import { menuSeparator, switchTab } from './ui.js';
 
-let selectionMode = readSetting('spend-tracker-selection-mode') === 'true';
-const selectedIds = new Set();
+export let selectionMode = readSetting('spend-tracker-selection-mode') === 'true';
+export const selectedIds = new Set();
 let selectionAnchorId = null;
-let visibleLedgerIds = [];
+export let visibleLedgerIds = [];
+/** Other modules change visibleLedgerIds through this; an imported binding is read-only. */
+export function setVisibleLedgerIds(value) { return (visibleLedgerIds = value); }
 let bulkBusy = false;
 
-function pruneSelection() {
+export function pruneSelection() {
   const visible = new Set(visibleLedgerIds);
   for (const id of selectedIds) if (!visible.has(id)) selectedIds.delete(id);
   if (!visible.has(selectionAnchorId)) selectionAnchorId = null;
@@ -32,7 +36,7 @@ function setSelectionMode(enabled) {
   else renderTransactions();
 }
 
-function selectionCell(tx) {
+export function selectionCell(tx) {
   const checkbox = el('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'selection-check retro-check';
@@ -44,7 +48,7 @@ function selectionCell(tx) {
 }
 
 /** Toggles one row, or with Shift sets every row between the last clicked row and this one. */
-function toggleSelection(id, extendRange = false) {
+export function toggleSelection(id, extendRange = false) {
   if (bulkBusy) return;
   let range = null;
   if (extendRange && selectionAnchorId !== null) {
@@ -238,7 +242,7 @@ function bulkMenuButton(label, onClick, disabled) {
 }
 
 /** "Selected: N" and a split button: the primary action plus a menu of the rest, as in TaskList. */
-function updateBulkControls() {
+export function updateBulkControls() {
   // Selection belongs to the ledger, so the controls only show on the Transactions tab.
   const shown = selectionMode && state.activeTab === 'transactions';
   $('#bulkControls').hidden = !shown;
@@ -282,7 +286,7 @@ function updateBulkControls() {
   $('#bulkActions').replaceChildren(group);
 }
 
-function initializeBulk() {
+export function initializeBulk() {
   $('#selectModeButton').addEventListener('click', () => setSelectionMode(!selectionMode));
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented || !selectionMode || bulkBusy || document.querySelector('dialog[open]')) return;

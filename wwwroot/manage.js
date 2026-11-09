@@ -1,9 +1,12 @@
-'use strict';
-
 /*
  * Adding, renaming, archiving, and deleting payment methods, people, tags, collections, and merchants. Each has its own
  * tab with an Add form at the top and these actions on every row.
  */
+import { $$, api, applyListItem, plural, state } from './app.js';
+import { bindSearchForm, confirmAction, promptText, rowActionButtons, setStatus, showError } from './widgets.js';
+import { renderPeople } from './people.js';
+import { renderCollectionsTab, renderMerchantsTab, renderMethodsTab, renderTagsTab } from './summaries.js';
+import { loadSnapshot } from './ui.js';
 
 const MANAGED = {
   'payment-methods': { singular: 'payment method', archivable: () => true },
@@ -14,7 +17,7 @@ const MANAGED = {
 };
 
 /** Rename, Archive or Restore, and Delete buttons for one row, after any leading ones; you can only rename yourself. */
-function manageButtons(path, item, uses, leading = []) {
+export function manageButtons(path, item, uses, leading = []) {
   const config = MANAGED[path];
   const actions = [...leading, ['Rename', () => renameManaged(path, item), `Rename ${item.name}`]];
   if (config.archivable(item))
@@ -38,7 +41,7 @@ async function addManaged(path, form) {
 }
 
 /** Asks for a name and adds a payment method, person, tag, merchant, or collection; resolves to it, or null. */
-async function addListItem(path) {
+export async function addListItem(path) {
   const config = MANAGED[path];
   const name = await promptText(`New ${config.singular}`, 'Name', '', { maxLength: config.maxLength ?? 60 });
   if (!name) return null;
@@ -88,7 +91,7 @@ async function deleteManaged(path, config, item, uses) {
   }
 }
 
-function initializeManage() {
+export function initializeManage() {
   $$('form[data-add]').forEach(form => form.addEventListener('submit', event => {
     event.preventDefault();
     addManaged(form.dataset.add, form);

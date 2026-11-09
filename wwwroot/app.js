@@ -1,7 +1,7 @@
-'use strict';
-
 /** Creates an element with an optional class and text; buttons get type="button". The same helper in every app. */
-function el(tag, className = '', text = '') {
+import { renderAll } from './ui.js';
+
+export function el(tag, className = '', text = '') {
   const node = document.createElement(tag);
   if (tag === 'button') node.type = 'button';
   if (className) node.className = className;
@@ -13,12 +13,12 @@ const REQUEST_TIMEOUT_MS = 30000;
 
 /** fetch that gives up after 30 seconds, like NewsReview, instead of waiting forever on a stopped server. */
 /** yyyyMMdd-HHmmss in local time, the stamp in every download's file name, like the other apps. */
-function fileStamp(date = new Date()) {
+export function fileStamp(date = new Date()) {
   const two = number => String(number).padStart(2, '0');
   return `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}-${two(date.getHours())}${two(date.getMinutes())}${two(date.getSeconds())}`;
 }
 
-async function timedFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+export async function timedFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   try {
     return await fetch(url, timeoutMs ? { ...options, signal: AbortSignal.timeout(timeoutMs) } : options);
   } catch (error) {
@@ -29,7 +29,7 @@ async function timedFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
 
 /* Shared state, money/date helpers, the API client, and the derived model every view reads from. */
 
-const state = {
+export const state = {
   snapshot: null,
   model: null,
   activeTab: 'transactions',
@@ -55,7 +55,7 @@ const state = {
 };
 
 /** Per-browser view preferences. Storage can be unavailable (private windows), so they fall back to defaults. */
-function readSetting(key) {
+export function readSetting(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
@@ -69,30 +69,30 @@ function savedChartMeasures() {
   }
 }
 
-function writeSetting(key, value) {
+export function writeSetting(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
 
-const $ = selector => document.querySelector(selector);
-const $$ = selector => [...document.querySelectorAll(selector)];
+export const $ = selector => document.querySelector(selector);
+export const $$ = selector => [...document.querySelectorAll(selector)];
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_MS = 86_400_000;
 
 // ---------------------------------------------------------------- money
 
 const moneyFormat = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' });
-const numberFormat = new Intl.NumberFormat();
-const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 });
+export const numberFormat = new Intl.NumberFormat();
+export const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 });
 
-function formatMoney(cents) {
+export function formatMoney(cents) {
   return moneyFormat.format(cents / 100);
 }
 
 /** Parses "12", "12.5", "$1,234.56" into whole cents without floating-point rounding. Returns null when invalid. */
-function parseMoney(text) {
+export function parseMoney(text) {
   const clean = String(text ?? '').trim().replace(/^\$/, '').replace(/,/g, '').trim();
   const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(clean);
   if (!match || clean === '' || clean === '.') return null;
@@ -100,81 +100,81 @@ function parseMoney(text) {
   return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
 }
 
-function centsToInput(cents) {
+export function centsToInput(cents) {
   return (cents / 100).toFixed(2);
 }
 
 const amountFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** "1,234.50": an amount box's value, without the dollar sign. Always US style, since parseMoney reads it back; everything else shown uses the browser's locale. */
-function formatAmount(cents) {
+export function formatAmount(cents) {
   return amountFormat.format(cents / 100);
 }
 
 /** Tags are listed as "food · gifts" in the editor and the ledger. */
-const TAG_SEPARATOR = ' · ';
+export const TAG_SEPARATOR = ' · ';
 
 // ---------------------------------------------------------------- dates
 // Dates are "YYYY-MM-DD" keys. Day arithmetic uses UTC day numbers so daylight-saving changes never shift a day.
 
-function pad2(value) {
+export function pad2(value) {
   return String(value).padStart(2, '0');
 }
 
-function todayKey() {
+export function todayKey() {
   const now = new Date();
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 }
 
-function dayNumber(key) {
+export function dayNumber(key) {
   const [year, month, day] = key.split('-').map(Number);
   return Date.UTC(year, month - 1, day) / DAY_MS;
 }
 
-function keyFromDayNumber(number) {
+export function keyFromDayNumber(number) {
   const date = new Date(number * DAY_MS);
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 }
 
-function addDays(key, days) {
+export function addDays(key, days) {
   return keyFromDayNumber(dayNumber(key) + days);
 }
 
-function weekdayOf(key) {
+export function weekdayOf(key) {
   return new Date(dayNumber(key) * DAY_MS).getUTCDay();
 }
 
-function monthOf(key) {
+export function monthOf(key) {
   return key.slice(0, 7);
 }
 
-function shiftMonth(monthKey, delta) {
+export function shiftMonth(monthKey, delta) {
   const [year, month] = monthKey.split('-').map(Number);
   const index = year * 12 + (month - 1) + delta;
   return `${Math.floor(index / 12)}-${pad2((index % 12) + 1)}`;
 }
 
-function daysInMonth(monthKey) {
+export function daysInMonth(monthKey) {
   const [year, month] = monthKey.split('-').map(Number);
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-function monthStart(monthKey) {
+export function monthStart(monthKey) {
   return `${monthKey}-01`;
 }
 
-function monthEnd(monthKey) {
+export function monthEnd(monthKey) {
   return `${monthKey}-${pad2(daysInMonth(monthKey))}`;
 }
 
 /** A yyyy-mm-dd day in the browser's own date format, like the other apps. */
-function formatDate(key) {
+export function formatDate(key) {
   const [year, month, day] = key.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 /** Dates are typed as m/d/yy or m/d/yyyy (or yyyy-mm-dd), like the date ranges in every app; returns yyyy-mm-dd, or '' when it is not a real date. */
-function parseTypedDate(text) {
+export function parseTypedDate(text) {
   const iso = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/.exec(text);
   const typed = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\s*$/.exec(text);
   if (!iso && !typed) return '';
@@ -186,34 +186,34 @@ function parseTypedDate(text) {
 }
 
 /** yyyy-mm-dd as it is typed: m/d/yyyy. */
-function typedDate(iso) {
+export function typedDate(iso) {
   const [year, month, day] = (iso || '').split('-').map(Number);
   return year ? `${month}/${day}/${year}` : '';
 }
 
-function formatMonth(monthKey) {
+export function formatMonth(monthKey) {
   const [year, month] = monthKey.split('-').map(Number);
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
-function formatDateRange(start, end) {
+export function formatDateRange(start, end) {
   return start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`;
 }
 
-function formatDateTime(iso) {
+export function formatDateTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const day = date.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
   return `${day} ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-function plural(count, singular, pluralForm = `${singular}s`) {
+export function plural(count, singular, pluralForm = `${singular}s`) {
   return `${numberFormat.format(count)} ${count === 1 ? singular : pluralForm}`;
 }
 
 // ---------------------------------------------------------------- API
 
-async function api(path, { method = 'GET', body } = {}) {
+export async function api(path, { method = 'GET', body } = {}) {
   const options = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
   if (body !== undefined) {
     options.headers['Content-Type'] = 'application/json';
@@ -241,7 +241,7 @@ async function api(path, { method = 'GET', body } = {}) {
  * Indexes the snapshot. Refunds have no person of their own; they belong to the person and tags of the
  * purchase they refund, so every view asks the model instead of reading those fields directly.
  */
-function buildModel(snapshot) {
+export function buildModel(snapshot) {
   const methods = new Map(snapshot.paymentMethods.map(method => [method.id, method]));
   const people = new Map(snapshot.people.map(person => [person.id, person]));
   const tags = new Map(snapshot.tags.map(tag => [tag.id, tag]));
@@ -265,11 +265,11 @@ function buildModel(snapshot) {
  * that can touch many entries at once (deleting a list item, Fresh Start, Restore) and File > Refresh still load the
  * whole snapshot.
  */
-const SNAPSHOT_LISTS = { 'payment-methods': 'paymentMethods', people: 'people', tags: 'tags', merchants: 'merchants', collections: 'collections' };
+export const SNAPSHOT_LISTS = { 'payment-methods': 'paymentMethods', people: 'people', tags: 'tags', merchants: 'merchants', collections: 'collections' };
 
 /** Names sort one way everywhere: A–Z in the browser's language, ignoring capitals and accents, so "Émile" sits with the Es. */
 const nameCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
-function compareNames(a, b) {
+export function compareNames(a, b) {
   return nameCollator.compare(a, b);
 }
 
@@ -280,7 +280,7 @@ function sortSnapshotList(path, list) {
 }
 
 /** Sorts every list in a freshly loaded snapshot, so names never show in the server's A–Z-only order. */
-function sortSnapshotLists(snapshot) {
+export function sortSnapshotLists(snapshot) {
   for (const [path, key] of Object.entries(SNAPSHOT_LISTS)) sortSnapshotList(path, snapshot[key]);
   return snapshot;
 }
@@ -291,7 +291,7 @@ function compareTransactions(a, b) {
 }
 
 /** Replaces saved entries (or adds new ones) in date order and drops deleted ones, then redraws. */
-function applyTransactionChanges({ saved = [], deleted = [] }) {
+export function applyTransactionChanges({ saved = [], deleted = [] }) {
   const replaced = new Set([...deleted, ...saved.map(tx => tx.id)]);
   const list = state.snapshot.transactions.filter(tx => !replaced.has(tx.id));
   for (const tx of saved) {
@@ -309,7 +309,7 @@ function applyTransactionChanges({ saved = [], deleted = [] }) {
 }
 
 /** Adds or replaces one payment method, person, tag, merchant, or collection, keeping the list's order. */
-function applyListItem(path, item) {
+export function applyListItem(path, item) {
   const key = SNAPSHOT_LISTS[path];
   const list = state.snapshot[key].filter(entry => entry.id !== item.id);
   list.push(item);
@@ -325,51 +325,51 @@ function refreshModel() {
 }
 
 /** Everyone a purchase was for (its shares), or the one person a refund or payback is about. */
-function peopleOf(tx) {
+export function peopleOf(tx) {
   return tx.kind === 'Purchase' ? tx.shares.map(share => share.personId) : [tx.personId];
 }
 
-function shareOf(purchase, personId) {
+export function shareOf(purchase, personId) {
   return purchase.shares.find(share => share.personId === personId)?.amountCents ?? 0;
 }
 
 /** A gift share is bought for that person but not owed back. */
-function isGiftShare(purchase, personId) {
+export function isGiftShare(purchase, personId) {
   return purchase?.shares.some(share => share.personId === personId && share.gift) ?? false;
 }
 
-function tagIdsOf(tx) {
+export function tagIdsOf(tx) {
   return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.tagIds ?? [] : tx.tagIds;
 }
 
 /** Collections work like tags: a refund counts under its purchase's collections. */
-function collectionIdsOf(tx) {
+export function collectionIdsOf(tx) {
   return tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId)?.collectionIds ?? [] : tx.collectionIds;
 }
 
-function personName(id) {
+export function personName(id) {
   return state.model.people.get(id)?.name ?? `Person #${id}`;
 }
 
-function methodName(id) {
+export function methodName(id) {
   return state.model.methods.get(id)?.name ?? `Method #${id}`;
 }
 
-function tagName(id) {
+export function tagName(id) {
   return state.model.tags.get(id)?.name ?? `Tag #${id}`;
 }
 
-function collectionName(id) {
+export function collectionName(id) {
   return state.model.collections.get(id)?.name ?? `Collection #${id}`;
 }
 
 /** The part of a purchase bought for people other than you. */
-function othersShare(purchase) {
+export function othersShare(purchase) {
   return purchase.shares.filter(share => share.personId !== state.model.self.id).reduce((sum, share) => sum + share.amountCents, 0);
 }
 
 /** "Me", "Me, Alex", "From Alex", or "Alex's share" — who a row is about, as shown in tables. */
-function whoLabel(tx) {
+export function whoLabel(tx) {
   if (tx.kind === 'Payback') return `From ${personName(tx.personId)}`;
   if (tx.kind === 'Refund') {
     const purchase = state.model.byId.get(tx.linkedId);
@@ -379,12 +379,12 @@ function whoLabel(tx) {
 }
 
 /** Short human label: "Merchant — description", whichever parts exist. */
-function describeTransaction(tx) {
+export function describeTransaction(tx) {
   return [tx.merchant, tx.description].filter(Boolean).join(' — ');
 }
 
 /** A person's share of a purchase not yet covered by refunds or paybacks linked to that share. */
-function shareRemaining(purchase, personId, excludingId = null) {
+export function shareRemaining(purchase, personId, excludingId = null) {
   let covered = 0;
   for (const tx of state.model.linked.get(purchase.id) ?? []) {
     if (tx.id !== excludingId && tx.personId === personId) covered += tx.amountCents;
@@ -392,23 +392,23 @@ function shareRemaining(purchase, personId, excludingId = null) {
   return shareOf(purchase, personId) - covered;
 }
 
-function purchaseRemaining(purchase, excludingId = null) {
+export function purchaseRemaining(purchase, excludingId = null) {
   return purchase.shares.reduce((sum, share) => sum + shareRemaining(purchase, share.personId, excludingId), 0);
 }
 
-function transactionsInRange(start, end) {
+export function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
 }
 
 /** What the ledger and calendar list: archived entries stay hidden unless View > Show Archived is on. */
-function listedTransactions(start, end) {
+export function listedTransactions(start, end) {
   return transactionsInRange(start, end).filter(tx => state.showArchived || !tx.archived);
 }
 
 // ---------------------------------------------------------------- time frame
 
 /** Every month from the first entry to the last one, including the current month, oldest first. */
-function allMonths() {
+export function allMonths() {
   const transactions = state.model.transactions;
   const today = monthOf(todayKey());
   const first = transactions.length && monthOf(transactions[0].date) < today ? monthOf(transactions[0].date) : today;
@@ -418,7 +418,7 @@ function allMonths() {
   return months;
 }
 
-function timeFrameMonths() {
+export function timeFrameMonths() {
   return state.timeFrame.all ? allMonths() : [...state.timeFrame.months].sort();
 }
 
@@ -427,17 +427,17 @@ function inTimeFrame(date) {
 }
 
 /** Entries in the time frame; listed: true leaves out archived ones unless View > Show Archived is on. */
-function timeFrameTransactions({ listed = false } = {}) {
+export function timeFrameTransactions({ listed = false } = {}) {
   return state.model.transactions.filter(tx => inTimeFrame(tx.date) && (!listed || state.showArchived || !tx.archived));
 }
 
 /** The one month chosen, or null for All time or several months. */
-function singleTimeFrameMonth() {
+export function singleTimeFrameMonth() {
   return !state.timeFrame.all && state.timeFrame.months.length === 1 ? state.timeFrame.months[0] : null;
 }
 
 /** "All time", "November 2026", "Oct 2026, Nov 2026", or "5 months". */
-function timeFrameLabel() {
+export function timeFrameLabel() {
   if (state.timeFrame.all) return 'All time';
   const months = timeFrameMonths();
   if (months.length === 1) return formatMonth(months[0]);
@@ -446,21 +446,21 @@ function timeFrameLabel() {
 }
 
 /** A transaction's number inside a scope ("person", "tag", "collection", "merchant", "method"), such as 3 for Alex's third entry. */
-function numberIn(tx, scope, scopeId) {
+export function numberIn(tx, scope, scopeId) {
   return tx.numbers.find(entry => entry.scope === scope && entry.scopeId === scopeId)?.number ?? null;
 }
 
-const SCOPE_NAMES = { person: personName, tag: tagName, collection: collectionName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}`, method: methodName };
+export const SCOPE_NAMES = { person: personName, tag: tagName, collection: collectionName, merchant: id => state.model.merchants.get(id)?.name ?? `Merchant #${id}`, method: methodName };
 
 /** Every per-scope number of a transaction, people first, each labelled like "Alex #3". */
-function scopeNumbers(tx) {
+export function scopeNumbers(tx) {
   return Object.keys(SCOPE_NAMES).flatMap(scope => tx.numbers
     .filter(entry => entry.scope === scope)
     .map(entry => ({ ...entry, label: `${SCOPE_NAMES[scope](entry.scopeId)} #${entry.number}` })));
 }
 
 /** A saved transaction as a request body, with any fields replaced by changes. */
-function transactionRequest(tx, changes = {}) {
+export function transactionRequest(tx, changes = {}) {
   return {
     kind: tx.kind, date: tx.date, amountCents: tx.amountCents, paymentMethodId: tx.paymentMethodId, personId: tx.personId,
     linkedId: tx.linkedId, merchantId: tx.merchantId, description: tx.description, note: tx.note, tagIds: tx.tagIds, collectionIds: tx.collectionIds,
@@ -470,7 +470,7 @@ function transactionRequest(tx, changes = {}) {
 }
 
 /** Divides an amount into equal cents for each person; the first people listed get any leftover cent. */
-function evenShares(amountCents, personIds) {
+export function evenShares(amountCents, personIds) {
   const base = Math.floor(amountCents / personIds.length);
   const leftover = amountCents - base * personIds.length;
   return personIds.map((personId, index) => ({ personId, amountCents: base + (index < leftover ? 1 : 0) }));
@@ -482,7 +482,7 @@ function evenShares(amountCents, personIds) {
  * people are left out so a search like "h" does not match every "Purchase" or "Cash" row. A word like "#12" finds
  * transaction #12 exactly.
  */
-function matchesSearch(tx, query) {
+export function matchesSearch(tx, query) {
   const wanted = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (wanted.length === 0) return true;
   const text = [
@@ -493,7 +493,7 @@ function matchesSearch(tx, query) {
 }
 
 /** The collections of the given entries, each once, by name. */
-function collectionsOf(transactions) {
+export function collectionsOf(transactions) {
   const ids = new Set(transactions.flatMap(collectionIdsOf));
   return [...ids].map(collectionName).sort(compareNames);
 }

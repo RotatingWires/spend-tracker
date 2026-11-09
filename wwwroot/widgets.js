@@ -1,6 +1,7 @@
-'use strict';
-
 /* Reusable Win95-style widgets: menus, single-select dropdowns, tables, stat cards, and modal prompts. */
+import { $, $$, el, formatMoney } from './app.js';
+import { addListItem } from './manage.js';
+import { menuSeparator } from './ui.js';
 
 /*
  * Every dialog puts Cancel first and the confirming button last, on the right, as in TaskList and NewsReview. Cancel
@@ -12,12 +13,12 @@ document.addEventListener('click', event => {
   if (button && !button.disabled) document.getElementById(button.dataset.close)?.close(button.value || 'cancel');
 });
 
-function closeMenus() {
+export function closeMenus() {
   $$('.menu-dropdown').forEach(menu => { menu.hidden = true; });
   $$('[aria-haspopup="menu"]').forEach(button => button.setAttribute('aria-expanded', 'false'));
 }
 
-function toggleMenu(button, menu) {
+export function toggleMenu(button, menu) {
   const open = menu.hidden;
   closeMenus();
   menu.hidden = !open;
@@ -25,7 +26,7 @@ function toggleMenu(button, menu) {
   if (open) placeMenu(button, menu);
 }
 
-function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
+export function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
   const button = el('button');
   button.setAttribute('role', role);
   if (role !== 'menuitem') button.setAttribute('aria-checked', checked ? 'true' : 'false');
@@ -100,7 +101,7 @@ function menuSearch(menu, render) {
   };
 }
 
-function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
+export function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
@@ -174,7 +175,7 @@ function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = 
  * ungrouped option), options are nested under group headings that expand and collapse in place, like the years of the
  * Time frame dropdown; a group holding a checked option starts expanded and shows how many are checked.
  */
-function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true } = {}) {
+export function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
@@ -296,7 +297,7 @@ function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary 
  * "overpaid", say). A caller that draws only part of its rows (the ledger) sorts them itself: it passes onSort and
  * gives its columns sortValue.
  */
-const tableSorts = new Map();
+export const tableSorts = new Map();
 
 /** A comparable value for a cell's text: a number (money, counts, #IDs, dates as YYYYMMDD), text, or null. */
 function sortValueOf(raw) {
@@ -321,7 +322,7 @@ function cellSortValue(cell) {
 }
 
 /** A sorted copy (stable, so ties keep their order); numbers come before text, and nulls last in both directions. */
-function sortByValue(items, valueOf, direction) {
+export function sortByValue(items, valueOf, direction) {
   const keyed = items.map((item, index) => ({ item, index, value: valueOf(item) }));
   keyed.sort((a, b) => {
     if (a.value == null || b.value == null) return (a.value == null) - (b.value == null) || a.index - b.index;
@@ -346,7 +347,7 @@ function cycleTableSort(key, index) {
  * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), onDoubleClick(event), className, id, selected }].
  * onDoubleClick opens on a double click (or Enter) instead, for rows a stray click should not open.
  */
-function renderTable(table, columns, rows, options = {}) {
+export function renderTable(table, columns, rows, options = {}) {
   const { empty = 'Nothing here yet.', footer = null, onSort = null } = options;
   const sortKey = table.id;
   const sort = tableSorts.get(sortKey);
@@ -449,7 +450,7 @@ function tableRow(columns, row) {
  * A search box and its Search button. As in NewsReview, the search runs on the button, Enter, or leaving the box after
  * changing it, never while typing; running the same search again is skipped.
  */
-function bindSearchForm(form, run) {
+export function bindSearchForm(form, run) {
   const input = form.querySelector('input');
   let applied = input.value.trim();
   const apply = () => {
@@ -472,7 +473,7 @@ function bindSearchForm(form, run) {
   };
 }
 
-function statCard(label, value, { sub = '', title = '' } = {}) {
+export function statCard(label, value, { sub = '', title = '' } = {}) {
   const card = el('div', 'stat-card');
   const labelElement = el('div', 'label');
   labelElement.textContent = label;
@@ -493,7 +494,7 @@ function statCard(label, value, { sub = '', title = '' } = {}) {
 }
 
 /** Fills a .metric-list with [label, value, tooltip?] rows. */
-function renderMetrics(container, metrics) {
+export function renderMetrics(container, metrics) {
   container.replaceChildren();
   for (const [label, value, title] of metrics) {
     const labelElement = el('div', 'metric-label');
@@ -509,12 +510,12 @@ function renderMetrics(container, metrics) {
   }
 }
 
-function moneyCell(cents, { direction = 'out', className = '' } = {}) {
+export function moneyCell(cents, { direction = 'out', className = '' } = {}) {
   const text = direction === 'in' ? `+${formatMoney(cents)}` : direction === 'refund' ? `−${formatMoney(cents)}` : formatMoney(cents);
   return { text, num: true, className: [direction === 'out' ? '' : 'money-in', className].filter(Boolean).join(' ') };
 }
 
-function rowActionButtons(actions) {
+export function rowActionButtons(actions) {
   const wrap = el('div', 'row-actions');
   for (const [label, onClick, ariaLabel] of actions) {
     const button = el('button');
@@ -530,7 +531,7 @@ function rowActionButtons(actions) {
 }
 
 /** Asks before an action. detail adds a scrollable list, such as the selected entries; notice: true shows only OK. */
-function confirmAction(title, message, okLabel = 'OK', { detail = '', notice = false } = {}) {
+export function confirmAction(title, message, okLabel = 'OK', { detail = '', notice = false } = {}) {
   const dialog = $('#confirmDialog');
   $('#confirmTitle').textContent = title;
   $('#confirmMessage').textContent = message;
@@ -546,7 +547,7 @@ function confirmAction(title, message, okLabel = 'OK', { detail = '', notice = f
 }
 
 /** Asks for a line of text. maxLength matches the server's limit for that field. */
-function promptText(title, label, value = '', { maxLength = 60 } = {}) {
+export function promptText(title, label, value = '', { maxLength = 60 } = {}) {
   const dialog = $('#promptDialog');
   const input = $('#promptInput');
   $('#promptTitle').textContent = title;
@@ -571,7 +572,7 @@ let choiceSelect = null;
 let choiceChecks = null;
 let modeSelect = null;
 let choiceAdd = null;
-function chooseOption(title, label, options, okLabel = 'OK', { modes = null, multiple = false, addPath = null } = {}) {
+export function chooseOption(title, label, options, okLabel = 'OK', { modes = null, multiple = false, addPath = null } = {}) {
   const dialog = $('#chooseDialog');
   const addOptions = { onAdd: () => choiceAdd?.(), canAdd: () => Boolean(choiceAdd) };
   choiceSelect ??= createSingleSelect($('#chooseSelect'), addOptions);
@@ -607,7 +608,7 @@ function chooseOption(title, label, options, okLabel = 'OK', { modes = null, mul
 }
 
 /** Errors show in the status bar, like TaskList's; an empty message clears an error still showing there. */
-function showError(message) {
+export function showError(message) {
   const status = $('#statusLeft');
   if (message) {
     status.textContent = `Error: ${message}`;
@@ -617,7 +618,7 @@ function showError(message) {
   }
 }
 
-function setStatus(message) {
+export function setStatus(message) {
   const status = $('#statusLeft');
   status.textContent = message;
   delete status.dataset.error;

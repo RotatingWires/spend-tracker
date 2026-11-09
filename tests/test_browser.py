@@ -778,9 +778,11 @@ class BrowserTests(unittest.TestCase):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         snapshots = []
         page.on("request", lambda request: snapshots.append(request.url) if request.url.endswith("/api/snapshot") else None)
+        stats_modules = []
+        page.on("request", lambda request: stats_modules.append(request.url) if request.url.endswith("/stats.js") else None)
         self.log_in(page)
         # Stats and its charts are not loaded until the Stats tab opens.
-        self.assertEqual(page.evaluate("typeof renderStats"), "undefined")
+        self.assertEqual(stats_modules, [])
         api = self.api_client()
         snapshot = api.get("/api/snapshot")
         me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
@@ -856,7 +858,7 @@ class BrowserTests(unittest.TestCase):
 
         page.click('.tabs [data-tab="stats"]')
         expect(page.locator("#statsTotals .stat-card")).to_have_count(10)
-        self.assertEqual(page.evaluate("typeof renderStats"), "function")
+        self.assertEqual(len(stats_modules), 1)
 
         # Merchants and History have search boxes.
         api.post("/api/merchants", {"name": "Zebra Mart"})

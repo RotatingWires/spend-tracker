@@ -1,12 +1,16 @@
-'use strict';
-
 /*
  * Payment Methods, Tags, Collections, and Merchants tabs: totals per item from the purchases that have it and the refunds
  * on those purchases, with an Add form and Rename/Archive/Delete on each row. Selecting a row lists that scope's
  * entries; a collection can also be opened as a Stats period.
  */
+import { $, collectionIdsOf, formatDateRange, formatMoney, numberFormat, state, tagIdsOf } from './app.js';
+import { renderTable } from './widgets.js';
+import { archivedLabel, monthTotals } from './transactions.js';
+import { manageButtons } from './manage.js';
+import { openScopeList } from './scopes.js';
+import { switchTab } from './ui.js';
 
-function merchantIdsOf(tx) {
+export function merchantIdsOf(tx) {
   const source = tx.kind === 'Refund' ? state.model.byId.get(tx.linkedId) ?? tx : tx;
   return source.merchantId == null ? [] : [source.merchantId];
 }
@@ -45,32 +49,32 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
 }
 
 /** The tab's search (applied with its Search button) narrows its list by name, ignoring case. */
-function searchedItems(tab, items) {
+export function searchedItems(tab, items) {
   const query = state.listQueries[tab].toLowerCase();
   return query ? items.filter(item => item.name.toLowerCase().includes(query)) : items;
 }
 
 /** The empty-table message: what the search missed, or how to add the first one. */
-function searchEmpty(tab, singular, emptyText) {
+export function searchEmpty(tab, singular, emptyText) {
   return state.listQueries[tab] ? `No ${singular} matches "${state.listQueries[tab]}".` : emptyText;
 }
 
-function renderMethodsTab() {
+export function renderMethodsTab() {
   renderLabelSummary($('#methodsTable'), 'method', 'payment-methods', searchedItems('methods', state.snapshot.paymentMethods), tx => [tx.paymentMethodId],
     { label: 'Payment Method', empty: searchEmpty('methods', 'payment method', 'No payment methods yet. Add one above.') });
 }
 
-function renderTagsTab() {
+export function renderTagsTab() {
   renderLabelSummary($('#tagsTable'), 'tag', 'tags', searchedItems('tags', state.snapshot.tags), tagIdsOf,
     { label: 'Tag', empty: searchEmpty('tags', 'tag', 'No tags yet. Add one above, then choose it on purchases in the editor.') });
 }
 
-function renderCollectionsTab() {
+export function renderCollectionsTab() {
   renderLabelSummary($('#collectionsTable'), 'collection', 'collections', searchedItems('collections', state.snapshot.collections), collectionIdsOf,
     { label: 'Collection', empty: searchEmpty('collections', 'collection', 'No collections yet. Add one above, then choose it on purchases in the editor.'), stats: true });
 }
 
-function renderMerchantsTab() {
+export function renderMerchantsTab() {
   renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', searchedItems('merchants', state.snapshot.merchants), merchantIdsOf, {
     label: 'Merchant',
     actionsInDialog: true,

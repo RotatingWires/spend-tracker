@@ -1,22 +1,25 @@
-'use strict';
-
 /*
  * Numbered lists: every entry in one scope (a person, tag, collection, merchant, or payment method) with its number there, such as Alex #1, #2,
  * #3. Opened from rows on the People, Payment Methods, Tags, Collections, and Merchants tabs and from the numbers at the
  * top of the transaction editor.
  */
+import { $, SCOPE_NAMES, describeTransaction, formatDate, formatMonth, monthOf, numberIn, plural, shareOf, state, whoLabel } from './app.js';
+import { moneyCell, renderTable } from './widgets.js';
+import { KIND_LABELS, openTransactionEditor } from './transactions.js';
+import { merchantIdsOf } from './summaries.js';
+import { manageButtons } from './manage.js';
 
 const SCOPE_TITLES = { person: 'Person', tag: 'Tag', collection: 'Collection', merchant: 'Merchant', method: 'Payment method' };
 let scopeListTarget = null;
 
 /** With month ("YYYY-MM"), only that month's entries are listed (Stats > Heatmaps > Tags × Month). */
-function openScopeList(scope, scopeId, { month = null } = {}) {
+export function openScopeList(scope, scopeId, { month = null } = {}) {
   scopeListTarget = { scope, scopeId, month };
   renderScopeList();
   $('#scopeDialog').showModal();
 }
 
-function renderScopeList() {
+export function renderScopeList() {
   if (!scopeListTarget) return;
   const { scope, scopeId, month } = scopeListTarget;
   // A merchant's dialog holds its Rename, Archive, and Delete buttons; deleting it closes the dialog.

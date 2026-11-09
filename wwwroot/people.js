@@ -1,6 +1,10 @@
-'use strict';
-
 /* People tab: what each other person owes you, and their purchase/payback detail. */
+import { $, compareNames, describeTransaction, formatDate, formatMoney, isGiftShare, numberFormat, numberIn, peopleOf, personName, shareOf, shareRemaining, state, writeSetting } from './app.js';
+import { moneyCell, renderMetrics, renderTable } from './widgets.js';
+import { KIND_LABELS, archivedLabel, openTransactionEditor } from './transactions.js';
+import { searchEmpty, searchedItems } from './summaries.js';
+import { manageButtons } from './manage.js';
+import { renderAll } from './ui.js';
 
 let personDialogId = null;
 
@@ -8,7 +12,7 @@ let personDialogId = null;
  * A person's balance: their shares of purchases, minus refunds on their shares, minus what they paid back. Gift
  * shares, and refunds on them, are left out unless People > Include gifts is checked.
  */
-function personLedger(personId, { through = null } = {}) {
+export function personLedger(personId, { through = null } = {}) {
   const ledger = { fronted: 0, gifted: 0, refunded: 0, giftRefunded: 0, paidBack: 0, purchases: 0, lastPayback: null, entries: [] };
   for (const tx of state.model.transactions) {
     // With through, the balance as it stood at the end of that day (Stats > People Over Time).
@@ -33,14 +37,14 @@ function personLedger(personId, { through = null } = {}) {
   return ledger;
 }
 
-function outstandingText(cents) {
+export function outstandingText(cents) {
   if (cents > 0) return `${formatMoney(cents)} owed to you`;
   if (cents < 0) return `${formatMoney(-cents)} overpaid`;
   return 'Settled';
 }
 
 /** Everyone, you first: balances for other people, plus Rename/Archive/Delete on each row. */
-function renderPeople() {
+export function renderPeople() {
   const rows = searchedItems('people', state.snapshot.people)
     .map(person => ({ person, ledger: personLedger(person.id) }))
     // Me first, then A–Z, like the dropdowns; the Balance heading sorts by balance.
@@ -75,13 +79,13 @@ function renderPeople() {
   ], rows, { empty: searchEmpty('people', 'person', 'No people yet.') });
 }
 
-function openPersonDialog(personId) {
+export function openPersonDialog(personId) {
   personDialogId = personId;
   renderPersonDialog();
   $('#personDialog').showModal();
 }
 
-function renderPersonDialog() {
+export function renderPersonDialog() {
   const personId = personDialogId;
   if (personId == null || !state.model.people.has(personId)) return;
   const ledger = personLedger(personId);
@@ -120,7 +124,7 @@ function renderPersonDialog() {
   $('#personPaybackButton').disabled = state.model.people.get(personId).archived;
 }
 
-function initializePeople() {
+export function initializePeople() {
   $('#includeGifts').checked = state.includeGifts;
   $('#includeGifts').addEventListener('change', event => {
     state.includeGifts = event.target.checked;

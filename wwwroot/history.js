@@ -1,6 +1,6 @@
-'use strict';
-
 /* History tab: the server's audit log of every change, rendered as readable before/after summaries. */
+import { $, TAG_SEPARATOR, api, collectionName, describeTransaction, formatDate, formatDateTime, formatMoney, methodName, personName, plural, tagName } from './app.js';
+import { bindSearchForm, renderTable, showError } from './widgets.js';
 
 const HISTORY_PAGE_SIZE = 100;
 const historyState = { entries: [], hasMore: false, loading: false, query: '' };
@@ -28,7 +28,7 @@ const SIMPLE_FIELDS = [
   ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
 ];
 
-async function loadHistory({ older = false } = {}) {
+export async function loadHistory({ older = false } = {}) {
   // A search pressed while a page is loading runs once it arrives, so the list never shows an older search.
   if (historyState.loading) {
     if (!older) historyState.reload = true;
@@ -92,7 +92,7 @@ function renderHistory() {
   $('#historyMoreButton').hidden = !historyState.hasMore;
 }
 
-function initializeHistory() {
+export function initializeHistory() {
   $('#historyMoreButton').addEventListener('click', () => loadHistory({ older: true }));
   // The server searches every change (action, type, ID, and the values before and after) when Search is pressed.
   bindSearchForm($('#historySearchForm'), query => {

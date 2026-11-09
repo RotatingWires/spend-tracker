@@ -1,6 +1,6 @@
-'use strict';
-
 /** The page font (Tahoma, or W95FA with View → Use Retro Font) for text drawn on charts. */
+import { el } from './app.js';
+
 const chartFont = () => getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim() || 'Tahoma, Arial, sans-serif';
 
 /*
@@ -10,7 +10,7 @@ const chartFont = () => getComputedStyle(document.documentElement).getPropertyVa
  * on the right axis. A line chart draws running totals and balances, one line per series, dashed ones for comparisons.
  */
 
-const Charts = (() => {
+export const Charts = (() => {
   let tooltip = null;
 
   function themeColor(name) {

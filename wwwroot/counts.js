@@ -1,9 +1,13 @@
-'use strict';
-
 /*
  * Stats > Counts: how many entries rather than how much money. Purchases, refunds, and paybacks over time and by
  * weekday, purchases by size, and the merchants and tags used most. Like the rest of Stats, archived entries count.
  */
+import { $, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, dayNumber, el, formatDate, formatMonth, keyFromDayNumber, monthOf, numberFormat, tagIdsOf, tagName, weekdayOf } from './app.js';
+import { renderMetrics } from './widgets.js';
+import { merchantIdsOf } from './summaries.js';
+import { Charts } from './charts.js';
+import { drawTimeChart } from './stats.js';
+import { SIZE_BUCKETS } from './insights.js';
 
 const COUNT_KINDS = [
   { kind: 'Purchase', label: 'Purchases', color: 5 },
@@ -36,7 +40,7 @@ function shortLabel(name) {
   return name.length > 12 ? `${name.slice(0, 11)}...` : name;
 }
 
-function renderCounts(stats) {
+export function renderCounts(stats) {
   const byKind = emptyCounts();
   for (const tx of stats.transactions) byKind[tx.kind]++;
 

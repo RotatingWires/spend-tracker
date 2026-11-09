@@ -1,6 +1,7 @@
-'use strict';
-
 // File > Fresh Start...: clear only the chosen data, then the server compacts the database to free disk space.
+import { $, api, plural } from './app.js';
+import { closeMenus, setStatus } from './widgets.js';
+import { loadSnapshot } from './ui.js';
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} bytes`;
