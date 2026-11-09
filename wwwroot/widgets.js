@@ -4,11 +4,12 @@
 
 /*
  * Every dialog puts Cancel first and the confirming button last, on the right, as in TaskList and NewsReview. Cancel
- * is a plain button marked data-close-dialog, so the confirming button stays the form's default and Enter confirms.
+ * is a plain button marked data-close="dialogId", so the confirming button stays the form's default and Enter confirms.
  */
+// Buttons marked data-close="dialogId" close that dialog; the same code in every app.
 document.addEventListener('click', event => {
-  const cancel = event.target.closest?.('[data-close-dialog]');
-  if (cancel) cancel.closest('dialog')?.close(cancel.value || 'cancel');
+  const button = event.target.closest('[data-close]');
+  if (button && !button.disabled) document.getElementById(button.dataset.close)?.close(button.value || 'cancel');
 });
 
 function closeMenus() {

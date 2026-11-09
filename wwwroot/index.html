@@ -18,7 +18,9 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <a class="skip" href="#workspace">Skip to content</a>
   <main class="window" id="appWindow">
+    <h1 class="sr-only">SpendTracker</h1>
     <header class="titlebar"><span class="title-left">SpendTracker</span><span class="title-center" id="titleScope"></span><span class="title-buttons" aria-hidden="true"><span class="title-minimize"></span><span class="title-maximize"></span><span class="title-close"></span></span></header>
 
     <nav class="menubar" aria-label="Application menu">
@@ -75,7 +77,7 @@
       <button type="button" role="tab" aria-selected="true" data-tab="transactions">Transactions</button><button type="button" role="tab" aria-selected="false" data-tab="calendar">Calendar</button><button type="button" role="tab" aria-selected="false" data-tab="stats">Stats</button><button type="button" role="tab" aria-selected="false" data-tab="people">People</button><button type="button" role="tab" aria-selected="false" data-tab="methods">Payment Methods</button><button type="button" role="tab" aria-selected="false" data-tab="tags">Tags</button><button type="button" role="tab" aria-selected="false" data-tab="collections">Collections</button><button type="button" role="tab" aria-selected="false" data-tab="merchants">Merchants</button><button type="button" role="tab" aria-selected="false" data-tab="history">History</button>
     </section>
 
-    <section class="workspace" id="workspace">
+    <section class="workspace skip-target" id="workspace" tabindex="-1">
       <div id="loadingPanel" class="message-panel">Loading...</div>
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
@@ -244,7 +246,7 @@
   </main>
 
   <dialog id="transactionDialog" class="retro-dialog wide" aria-labelledby="transactionDialogTitle">
-    <form class="dialog-window" id="transactionForm" novalidate>
+    <form method="dialog" class="dialog-window" id="transactionForm" novalidate>
       <div class="dialog-title" id="transactionDialogTitle">New Transaction</div>
       <div class="dialog-body">
         <div id="txNumbers" class="form-hint tx-numbers" hidden></div>
@@ -295,7 +297,7 @@
         <button type="button" id="txArchiveButton">Archive</button>
         <button type="button" id="txViewButton" title="Close this and show the entry in the ledger: its month, with filters and search cleared, highlighted">View Entry in Time</button>
         <span class="spacer"></span>
-        <button type="button" id="txCancelButton">Cancel</button>
+        <button type="button" id="txCancelButton" data-close="transactionDialog">Cancel</button>
         <button type="submit" id="txSaveButton">Save</button>
       </div>
     </form>
@@ -305,7 +307,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="dayDialogTitle">Day</div>
       <div class="dialog-body"><div id="dayDialogCollections" class="note"></div><div class="table-wrap"><table id="dayTable"></table></div></div>
-      <div class="dialog-buttons"><button type="button" id="dayAddButton">Add to This Day</button><span class="spacer"></span><button type="submit">Close</button></div>
+      <div class="dialog-buttons"><button type="button" id="dayAddButton">Add to This Day</button><span class="spacer"></span><button type="button" data-close="dayDialog">Close</button></div>
     </form>
   </dialog>
 
@@ -313,7 +315,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="personDialogTitle">Person</div>
       <div class="dialog-body"><div id="personSummary" class="metric-list"></div><div class="section-title">Purchases and paybacks</div><div class="table-wrap"><table id="personTable"></table></div></div>
-      <div class="dialog-buttons"><button type="button" id="personPaybackButton">Record Payback</button><span class="spacer"></span><button type="submit">Close</button></div>
+      <div class="dialog-buttons"><button type="button" id="personPaybackButton">Record Payback</button><span class="spacer"></span><button type="button" data-close="personDialog">Close</button></div>
     </form>
   </dialog>
 
@@ -321,7 +323,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="scopeDialogTitle">List</div>
       <div class="dialog-body"><div id="scopeSummary" class="note"></div><div class="table-wrap"><table id="scopeTable"></table></div></div>
-      <div class="dialog-buttons"><span id="scopeActions" class="scope-actions"></span><span class="spacer"></span><button type="submit">Close</button></div>
+      <div class="dialog-buttons"><span id="scopeActions" class="scope-actions"></span><span class="spacer"></span><button type="button" data-close="scopeDialog">Close</button></div>
     </form>
   </dialog>
 
@@ -329,7 +331,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="confirmTitle">Confirm</div>
       <div class="dialog-body"><p id="confirmMessage"></p><div id="confirmDetail" class="confirm-detail" hidden></div></div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" id="confirmCancelButton" data-close-dialog>Cancel</button><button type="submit" value="ok" id="confirmOkButton">OK</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" id="confirmCancelButton" data-close="confirmDialog">Cancel</button><button type="submit" value="ok" id="confirmOkButton">OK</button></div>
     </form>
   </dialog>
 
@@ -337,7 +339,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="chooseTitle">Choose</div>
       <div class="dialog-body choose-body"><span class="form-label" id="chooseModeLabel" hidden>Change</span><div id="chooseMode" aria-labelledby="chooseModeLabel" hidden></div><span class="form-label" id="chooseLabel">Choose</span><div id="chooseSelect" aria-labelledby="chooseLabel"></div><div id="chooseMulti" aria-labelledby="chooseLabel" hidden></div></div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="submit" value="ok" id="chooseOkButton">OK</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close="chooseDialog">Cancel</button><button type="submit" value="ok" id="chooseOkButton">OK</button></div>
     </form>
   </dialog>
 
@@ -345,19 +347,19 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="promptTitle">Rename</div>
       <div class="dialog-body"><label for="promptInput" id="promptLabel">Name</label><input id="promptInput" class="retro-input prompt-input" type="text" maxlength="60"></div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="submit" value="ok">Save</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close="promptDialog">Cancel</button><button type="submit" value="ok">Save</button></div>
     </form>
   </dialog>
 
   <dialog id="firstRunDialog" class="retro-dialog first-run-dialog" aria-labelledby="firstRunTitle" aria-describedby="firstRunMessage">
-    <div class="dialog-window">
+    <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="firstRunTitle">Restore a Backup Before Starting</div>
       <div class="dialog-body first-run-body">
         <p id="firstRunMessage">If you have a SpendTracker backup ZIP, restore it before adding entries. Use File &gt; Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.</p>
         <div id="firstRunError" class="form-error" role="alert"></div>
       </div>
       <div class="dialog-buttons"><span class="spacer"></span><button type="button" id="firstRunContinue">Start Fresh</button><button type="button" id="firstRunImport">Import/Export...</button></div>
-    </div>
+    </form>
   </dialog>
 
   <dialog id="transferDialog" class="retro-dialog transfer-dialog" aria-labelledby="transferTitle">
@@ -371,7 +373,7 @@
         <p>Export Transactions CSV downloads every transaction, archived or not, for viewing in a spreadsheet. CSV cannot be imported; use a backup ZIP to restore.</p>
         <button type="button" id="exportCsvButton">Export Transactions CSV</button>
       </div>
-      <div class="dialog-buttons"><span class="spacer"></span><button type="submit">OK</button></div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" data-close="transferDialog">OK</button></div>
     </form>
   </dialog>
 
@@ -392,7 +394,7 @@
         <label class="fresh-start-confirm">Type RESET SELECTED to confirm<input id="freshStartConfirmation" class="retro-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"></label>
         <p id="freshStartError" class="fresh-start-error" role="alert" aria-live="polite"></p>
       </div>
-      <div class="fresh-start-actions"><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="button" id="freshStartButton" class="danger">Reset Selected Data</button></div>
+      <div class="fresh-start-actions"><button type="button" value="cancel" data-close="freshStartDialog">Cancel</button><button type="submit" id="freshStartButton" class="danger">Reset Selected Data</button></div>
     </form>
   </dialog>
 
@@ -405,7 +407,7 @@
         <p><strong>Tips:</strong> double-click a row to edit it, and use File > Select... to change several at once. File > Import/Export... backs up everything but your password. MANUAL.md has the full guide.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>
-      <div class="dialog-buttons"><button type="submit">OK</button></div>
+      <div class="dialog-buttons"><button type="button" data-close="aboutDialog">OK</button></div>
     </form>
   </dialog>
 

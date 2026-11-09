@@ -368,7 +368,6 @@ function initializeTransactionEditor() {
     event.preventDefault();
     saveTransaction();
   });
-  $('#txCancelButton').addEventListener('click', () => $('#transactionDialog').close());
   $('#txDeleteButton').addEventListener('click', () => deleteTransaction());
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
   $('#txAmount').addEventListener('input', () => updateShareTotal());

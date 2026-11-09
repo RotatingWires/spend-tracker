@@ -83,4 +83,8 @@ $('[data-fresh-start="allEntries"]').addEventListener('change', event => {
 });
 
 $('#freshStartMenuItem').addEventListener('click', openFreshStart);
-$('#freshStartButton').addEventListener('click', runFreshStart);
+// Reset Selected Data is the form's submit button, so Enter in the confirmation box does the same.
+$('#freshStartButton').form.addEventListener('submit', event => {
+  event.preventDefault();
+  runFreshStart();
+});
