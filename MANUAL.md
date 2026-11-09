@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.29 Manual
+# SpendTracker v1.2.30 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -84,7 +84,8 @@ wwwroot/
   style.css             Windows 95-style layout and components
   login.html / login.js / auth.css   login and first-run setup
   sw.js                 removes the offline cache earlier releases installed
-  manifest.webmanifest, icons/spend.svg, version.json
+  manifest.webmanifest, version.json
+  icons/                favicon.svg, favicon.ico, and touch-180/192/512.png, the same names in every app
 
 tests/
   server.py             starts a real server on a temporary data folder
@@ -569,6 +570,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.30
+
+- The login and main pages share one set of page tags, the same in every app: a description, the iPhone home-screen and status-bar settings, the manifest, and icons.
+- Icons live in `/icons/` with the same names in every app: `favicon.svg`, `favicon.ico`, and `touch-180/192/512.png`. The manifest has an app ID, scope, and description.
+- The main page sets the iPhone status-bar style like its login page; there is now a `favicon.ico`.
 
 ### v1.2.29
 

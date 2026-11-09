@@ -1,7 +1,10 @@
 {
+  "id": "/",
   "name": "SpendTracker",
   "short_name": "SpendTracker",
+  "description": "A self-hosted spending tracker for purchases, refunds, shared costs, and paybacks.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#c0c0c0",
   "theme_color": "#000080",
@@ -17,7 +20,7 @@
       "type": "image/png"
     },
     {
-      "src": "/icons/spend.svg",
+      "src": "/icons/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }
