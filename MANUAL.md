@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.28 Manual
+# SpendTracker v1.2.29 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -55,6 +55,10 @@ src/
   Store.cs              SQLite schema, validation rules, history, restoring rows, and Fresh start
   Transfer.cs           backup ZIP creation and restore verification
   SingleFileLogger.cs   capped logs/console.log writer
+  PasswordAuth.cs       setup token, password file, and sign-in cookie (the same file in all four apps)
+appsettings.json        listen address and log level
+deploy/spendtracker.service
+                        example systemd unit
 README.md / MANUAL.md   documentation
 
 wwwroot/
@@ -118,6 +122,12 @@ dotnet run
 Releases before v1.2.18 named the database `spend-tracker.db`; SpendTracker renames it on its first start, and backups made before v1.2.18 still restore.
 
 There are no other settings. To keep SpendTracker running in the background, start `dotnet run` (or a published build) from the service manager you already use, with the project folder as the working directory and write access to `data/` and `logs/`.
+
+### Run as a Linux service
+
+`deploy/spendtracker.service` is a systemd template, not an installer, like NewsReview's: build with `dotnet publish -c Release -o /opt/spendtracker`, create the service account, `/var/lib/spendtracker` (the data folder) and `/opt/spendtracker/logs`, adjust `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match, then install and enable it. It listens on loopback at port 8715; change its `--urls` for LAN access, and find the first-run setup token in the journal.
+
+`appsettings.json` holds the default listen address (`Urls`) and log level, the same keys in every app. `--urls` and `ASPNETCORE_URLS` override it.
 
 ### Updating
 
@@ -559,6 +569,12 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.29
+
+- Sign-in code lives in `src/PasswordAuth.cs`, the same file in all four apps. Passwords are capped at 1024 characters and `auth.json` is saved readable only by its owner on Linux and macOS.
+- New `appsettings.json` with the listen address and log level, the same keys in every app.
+- New `deploy/spendtracker.service` systemd template, like NewsReview's.
 
 ### v1.2.28
 

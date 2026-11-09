@@ -1,0 +1,25 @@
+[Unit]
+Description=SpendTracker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Replace these paths and account before installation. Build first with:
+#   dotnet publish -c Release -o /opt/spendtracker
+User=spendtracker
+WorkingDirectory=/opt/spendtracker
+EnvironmentFile=-/etc/spendtracker.env
+ExecStart=/usr/bin/dotnet /opt/spendtracker/SpendTracker.dll --urls http://127.0.0.1:8715 --data-dir /var/lib/spendtracker
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Create /opt/spendtracker/logs and make it writable by the service account.
+ReadWritePaths=/var/lib/spendtracker /opt/spendtracker/logs
+
+[Install]
+WantedBy=multi-user.target
