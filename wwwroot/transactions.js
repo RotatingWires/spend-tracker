@@ -451,7 +451,7 @@ function openTransactionEditor(tx = null, defaults = {}) {
   editor.transaction = tx;
   editor.kind.value = tx?.kind ?? defaults.kind ?? 'Purchase';
   $('#transactionDialogTitle').textContent = tx ? `Edit ${KIND_LABELS[tx.kind]} #${tx.id}` : 'New Transaction';
-  $('#txDate').value = tx?.date ?? defaults.date ?? todayKey();
+  $('#txDate').value = typedDate(tx?.date ?? defaults.date ?? todayKey());
   $('#txAmount').value = tx ? formatAmount(tx.amountCents) : '';
   editor.merchant.setOptions(merchantOptions(tx?.merchantId ?? null), tx?.merchantId ?? '');
   $('#txDescription').value = tx?.description ?? '';
@@ -795,6 +795,11 @@ async function saveTransaction(changes = {}) {
     $('#txAmount').focus();
     return;
   }
+  if (!parseTypedDate($('#txDate').value)) {
+    error.textContent = 'Type the date as m/d/yy, like 11/8/26.';
+    $('#txDate').focus();
+    return;
+  }
 
   let shares = [];
   try {
@@ -806,7 +811,7 @@ async function saveTransaction(changes = {}) {
 
   const body = {
     kind,
-    date: $('#txDate').value,
+    date: parseTypedDate($('#txDate').value),
     amountCents,
     paymentMethodId: editor.method.value ? Number(editor.method.value) : null,
     personId: kind === 'Purchase' || !editor.person.value ? null : Number(editor.person.value),

@@ -36,7 +36,8 @@ class BrowserTests(unittest.TestCase):
         cls.server.stop()
 
     def new_page(self, **options):
-        context = self.browser.new_context(**options)
+        # The assertions expect US-style dates and dollars, so the browser reads in American English.
+        context = self.browser.new_context(**{'locale': 'en-US', **options})
         self.addCleanup(context.close)
         page = context.new_page()
         errors = []

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.36
+# SpendTracker v1.2.37
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -573,7 +573,12 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.36**.
+Current release: **v1.2.37**.
+
+### v1.2.37
+
+- Dates show in the browser's own format, like the other apps (they were always MM/DD/YYYY).
+- An entry's date is typed as m/d/yy (or m/d/yyyy), like the date ranges in every app, instead of using the browser's date picker; a date that isn't real is caught before saving.
 
 ### v1.2.36
 

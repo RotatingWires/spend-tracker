@@ -158,9 +158,28 @@ function monthEnd(monthKey) {
   return `${monthKey}-${pad2(daysInMonth(monthKey))}`;
 }
 
+/** A yyyy-mm-dd day in the browser's own date format, like the other apps. */
 function formatDate(key) {
-  const [year, month, day] = key.split('-');
-  return `${month}/${day}/${year}`;
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+/** Dates are typed as m/d/yy or m/d/yyyy (or yyyy-mm-dd), like the date ranges in every app; returns yyyy-mm-dd, or '' when it is not a real date. */
+function parseTypedDate(text) {
+  const iso = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/.exec(text);
+  const typed = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\s*$/.exec(text);
+  if (!iso && !typed) return '';
+  const year = iso ? Number(iso[1]) : typed[3] ? Number(typed[3]) + (typed[3].length === 2 ? 2000 : 0) : new Date().getFullYear();
+  const month = Number(iso ? iso[2] : typed[1]), day = Number(iso ? iso[3] : typed[2]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** yyyy-mm-dd as it is typed: m/d/yyyy. */
+function typedDate(iso) {
+  const [year, month, day] = (iso || '').split('-').map(Number);
+  return year ? `${month}/${day}/${year}` : '';
 }
 
 function formatMonth(monthKey) {
@@ -175,7 +194,7 @@ function formatDateRange(start, end) {
 function formatDateTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const day = `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}/${date.getFullYear()}`;
+  const day = date.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
   return `${day} ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
