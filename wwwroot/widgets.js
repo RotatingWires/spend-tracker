@@ -25,36 +25,6 @@ function toggleMenu(button, menu) {
   if (open) placeMenu(button, menu);
 }
 
-/**
- * A dropdown inside a dialog floats over the page instead of being cut off by the dialog's scrolling body: it opens
- * below its button, or above when there is more room there, as tall as the window allows. Scrolling or resizing closes
- * it, so it never drifts away from its button.
- */
-function placeMenu(button, menu) {
-  menu.classList.remove('floating-menu');
-  for (const property of ['position', 'left', 'top', 'bottom', 'minWidth', 'maxHeight']) menu.style[property] = '';
-  if (!button.closest('dialog')) return;
-  const rect = button.getBoundingClientRect();
-  const below = window.innerHeight - rect.bottom - 8;
-  const above = rect.top - 8;
-  const upward = below < 220 && above > below;
-  menu.classList.add('floating-menu');
-  menu.style.position = 'fixed';
-  menu.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 165) - 4))}px`;
-  menu.style.minWidth = `${rect.width}px`;
-  menu.style.maxHeight = `${Math.max(120, Math.min(480, upward ? above : below))}px`;
-  if (upward) menu.style.bottom = `${window.innerHeight - rect.top + 1}px`;
-  else menu.style.top = `${rect.bottom + 1}px`;
-}
-
-document.addEventListener('scroll', event => {
-  const floating = $$('.floating-menu').find(menu => !menu.hidden);
-  if (floating && !floating.contains(event.target)) closeMenus();
-}, true);
-window.addEventListener('resize', () => {
-  if ($$('.floating-menu').some(menu => !menu.hidden)) closeMenus();
-});
-
 function menuButton(label, { role = 'menuitem', checked = false, onClick }) {
   const button = document.createElement('button');
   button.type = 'button';

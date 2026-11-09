@@ -35,7 +35,7 @@ function setSelectionMode(enabled) {
 function selectionCell(tx) {
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.className = 'selection-check';
+  checkbox.className = 'selection-check retro-check';
   checkbox.checked = selectedIds.has(tx.id);
   checkbox.setAttribute('aria-label', `Select #${tx.id}: ${describeTransaction(tx) || KIND_LABELS[tx.kind]}`);
   const wrap = document.createElement('span');
