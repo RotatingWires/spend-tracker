@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.38
+# SpendTracker v1.2.39
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -573,7 +573,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.38**.
+Current release: **v1.2.39**.
+
+### v1.2.39
+
+- Code: every script starts with a short comment saying what it holds (and `'use strict';` where it is not a module), like SpendTracker's; `SingleFileLogger.cs` is now the same file in all four apps.
 
 ### v1.2.38
 
