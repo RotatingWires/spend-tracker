@@ -364,7 +364,7 @@ api.MapGet("/backup", async (HttpContext context) =>
         var path = Path.Combine(workDirectory.FullName, "backup.zip");
         Transfer.CreateArchive(store, path, appVersion);
         context.Response.Headers.CacheControl = "no-store";
-        await Results.File(path, "application/zip", $"spend-tracker-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.zip").ExecuteAsync(context);
+        await Results.File(path, "application/zip", $"spendtracker-backup-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip").ExecuteAsync(context);
     }
     finally
     {

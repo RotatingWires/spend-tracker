@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.23 Manual
+# SpendTracker v1.2.24 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -360,7 +360,7 @@ logs/
 
 ### Download Backup
 
-**Download Backup** downloads `spend-tracker-YYYYMMDD-HHMMSS.zip`, the same layout TaskList and NewsReview use. It contains exactly two files:
+**Download Backup** downloads `spendtracker-backup-YYYYMMDD-HHMMSS.zip` (local time), the same layout TaskList and NewsReview use. It contains exactly two files:
 
 - `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
@@ -401,7 +401,7 @@ The database part runs in one SQLite transaction, so a failure changes nothing. 
 
 ### Export Transactions CSV
 
-**Export Transactions CSV** downloads every transaction, archived or not, with its ID, date, type, for who (with each person's amount when a purchase was split), merchant, description, tags, payment method, amount, linked transaction, note, and whether it is archived. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
+**Export Transactions CSV** downloads `spendtracker-transactions-YYYYMMDD-HHMMSS.csv` with every transaction, archived or not, with its ID, date, type, for who (with each person's amount when a purchase was split), merchant, description, tags, payment method, amount, linked transaction, note, and whether it is archived. Cells starting with `=`, `+`, `-`, or `@` are prefixed with `'` so spreadsheet apps do not run them as formulas. CSV is for viewing and analysis elsewhere; use a backup ZIP to restore.
 
 ### Copying the database directly
 
@@ -551,6 +551,10 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.24
+
+- Download names follow one pattern in every app, in local time: `spendtracker-backup-YYYYMMDD-HHMMSS.zip` and `spendtracker-transactions-YYYYMMDD-HHMMSS.csv`.
 
 ### v1.2.23
 

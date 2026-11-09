@@ -343,7 +343,7 @@ class BrowserTests(unittest.TestCase):
         with page.expect_download() as download_info:
             page.click("#backupButton")
         download = download_info.value
-        self.assertRegex(download.suggested_filename, r"^spend-tracker-\d{8}-\d{6}\.zip$")
+        self.assertRegex(download.suggested_filename, r"^spendtracker-backup-\d{8}-\d{6}\.zip$")
         backup_path = Path(download.path())
         page.locator("#transferDialog").get_by_role("button", name="OK").click()
         self.add_transaction(page, amount="99", merchant="After backup")

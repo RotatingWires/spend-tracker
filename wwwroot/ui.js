@@ -230,7 +230,7 @@ async function downloadBackup() {
       return;
     }
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spend-tracker-${todayKey()}.zip`;
+    const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spendtracker-backup-${fileStamp()}.zip`;
     downloadFile(name, 'application/zip', await response.blob());
     setStatus('Backup downloaded. Keep it private; it contains all your spending data.');
   } catch (error) {

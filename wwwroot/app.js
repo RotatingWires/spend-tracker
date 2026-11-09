@@ -3,6 +3,12 @@
 const REQUEST_TIMEOUT_MS = 30000;
 
 /** fetch that gives up after 30 seconds, like NewsReview, instead of waiting forever on a stopped server. */
+/** yyyyMMdd-HHmmss in local time, the stamp in every download's file name, like the other apps. */
+function fileStamp(date = new Date()) {
+  const two = number => String(number).padStart(2, '0');
+  return `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}-${two(date.getHours())}${two(date.getMinutes())}${two(date.getSeconds())}`;
+}
+
 async function timedFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   try {
     return await fetch(url, timeoutMs ? { ...options, signal: AbortSignal.timeout(timeoutMs) } : options);

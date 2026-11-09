@@ -279,7 +279,7 @@ function exportTransactionsCsv() {
     ]);
   }
   const csv = lines.map(line => line.map(csvField).join(',')).join('\r\n');
-  downloadFile(`spend-tracker-transactions-${todayKey()}.csv`, 'text/csv', csv);
+  downloadFile(`spendtracker-transactions-${fileStamp()}.csv`, 'text/csv', csv);
 }
 
 function csvField(value) {
