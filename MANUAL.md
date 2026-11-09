@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.27 Manual
+# SpendTracker v1.2.28 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -65,12 +65,12 @@ wwwroot/
   transactions.js       monthly ledger, CSV export, transaction editor
   calendar.js           month calendar and day detail
   stats.js              statistics calculations, Stats sub-tabs, and Overview
-  heatmaps.js           Stats → Heatmaps
-  insights.js           Stats → Trends, Compare, and People & Places
-  counts.js             Stats → Counts
+  heatmaps.js           Stats > Heatmaps
+  insights.js           Stats > Trends, Compare, and People & Places
+  counts.js             Stats > Counts
   people.js             people balances and person detail
   summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
-  fresh-start.js        File → Fresh Start... dialog
+  fresh-start.js        File > Fresh Start... dialog
   history.js            history log rendering
   manage.js             add, rename, archive, and delete payment methods, people, tags, collections, and merchants
   bulk.js               selection mode and bulk actions in the ledger
@@ -139,7 +139,7 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **IDs and numbers.** Every transaction has a permanent **ID** (#12) that is never reused, shown in the ledger's ID column; search `#12` to find it. Every person, payment method, tag, collection, and merchant has its own permanent ID too, shown in the ID column of its tab. Each transaction is also numbered inside every **scope** it belongs to: each person on it (or who paid it back), each of its tags and collections, its merchant, and its payment method. *Alex #3* is the third entry involving Alex, *food #12* the twelfth purchase tagged food, *Diner #5* the fifth visit to Diner, *Cash #40* the fortieth cash entry. Numbers follow the order entries join a scope and are never reused: deleting Alex #2 does not renumber Alex #3, and an entry that leaves a scope (a tag removed) loses that number and gets a new one if it rejoins. The editor shows an entry's numbers at the top; select one (say *Alex #3*) to open Alex's whole numbered list. Selecting a row on the Payment Methods, Tags, Collections, or Merchants tab opens the same list, and the person dialog on the People tab also shows each entry's number for that person. The scopes are one list in `src/Store.cs` (`NumberedScopes`), so a future kind of grouping can be numbered by adding one line. When one is added, SpendTracker numbers existing entries in it at the next start (in date order), and restoring an older backup does the same.
 
-**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View → Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
+**Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View > Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
 **Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
@@ -189,15 +189,15 @@ Payment methods, people, and merchants that are used by transactions cannot be d
 
 ### Transactions
 
-The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. The dropdown names a single month and shows several as a count, such as *3 months*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View → Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
+The default tab is the ledger for the **Time frame** chosen in the toolbar: **All time**, one month, or several months checked together in the dropdown (it starts on the current month). In the dropdown, months are listed under their year: select a year to expand or collapse its months without closing the dropdown. A year holding checked months opens on its own and shows how many are checked, such as *2026 (2)*. The dropdown names a single month and shows several as a count, such as *3 months*. All time and months exclude each other: checking All time clears the months, and checking a month leaves All time; the last choice cannot be unchecked, so something is always shown. **◀ / ▶** move every chosen month back or forward by one (off for All time). The title bar names the time frame. The time frame's totals (spent, refunds, net spent, paybacks) are on the Stats tab; the ledger itself starts with the table. Entries are listed newest first, the highest ID on top, as in TaskList. The ledger fills the window and scrolls inside its frame, so the column headers and the **Totals** row stay in view. It draws the newest 200 rows first; below it, **Show 200 More** and **Show All** draw the rest, and the **Totals** row always covers every listed entry in the time frame. Changing the time frame starts again at 200. The table has one amount column per payment method used in the time frame (methods with no entries there get no column), and an **Collections** column once you have created a collection; refunds show as −$ and paybacks as +$ in green. The last column, **Net Spent**, shows what each row adds to net spent: a purchase adds its amount, a refund subtracts it, and a payback shows — because it does not change net spent. The **Totals** footer row shows net spent per payment method and, under Net Spent, for all the listed rows. Archived entries are left out of the table unless **View > Show Archived** is on; a note under the table says how many are hidden; Stats still includes them. With Show Archived on, archived rows are grey and marked *(archived)*.
 
 **Today**, after ◀ / ▶, appears whenever the time frame is anything but this month and goes back to it.
 
 **Filters**, after Time frame on the Transactions tab, is a dropdown of check items grouped by **Type**, **Payment method**, **For who**, **Merchant**, **Tags**, and **Collections**; each group expands and collapses like the Time frame years. The ledger keeps entries matching any checked item in a group and every group with something checked (Cash and Credit Card with the tag *food* lists food bought with either). Refunds count under their purchase's merchant, tags, and collections. One filter shows its name and several show as a count. **Clear Filters** appears beside it while a filter is checked.
 
-The **search box** at the right above the ledger, like the other tabs', with its **Search** button (or Enter, or leaving the box after changing it, as in NewsReview), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View → Show Archived** for archived entries).
+The **search box** at the right above the ledger, like the other tabs', with its **Search** button (or Enter, or leaving the box after changing it, as in NewsReview), keeps only the entries in the time frame that match; searching with an empty box lists them all again. It runs only on Search or Enter, not while you type, and looks in what you typed or tagged: merchant, description, note, tags, collections, and amount (`12.17` or `$12.17`). Words can match anywhere, including the middle of a word (`inn` finds *dinner*), and every word must match. A word like `#12` finds transaction #12 exactly. The type, payment method, and people are not searched, so a search never matches a row only because it is a *Purchase* paid with *Cash*. The **Totals** row adds up the matches. To search everything, choose **All time** (and **View > Show Archived** for archived entries).
 
-Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. When an entry in the list is linked to another, a **Linked To** column shows it: a refund's or payback's purchase, or a purchase's refunds and paybacks. Double-click one there to open that entry instead. In the editor, **View Entry in Time** closes it and shows the entry in the ledger: its month, with filters and search cleared (and View → Show Archived turned on for an archived entry), scrolled to and briefly highlighted, as TaskList does for a visited task. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
+Double-click a row (or focus it and press Enter) to edit it; a single click does nothing, so a stray click never opens an entry. When an entry in the list is linked to another, a **Linked To** column shows it: a refund's or payback's purchase, or a purchase's refunds and paybacks. Double-click one there to open that entry instead. In the editor, **View Entry in Time** closes it and shows the entry in the ledger: its month, with filters and search cleared (and View > Show Archived turned on for an archived entry), scrolled to and briefly highlighted, as TaskList does for a visited task. The editor's title shows the entry's ID, and the line under it its per-scope numbers. **Archive** / **Restore** saves the editor and changes whether the entry is listed. **New Transaction...** (the bold button at the left of the toolbar, framed like a Windows 95 default button, or the File menu, both on every tab) opens an empty editor. The button is the toolbar's first item, so it stays in the same place on every tab; the Time frame controls follow it on the Transactions and Calendar tabs. New entries default to today, or to the first day of the viewed month when the time frame is one other month, and to the payment method of your most recent purchase. Both defaults are visible and editable before saving.
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown with more than ten choices (merchants, tags, people, months, filters) starts with a search box that narrows the list as you type; Enter picks the first match in a one-choice list. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it.
 
@@ -214,7 +214,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 
 ### Selecting several entries
 
-**File → Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File → Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame. The **Tags**, **Collections**, **People**, and **Merchant** actions' dropdowns end with **Add New...**, which adds one and checks or chooses it.
+**File > Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File > Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame. The **Tags**, **Collections**, **People**, and **Merchant** actions' dropdowns end with **Add New...**, which adds one and checks or chooses it.
 
 The split button's main action is **Archive** (or **Restore** when every selected entry is archived). Its ▼ menu has:
 
@@ -230,7 +230,7 @@ Every action first asks for confirmation, listing up to 12 selected entries and 
 
 ### Calendar
 
-One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View → Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Days with no entries cannot be selected. Select a day to list its entries with their **Amount** and **Net Spent** (as in the ledger, a payback shows — there), edit one, or add a new entry with **Add to This Day**. Select a collection's name there to show that collection in the calendar: the time frame becomes the months it spans and its days are outlined until you change the time frame or tab. Open the name in a new tab instead (middle-click, or Ctrl/Cmd-click) for its deep link, `/collection/{id}`, like TaskList's `/task/{id}`: it opens the Collections tab with that collection's numbered entries, and survives signing in.
+One month grid for each month in the toolbar's time frame, newest first (All time shows every month from your first entry). Each day shows net spent and the number of entries (archived entries are left out unless **View > Show Archived** is on); the bar along the bottom of a day is relative to that month's biggest day. A day lists the collections of the entries recorded on it. Days with no entries cannot be selected. Select a day to list its entries with their **Amount** and **Net Spent** (as in the ledger, a payback shows — there), edit one, or add a new entry with **Add to This Day**. Select a collection's name there to show that collection in the calendar: the time frame becomes the months it spans and its days are outlined until you change the time frame or tab. Open the name in a new tab instead (middle-click, or Ctrl/Cmd-click) for its deep link, `/collection/{id}`, like TaskList's `/task/{id}`: it opens the Collections tab with that collection's numbered entries, and survives signing in.
 
 ### Stats
 
@@ -257,18 +257,18 @@ Four tabs with the same layout: an **Add** form, then one row per payment method
 
 ### History
 
-Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. The search box at the top, with its **Search** button (or Enter), finds changes anywhere in history whose action, type, ID, or before and after values contain the text (ignoring case), such as a merchant name, description, or amount in cents; searching with an empty box lists everything again. History is stored in the database and included in backups. **File → Fresh Start...** can clear it; see [Fresh Start](#fresh-start).
+Every create, edit, delete, and restore, newest first, with the item and the changed fields (old → new). **Load Older** fetches earlier entries. The search box at the top, with its **Search** button (or Enter), finds changes anywhere in history whose action, type, ID, or before and after values contain the text (ignoring case), such as a merchant name, description, or amount in cents; searching with an empty box lists everything again. History is stored in the database and included in backups. **File > Fresh Start...** can clear it; see [Fresh Start](#fresh-start).
 
 ### Menus
 
 - **File:** New Transaction..., Refresh (loads everything from the server again, for changes made on another device), Select..., Import/Export..., Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
 - **View:** switch tabs, **Show Archived**, choose the Light or Dark theme, and **Use Retro Font**. These are saved in this browser.
 
-**View → Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
+**View > Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
-Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, …). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
-- **Status bar:** messages such as "Added purchase …" appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList.
+Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, ...). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
+- **Status bar:** messages such as "Added purchase ..." appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList.
 - **Help:** a short explanation of the concepts above, ending with about.lehighradio.com above the version, as in TaskList, TaskList Stats, and NewsReview.
 
 ## Statistics
@@ -337,7 +337,7 @@ Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show
 
 ### Speed
 
-- The app downloads all of your data once, when it opens. After that, saving, deleting, archiving, bulk actions, and adding, renaming, or archiving a payment method, person, tag, merchant, or collection merge the server's answer into the data already in the browser instead of downloading everything again. Deleting one of those items, Fresh Start, Restore, and **File → Refresh** load everything again, since they can change many entries at once. With 5,000 entries, a save redraws in about 5 ms instead of about 55 ms.
+- The app downloads all of your data once, when it opens. After that, saving, deleting, archiving, bulk actions, and adding, renaming, or archiving a payment method, person, tag, merchant, or collection merge the server's answer into the data already in the browser instead of downloading everything again. Deleting one of those items, Fresh Start, Restore, and **File > Refresh** load everything again, since they can change many entries at once. With 5,000 entries, a save redraws in about 5 ms instead of about 55 ms.
 - Stats and its charts (`charts.js`, `stats.js`, `heatmaps.js`, `insights.js`, `counts.js`) load the first time the Stats tab opens, so starting up reads only what the ledger needs.
 - The ledger draws 200 rows at a time (about 4 ms instead of about 75 ms for 5,000 rows).
 - The server compresses its responses with Brotli or gzip. With 2,000 entries the data download is 139 KB instead of 938 KB, and scripts and styles shrink about threefold. (Only plain HTTP is compressed, ASP.NET's default; behind an HTTPS reverse proxy, let the proxy compress.)
@@ -359,12 +359,12 @@ data/
   spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
   keys/                 sign-in cookie keys when there is no Windows profile key ring (Linux, Task Scheduler)
-  backups/              recovery copies written automatically before each restore (File → Fresh Start can remove them)
+  backups/              recovery copies written automatically before each restore (File > Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
 ```
 
-**File → Import/Export...** opens one dialog for backups and CSV, like TaskList's Import/Export: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button to close it.
+**File > Import/Export...** opens one dialog for backups and CSV, like TaskList's Import/Export: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button to close it.
 
 ### Download Backup
 
@@ -392,7 +392,7 @@ Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0
 
 ### Fresh Start
 
-**File → Fresh Start...**, at the bottom of the File menu below Log Out so it is kept apart from everyday commands, clears only what you choose and then compacts the database so the space goes back to the disk, like Fresh start in NewsReview and TaskList. Its dialog uses NewsReview's Fresh start size, frame, title bar with a close button, and footer. Tick the items to clear, type `RESET SELECTED`, and choose **Reset selected data**. Each choice shows how much it holds, and the dialog shows the current database size. Change history and pre-restore recovery backups are ticked to start with; nothing that removes an entry is.
+**File > Fresh Start...**, at the bottom of the File menu below Log Out so it is kept apart from everyday commands, clears only what you choose and then compacts the database so the space goes back to the disk, like Fresh start in NewsReview and TaskList. Its dialog uses NewsReview's Fresh start size, frame, title bar with a close button, and footer. Tick the items to clear, type `RESET SELECTED`, and choose **Reset Selected Data**. Each choice shows how much it holds, and the dialog shows the current database size. Change history and pre-restore recovery backups are ticked to start with; nothing that removes an entry is.
 
 | Choice | What is cleared |
 | --- | --- |
@@ -488,7 +488,7 @@ A transaction body is:
 }
 ```
 
-`merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, …]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
+`merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, ...]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
 
 Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares` (each share may set `"gift": true` for anyone but you; leaving it out means false); refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `collectionIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
 
@@ -507,7 +507,7 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 - Transfers between your own accounts (paying off a card, withdrawing cash) are not tracked; record only real spending.
 - No automatic import yet. Entries are added by hand.
 - Stats are computed in the browser from the full snapshot, which is fine for years of personal data but not designed for very large datasets.
-- After a save, only the saved entries are updated in the browser; changes made on another device or in another tab show up after **File → Refresh** or reloading the page.
+- After a save, only the saved entries are updated in the browser; changes made on another device or in another tab show up after **File > Refresh** or reloading the page.
 
 ## Troubleshooting
 
@@ -533,7 +533,7 @@ The message explains which rule was broken (for example a refund larger than wha
 
 ### Restore failed
 
-Nothing was changed; the message names the problem. Only files saved with **File → Import/Export... → Download Backup** (or the automatic `data/backups/` copies) can be restored.
+Nothing was changed; the message names the problem. Only files saved with **File > Import/Export... > Download Backup** (or the automatic `data/backups/` copies) can be restored.
 
 ### The page shows "Could not load data"
 
@@ -560,6 +560,14 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 ## Release notes
 
+### v1.2.28
+
+- Wording matches the other apps: menu paths are written **File > Import/Export...**, only "..." and straight quotes are used.
+- Loading text is **Loading...** like the other apps; add and search boxes end with "..." like TaskList's (**New tag...**, **Search people...**).
+- **Reset Selected Data** is in Title Case like the other buttons.
+- Money, counts, percentages and times use the browser's locale (amounts still show $; amount boxes keep the 1,234.50 style they read back).
+- When the session expires, SpendTracker goes to the login page with **Your session has expired.**, like TaskList.
+
 ### v1.2.27
 
 - On phones the status bar keeps both sides, like TaskList: the right side shortens with an ellipsis.
@@ -585,7 +593,7 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 ### v1.2.22
 
-- **View → Use Retro Font**: the whole app, login page and chart labels included, can use W95FA, an open-source recreation of the Windows 95 font bundled with the app (SIL Open Font License, `wwwroot/fonts/OFL.txt`), so it looks the same on Windows, Linux, macOS, Android, and iOS. Off by default; saved per browser.
+- **View > Use Retro Font**: the whole app, login page and chart labels included, can use W95FA, an open-source recreation of the Windows 95 font bundled with the app (SIL Open Font License, `wwwroot/fonts/OFL.txt`), so it looks the same on Windows, Linux, macOS, Android, and iOS. Off by default; saved per browser.
 
 ### v1.2.21
 
@@ -657,7 +665,7 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 ### v1.2.7
 
-- Every dialog puts **Cancel** first and the confirming button (OK, Save, Reset selected data) on the right, as in TaskList and NewsReview; Enter still confirms.
+- Every dialog puts **Cancel** first and the confirming button (OK, Save, Reset Selected Data) on the right, as in TaskList and NewsReview; Enter still confirms.
 - Dropdowns with more than ten choices, such as Merchant and Tags, have a search box at the top.
 - People are listed by name after Me, in dropdowns, dialogs, and the People tab.
 
@@ -678,7 +686,7 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 ### v1.2.4
 
-- The ledger has a search box with a **Search** button above it, replacing **File → Search...**: it keeps only the matching entries in the time frame (merchant, description, note, tags, collections, amount, or #ID), and the Totals row adds up the matches.
+- The ledger has a search box with a **Search** button above it, replacing **File > Search...**: it keeps only the matching entries in the time frame (merchant, description, note, tags, collections, amount, or #ID), and the Totals row adds up the matches.
 - The Merchants search box sits beside the Add box, and the Merchants and History searches run on their **Search** button or Enter instead of while typing.
 
 ### v1.2.3
@@ -702,14 +710,14 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 ### v1.2.0
 
-- Saves update the data already in the browser instead of downloading every entry again (about 10× faster with 5,000 entries); deleting a list item, Fresh Start, Restore, and File → Refresh still load everything.
+- Saves update the data already in the browser instead of downloading every entry again (about 10× faster with 5,000 entries); deleting a list item, Fresh Start, Restore, and File > Refresh still load everything.
 - Stats and its charts load the first time the Stats tab opens.
 - The ledger shows the newest 200 rows, with **Show 200 More** and **Show All** below it; the Totals row still covers the whole time frame.
 
 ### v1.1.0
 
 - The ledger lists entries newest first (highest ID on top), like TaskList, and scrolls inside its frame so its headers and Totals row stay in view.
-- Stats → Overview has ten totals in two even rows of five, adding **Average per day** and **Entries**.
+- Stats > Overview has ten totals in two even rows of five, adding **Average per day** and **Entries**.
 - **Charts: Bars / Lines** beside Period switches charts over time between bars and lines; line charts give counts their own axis.
 - New **Counts** sub-tab: how many entries rather than how much money, with busiest day, month, weekday, and merchant, and charts of entries over time and by weekday, purchases by size, visits per merchant, and purchases per tag.
 
@@ -717,8 +725,8 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `tes
 
 SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with heatmaps and trends, and Import/Export are complete.
 
-- The Transactions tab no longer has summary cards above the ledger; the same totals are on Stats → Overview, and the ledger keeps its **Totals** row.
-- The net spent chart moves from Stats → Overview to the top of Stats → Trends.
+- The Transactions tab no longer has summary cards above the ledger; the same totals are on Stats > Overview, and the ledger keeps its **Totals** row.
+- The net spent chart moves from Stats > Overview to the top of Stats > Trends.
 - Notes under charts and heatmaps on Stats have more room above them.
 - Running totals across several years label each month once, on its first day.
 
@@ -733,7 +741,7 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 
 ### v0.13.0
 
-- **File → Import/Export...** replaces the three File menu items Export Transactions CSV, Download Backup, and Restore Backup with one dialog like TaskList's: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button.
+- **File > Import/Export...** replaces the three File menu items Export Transactions CSV, Download Backup, and Restore Backup with one dialog like TaskList's: an explanation above each of **Download Backup**, **Choose File to Restore...**, and **Export Transactions CSV**, and an OK button.
 
 ### v0.12.3
 
@@ -741,16 +749,16 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 
 ### v0.12.2
 
-- The Dark theme's error red is `#ff9c9c`, the same as NewsReview's and TaskList's, so error text and the Fresh Start **Reset selected data** button match across the apps.
+- The Dark theme's error red is `#ff9c9c`, the same as NewsReview's and TaskList's, so error text and the Fresh Start **Reset Selected Data** button match across the apps.
 
 ### v0.12.1
 
 - **Fresh Start...** moves to the bottom of the File menu, below Log Out.
-- The Fresh Start dialog matches NewsReview's Fresh start dialog: size, frame, title bar with ×, footer, and a **Reset selected data** button.
+- The Fresh Start dialog matches NewsReview's Fresh start dialog: size, frame, title bar with ×, footer, and a **Reset Selected Data** button.
 
 ### v0.12.0
 
-- Add **File → Fresh Start...**, like NewsReview's and TaskList's: choose what to clear (archived entries, every entry, unused labels, change history, or pre-restore recovery backups), type `RESET SELECTED`, and the database is compacted afterwards to free disk space. Removals are recorded as Deleted unless history is cleared too, and entry numbers are never reused.
+- Add **File > Fresh Start...**, like NewsReview's and TaskList's: choose what to clear (archived entries, every entry, unused labels, change history, or pre-restore recovery backups), type `RESET SELECTED`, and the database is compacted afterwards to free disk space. Removals are recorded as Deleted unless history is cleared too, and entry numbers are never reused.
 
 ### v0.11.4
 
@@ -789,14 +797,14 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 
 ### v0.10.0
 
-- **Gifts:** mark a person's share of a purchase as a gift in **For who**. Gifts stay off their balance unless **People → Include gifts in Balance** is checked; the People tab and person dialog show them, and the ledger marks them *(gift)*. The API's shares take `gift`; database schema 6, with no upgrade from schema 5.
+- **Gifts:** mark a person's share of a purchase as a gift in **For who**. Gifts stay off their balance unless **People > Include gifts in Balance** is checked; the People tab and person dialog show them, and the ledger marks them *(gift)*. The API's shares take `gift`; database schema 6, with no upgrade from schema 5.
 - **Add New...** at the end of every editor dropdown of your own items adds one without leaving the editor.
 - **New Transaction...** is the first item in the toolbar, so it stays in the top left on every tab.
 
 ### v0.9.0
 
 - **Events are now Collections**, everywhere: the tab, editor, bulk action, Stats, search, CSV, and Help, and internally too (database tables `collections` and `transaction_collections`, `/api/collections`, `collectionIds`, the `collection` numbering scope, and `Collection` history entries). Database schema 5; databases and backups from earlier versions are not upgraded.
-- **Stats → Period** is a dropdown of check items: combine any years, months, and collections. Entries count when they fall in any checked period, and day-based numbers use only the checked days.
+- **Stats > Period** is a dropdown of check items: combine any years, months, and collections. Entries count when they fall in any checked period, and day-based numbers use only the checked days.
 - The **Rename** dialog has **Cancel**, then **Save**; Enter saves.
 - Add boxes on each tab are exactly as tall as their **Add** button.
 
@@ -812,14 +820,14 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 ### v0.8.0
 
 - **No more Manage tab:** payment methods, people, tags, events, and merchants are added, renamed, archived, and deleted on their own tabs. A new **Payment Methods** tab totals each method like the Tags, Events, and Merchants tabs; People lists you too.
-- **File → Search...** has **Keyword** and **Date** tabs like TaskList, and its fields fill the dialog.
+- **File > Search...** has **Keyword** and **Date** tabs like TaskList, and its fields fill the dialog.
 - **Bulk Tags..., Events..., and People...** take any number of check items at once.
 - The Stats chart's **Show** is a check list: several measures at once, each in its own color with a key whose entries explain each measure, and a tooltip listing all of them.
 - Archived-item errors name the tab to restore them on.
 
 ### v0.7.0
 
-- **Search** moved to **File → Search...**, a dialog like TaskList's that searches every transaction in any time frame, archived or not. **New Transaction...** is back in the toolbar so it is there on every tab.
+- **Search** moved to **File > Search...**, a dialog like TaskList's that searches every transaction in any time frame, archived or not. **New Transaction...** is back in the toolbar so it is there on every tab.
 - **Tags** and **Merchants** tabs join People and Events, totaling each tag and merchant the way the Events tab totals events.
 - **Bulk actions** are one per kind: **Tags...**, **Events...**, and **People...** ask whether to add or remove, and **Merchant...** sets one, instead of separate Add and Remove items.
 - The Stats chart's **Show** dropdown picks net spent, spent, refunds, paybacks, purchases, entries, average purchase, or running net spent.
@@ -827,7 +835,7 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 
 ### v0.6.0
 
-- **Merchant is a dropdown** in the editor, like payment methods and tags, with **No merchant**; merchants are added and managed only under **Manage → Merchants**. The API takes `merchantId` instead of a merchant name.
+- **Merchant is a dropdown** in the editor, like payment methods and tags, with **No merchant**; merchants are added and managed only under **Manage > Merchants**. The API takes `merchantId` instead of a merchant name.
 - **Stats** lists **People**, **Tags**, **Events**, and **Merchants** in the same table layout (purchases, spent, refunds, net, average purchase, last purchase); selecting a row opens its numbered list.
 - The chart tooltip matches TaskList Stats: its colors (light in the Dark theme), font, and position below the pointer. Hover help popups keep the note color.
 - The Time frame ◀ / ▶ buttons are exactly the dropdown's height.
@@ -836,7 +844,7 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 ### v0.5.0
 
 - **Time frame** replaces Month in the toolbar: choose **All time**, one month, or several months together. The ledger, its cards, and the calendar (one grid per month) follow it; ◀ / ▶ move the chosen months by one.
-- **Events work like tags:** created, renamed, archived, and deleted under **Manage → Events**, and chosen on purchases in the editor or with **Add Event...** / **Remove Event...** in bulk actions. They no longer have dates; an event covers its purchases and the refunds on them. Events are numbered like tags and have numbered lists. The Events tab totals each event, the ledger gains an Events column once events exist, and search and CSV include events.
+- **Events work like tags:** created, renamed, archived, and deleted under **Manage > Events**, and chosen on purchases in the editor or with **Add Event...** / **Remove Event...** in bulk actions. They no longer have dates; an event covers its purchases and the refunds on them. Events are numbered like tags and have numbered lists. The Events tab totals each event, the ledger gains an Events column once events exist, and search and CSV include events.
 - **New Transaction...** is a bold default-style button.
 - Database schema 4. Databases and backups from 0.4 are not upgraded; start with a new `data/spend-tracker.db`.
 - Browser tests sign in with the shared API session after first-run setup, staying under the login rate limit, and ignore Firefox's message for a service-worker fetch abandoned by navigation.
@@ -846,7 +854,7 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 - **Set Merchant...** in bulk actions is a dropdown of your merchants, like Add Tag and Add Person, with **No merchant** to clear it.
 - The bulk-action chooser no longer scrolls inside a small box: its dropdown opens at full size over the dialog and scrolls on its own.
 - **Payment methods** are numbered like people, tags, and merchants (*Cash #40*), and selecting one under Manage lists its entries. Existing entries are numbered at the next start; restoring a backup without these numbers fills them in.
-- Selection mode spaces the menu bar exactly like TaskList (full-size buttons, same margins), and the extra **Done** button is gone; Escape or **File → Select...** leaves it.
+- Selection mode spaces the menu bar exactly like TaskList (full-size buttons, same margins), and the extra **Done** button is gone; Escape or **File > Select...** leaves it.
 - The **search bar** moved into the toolbar, filling it like TaskList's new-task bar, and **New Transaction** moved to where the search was, above the ledger.
 
 ### v0.4.1
@@ -860,14 +868,14 @@ SpendTracker 1.0: the ledger, calendar, people, collections, history, Stats with
 
 - **IDs:** the ledger shows each entry's permanent ID, and searching `#12` finds entry #12. People, payment methods, tags, merchants, and events show their IDs under Manage.
 - **Per-scope numbers:** every entry is numbered within each person, tag, and merchant it belongs to (*Alex #3*, *food #12*), shown in the editor and the person dialog. Numbers are never reused. The scopes are a single list in the server, so new kinds can be numbered later.
-- **Merchants** are now their own records with IDs: matched ignoring case, created when first used, and managed (rename, archive, delete unused) under **Manage → Merchants**. Stats groups merchants by ID.
-- **Archive transactions:** hidden from the ledger and calendar unless **View → Show Archived** is on, still counted in Stats, balances, and totals.
-- **Select and bulk actions** like TaskList: **File → Select...**, Shift-click ranges, and Archive, Unarchive, Add/Remove Tag, Add/Remove Person (re-split evenly), Set Merchant, and Delete. Entries the server's rules refuse are skipped and listed with the reason.
+- **Merchants** are now their own records with IDs: matched ignoring case, created when first used, and managed (rename, archive, delete unused) under **Manage > Merchants**. Stats groups merchants by ID.
+- **Archive transactions:** hidden from the ledger and calendar unless **View > Show Archived** is on, still counted in Stats, balances, and totals.
+- **Select and bulk actions** like TaskList: **File > Select...**, Shift-click ranges, and Archive, Unarchive, Add/Remove Tag, Add/Remove Person (re-split evenly), Set Merchant, and Delete. Entries the server's rules refuse are skipped and listed with the reason.
 - Database schema 3. Databases and backups from 0.3 are not upgraded; start with a new `data/spend-tracker.db`.
 
 ### v0.3.4
 
-- Opening a menu no longer moves focus to its first item, which made **New Transaction…** look stuck highlighted in the File menu. Menus now behave like TaskList and TaskList Stats.
+- Opening a menu no longer moves focus to its first item, which made **New Transaction...** look stuck highlighted in the File menu. Menus now behave like TaskList and TaskList Stats.
 
 ### v0.3.3
 

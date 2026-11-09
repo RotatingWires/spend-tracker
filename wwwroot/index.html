@@ -73,10 +73,10 @@
     </section>
 
     <section class="workspace" id="workspace">
-      <div id="loadingPanel" class="message-panel">Loading SpendTracker data...</div>
+      <div id="loadingPanel" class="message-panel">Loading...</div>
 
       <section class="tab-panel" data-panel="transactions" role="tabpanel">
-        <div class="tab-actions"><form class="panel-actions search-form" id="ledgerSearchForm" role="search"><input id="ledgerSearch" class="retro-input" type="search" maxlength="200" placeholder="Search entries" aria-label="Search entries in the time frame" autocomplete="off"><button type="submit">Search</button></form></div>
+        <div class="tab-actions"><form class="panel-actions search-form" id="ledgerSearchForm" role="search"><input id="ledgerSearch" class="retro-input" type="search" maxlength="200" placeholder="Search entries..." aria-label="Search entries in the time frame" autocomplete="off"><button type="submit">Search</button></form></div>
         <div class="table-wrap"><table id="transactionsTable"></table></div>
         <div id="ledgerMore" class="ledger-more" hidden><span id="ledgerMoreText"></span><button type="button" id="ledgerMoreButton">Show 200 More</button><button type="button" id="ledgerAllButton">Show All</button></div>
         <div id="archivedNote" class="note" hidden></div>
@@ -85,7 +85,7 @@
       <section class="tab-panel" data-panel="calendar" role="tabpanel" hidden>
         <div class="heat-legend" aria-hidden="true">Less <span class="heat-swatch heat-0"></span><span class="heat-swatch heat-1"></span><span class="heat-swatch heat-2"></span><span class="heat-swatch heat-3"></span><span class="heat-swatch heat-4"></span> More</div>
         <div id="calendarMonths"></div>
-        <div class="note">One calendar per month in the time frame, newest first. Each day shows net spent (purchases minus refunds) and how many entries were recorded. The bar under each day is relative to that month's biggest day. A day shows the collections of the entries recorded on it. Archived entries are left out unless View → Show Archived is on.</div>
+        <div class="note">One calendar per month in the time frame, newest first. Each day shows net spent (purchases minus refunds) and how many entries were recorded. The bar under each day is relative to that month's biggest day. A day shows the collections of the entries recorded on it. Archived entries are left out unless View > Show Archived is on.</div>
       </section>
 
       <section class="tab-panel" data-panel="stats" role="tabpanel" hidden>
@@ -152,7 +152,7 @@
             </div>
             <fieldset class="groupbox"><legend id="countTimeLegend">Entries per Day</legend><div id="countTimeKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="countTimeChart"></canvas></div></fieldset>
             <fieldset class="groupbox"><legend>Entries by Weekday</legend><div id="countWeekdayKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="countWeekdayChart"></canvas></div><div class="note">Entries on each weekday in the period, by type.</div></fieldset>
-            <fieldset class="groupbox"><legend>Purchases by Size</legend><div class="chart-frame"><canvas id="countSizeChart"></canvas></div><div class="note">The number of purchases in each size band, as in Trends → Purchase Sizes.</div></fieldset>
+            <fieldset class="groupbox"><legend>Purchases by Size</legend><div class="chart-frame"><canvas id="countSizeChart"></canvas></div><div class="note">The number of purchases in each size band, as in Trends > Purchase Sizes.</div></fieldset>
             <div class="two-column">
               <fieldset class="groupbox"><legend>Visits per Merchant</legend><div class="chart-frame"><canvas id="countMerchantChart"></canvas></div><div class="note">The twelve merchants with the most purchases.</div></fieldset>
               <fieldset class="groupbox"><legend>Purchases per Tag</legend><div class="chart-frame"><canvas id="countTagChart"></canvas></div><div class="note">The twelve tags on the most purchases. A purchase with two tags counts for both.</div></fieldset>
@@ -173,7 +173,7 @@
           <div class="stats-panel" data-stats-panel="places" role="tabpanel" hidden>
             <div class="note">Select a person, tag, collection, or merchant below to list its entries.</div>
             <fieldset class="groupbox"><legend>People</legend><div class="note">For a split purchase, each person counts their own share.</div><div class="table-wrap"><table id="statsPeopleTable"></table></div></fieldset>
-            <fieldset class="groupbox"><legend>People Over Time</legend><div id="balanceKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="balanceChart"></canvas></div><div class="table-wrap"><table id="balanceTable"></table></div><div class="note">What each person owed you at the end of each month, counting everything before it too. Gifts follow People → Include gifts in Balance.</div></fieldset>
+            <fieldset class="groupbox"><legend>People Over Time</legend><div id="balanceKey" class="chart-key" aria-label="Chart key"></div><div class="chart-frame"><canvas id="balanceChart"></canvas></div><div class="table-wrap"><table id="balanceTable"></table></div><div class="note">What each person owed you at the end of each month, counting everything before it too. Gifts follow People > Include gifts in Balance.</div></fieldset>
             <fieldset class="groupbox"><legend>Tags</legend><div class="note">A purchase with two tags counts toward both, so tag totals can add up to more than total spent.</div><div class="table-wrap"><table id="statsTagsTable"></table></div></fieldset>
             <fieldset class="groupbox"><legend>Collections</legend><div class="note">A purchase in two collections counts toward both.</div><div class="table-wrap"><table id="statsCollectionsTable"></table></div></fieldset>
             <fieldset class="groupbox"><legend>Merchants</legend><div class="table-wrap"><table id="statsMerchantsTable"></table></div></fieldset>
@@ -185,8 +185,8 @@
 
       <section class="tab-panel" data-panel="people" role="tabpanel" hidden>
         <div class="tab-actions">
-          <form class="panel-actions" data-add="people"><input class="retro-input" name="name" maxlength="60" placeholder="New person" aria-label="New person name" required><button type="submit">Add</button></form>
-          <form class="panel-actions search-form" id="peopleSearchForm" data-search="people" role="search"><input id="peopleSearch" class="retro-input" type="search" maxlength="60" placeholder="Search people" aria-label="Search people" autocomplete="off"><button type="submit">Search</button></form>
+          <form class="panel-actions" data-add="people"><input class="retro-input" name="name" maxlength="60" placeholder="New person..." aria-label="New person name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="peopleSearchForm" data-search="people" role="search"><input id="peopleSearch" class="retro-input" type="search" maxlength="60" placeholder="Search people..." aria-label="Search people" autocomplete="off"><button type="submit">Search</button></form>
         </div>
         <div class="note">What other people owe you, from purchases you marked as for them (gifts left out unless Include gifts is checked), minus refunds on those purchases and paybacks they made. Select a person for their purchases and paybacks. Archiving a person only stops them being offered for new entries.</div>
         <label class="control-row"><input type="checkbox" id="includeGifts" class="retro-check"> Include gifts in Balance</label>
@@ -195,8 +195,8 @@
 
       <section class="tab-panel" data-panel="methods" role="tabpanel" hidden>
         <div class="tab-actions">
-          <form class="panel-actions" data-add="payment-methods"><input class="retro-input" name="name" maxlength="60" placeholder="New payment method" aria-label="New payment method name" required><button type="submit">Add</button></form>
-          <form class="panel-actions search-form" id="methodSearchForm" data-search="methods" role="search"><input id="methodSearch" class="retro-input" type="search" maxlength="60" placeholder="Search payment methods" aria-label="Search payment methods" autocomplete="off"><button type="submit">Search</button></form>
+          <form class="panel-actions" data-add="payment-methods"><input class="retro-input" name="name" maxlength="60" placeholder="New payment method..." aria-label="New payment method name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="methodSearchForm" data-search="methods" role="search"><input id="methodSearch" class="retro-input" type="search" maxlength="60" placeholder="Search payment methods..." aria-label="Search payment methods" autocomplete="off"><button type="submit">Search</button></form>
         </div>
         <div class="note">Spending per payment method; each one is also an amount column in the ledger. Select a payment method to list its entries. Archiving one only stops it being offered for new entries.</div>
         <div class="table-wrap"><table id="methodsTable"></table></div>
@@ -204,8 +204,8 @@
 
       <section class="tab-panel" data-panel="tags" role="tabpanel" hidden>
         <div class="tab-actions">
-          <form class="panel-actions" data-add="tags"><input class="retro-input" name="name" maxlength="60" placeholder="New tag" aria-label="New tag name" required><button type="submit">Add</button></form>
-          <form class="panel-actions search-form" id="tagSearchForm" data-search="tags" role="search"><input id="tagSearch" class="retro-input" type="search" maxlength="60" placeholder="Search tags" aria-label="Search tags" autocomplete="off"><button type="submit">Search</button></form>
+          <form class="panel-actions" data-add="tags"><input class="retro-input" name="name" maxlength="60" placeholder="New tag..." aria-label="New tag name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="tagSearchForm" data-search="tags" role="search"><input id="tagSearch" class="retro-input" type="search" maxlength="60" placeholder="Search tags..." aria-label="Search tags" autocomplete="off"><button type="submit">Search</button></form>
         </div>
         <div class="note">Spending per tag. Add tags here and choose them on purchases; refunds count under their purchase's tags, and a purchase with two tags counts toward both. Select a tag to list its entries. Deleting a tag removes it from its purchases.</div>
         <div class="table-wrap"><table id="tagsTable"></table></div>
@@ -213,8 +213,8 @@
 
       <section class="tab-panel" data-panel="collections" role="tabpanel" hidden>
         <div class="tab-actions">
-          <form class="panel-actions" data-add="collections"><input class="retro-input" name="name" maxlength="60" placeholder="New collection" aria-label="New collection name" required><button type="submit">Add</button></form>
-          <form class="panel-actions search-form" id="collectionSearchForm" data-search="collections" role="search"><input id="collectionSearch" class="retro-input" type="search" maxlength="60" placeholder="Search collections" aria-label="Search collections" autocomplete="off"><button type="submit">Search</button></form>
+          <form class="panel-actions" data-add="collections"><input class="retro-input" name="name" maxlength="60" placeholder="New collection..." aria-label="New collection name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="collectionSearchForm" data-search="collections" role="search"><input id="collectionSearch" class="retro-input" type="search" maxlength="60" placeholder="Search collections..." aria-label="Search collections" autocomplete="off"><button type="submit">Search</button></form>
         </div>
         <div class="note">Collections work like tags: add them here (a trip, a move, a wedding) and choose them on purchases in the editor. Totals include those purchases and any refunds on them. Select a collection to list its entries; Stats shows the collection as a period.</div>
         <div class="table-wrap"><table id="collectionsTable"></table></div>
@@ -222,15 +222,15 @@
 
       <section class="tab-panel" data-panel="merchants" role="tabpanel" hidden>
         <div class="tab-actions">
-          <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant" aria-label="New merchant name" required><button type="submit">Add</button></form>
-          <form class="panel-actions search-form" id="merchantSearchForm" data-search="merchants" role="search"><input id="merchantSearch" class="retro-input" type="search" maxlength="120" placeholder="Search merchants" aria-label="Search merchants" autocomplete="off"><button type="submit">Search</button></form>
+          <form class="panel-actions" data-add="merchants"><input class="retro-input" name="name" maxlength="120" placeholder="New merchant..." aria-label="New merchant name" required><button type="submit">Add</button></form>
+          <form class="panel-actions search-form" id="merchantSearchForm" data-search="merchants" role="search"><input id="merchantSearch" class="retro-input" type="search" maxlength="120" placeholder="Search merchants..." aria-label="Search merchants" autocomplete="off"><button type="submit">Search</button></form>
         </div>
         <div class="note">Spending per merchant. Add merchants here and choose them in the editor's Merchant dropdown; refunds count under their purchase's merchant. Select a merchant to list its entries.</div>
         <div class="table-wrap"><table id="merchantsTable"></table></div>
       </section>
 
       <section class="tab-panel" data-panel="history" role="tabpanel" hidden>
-        <div class="tab-actions"><form class="panel-actions search-form" id="historySearchForm" role="search"><input id="historySearch" class="retro-input" type="search" maxlength="200" placeholder="Search history" aria-label="Search history" autocomplete="off"><button type="submit">Search</button></form></div>
+        <div class="tab-actions"><form class="panel-actions search-form" id="historySearchForm" role="search"><input id="historySearch" class="retro-input" type="search" maxlength="200" placeholder="Search history..." aria-label="Search history" autocomplete="off"><button type="submit">Search</button></form></div>
         <div class="note">Every add, edit, delete, and restore, newest first, with the values before and after the change.</div>
         <div class="table-wrap"><table id="historyTable"></table></div>
         <div class="panel-actions"><button type="button" id="historyMoreButton" hidden>Load Older</button></div>
@@ -376,7 +376,7 @@
     <form method="dialog" class="fresh-start-layout">
       <div class="fresh-start-heading"><h2 id="freshStartTitle">Fresh Start</h2></div>
       <div class="fresh-start-body">
-        <p>Only the selected items will be cleared, then the database is compacted to free disk space. This cannot be undone in SpendTracker. Use File → Import/Export... to download a backup first if you might want to restore them.</p>
+        <p>Only the selected items will be cleared, then the database is compacted to free disk space. This cannot be undone in SpendTracker. Use File > Import/Export... to download a backup first if you might want to restore them.</p>
         <fieldset class="fresh-start-options"><legend>Choose what to clear</legend>
           <label><input type="checkbox" class="retro-check" data-fresh-start="archivedEntries"> <span><strong>Archived entries</strong> <span data-fresh-count="archivedEntries"></span><br>Archived entries still count in totals and balances, so those change. An archived purchase stays while an active refund or payback links to it.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="allEntries"> <span><strong>Every entry</strong> <span data-fresh-count="allEntries"></span><br>All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay unless you also clear unused labels.</span></label>
@@ -389,7 +389,7 @@
         <label class="fresh-start-confirm">Type RESET SELECTED to confirm<input id="freshStartConfirmation" class="retro-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40"></label>
         <p id="freshStartError" class="fresh-start-error" role="alert" aria-live="polite"></p>
       </div>
-      <div class="fresh-start-actions"><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="button" id="freshStartButton" class="danger">Reset selected data</button></div>
+      <div class="fresh-start-actions"><button type="button" value="cancel" data-close-dialog>Cancel</button><button type="button" id="freshStartButton" class="danger">Reset Selected Data</button></div>
     </form>
   </dialog>
 
@@ -399,7 +399,7 @@
       <div class="dialog-body">
         <p>A self-hosted spending tracker. Every number comes from entries you recorded; nothing is guessed or categorized for you.</p>
         <p>Record <strong>purchases</strong> (split between people, or as gifts), <strong>refunds</strong> linked to the purchase they return, and <strong>paybacks</strong> from people who owe you. Paybacks never change net spent. Tags, collections, and merchants are labels you add on their tabs; Stats breaks spending down by them.</p>
-        <p><strong>Tips:</strong> double-click a row to edit it, and use File → Select... to change several at once. File → Import/Export... backs up everything but your password. MANUAL.md has the full guide.</p>
+        <p><strong>Tips:</strong> double-click a row to edit it, and use File > Select... to change several at once. File > Import/Export... backs up everything but your password. MANUAL.md has the full guide.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>
       <div class="dialog-buttons"><button type="submit">OK</button></div>

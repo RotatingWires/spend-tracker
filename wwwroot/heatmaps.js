@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Stats → Heatmaps, drawn like TaskList Stats' heatmaps: a year of days, months by year, tags or merchants by month,
+ * Stats > Heatmaps, drawn like TaskList Stats' heatmaps: a year of days, months by year, tags or merchants by month,
  * and weekdays by week of the month. One Show choice applies to all four. Darker cells hold more; the darkest shade
  * starts at the 90th percentile of the heatmap's cells, so one huge purchase does not wash out every other day. A net
  * of zero or less (refunds only) is the lightest.
@@ -14,7 +14,7 @@ const HEAT_MEASURES = [
   { value: 'purchases', label: 'Purchases', count: true, of: bucket => bucket.purchases }
 ];
 const HEAT_ROWS = [{ value: 'tags', label: 'Tags' }, { value: 'merchants', label: 'Merchants' }];
-const compactMoney = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
+const compactMoney = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', notation: 'compact', maximumFractionDigits: 1 });
 let heatMeasureSelect = null;
 let heatYearSelect = null;
 let heatRowsSelect = null;

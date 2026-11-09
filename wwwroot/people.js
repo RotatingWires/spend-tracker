@@ -6,12 +6,12 @@ let personDialogId = null;
 
 /**
  * A person's balance: their shares of purchases, minus refunds on their shares, minus what they paid back. Gift
- * shares, and refunds on them, are left out unless People → Include gifts is checked.
+ * shares, and refunds on them, are left out unless People > Include gifts is checked.
  */
 function personLedger(personId, { through = null } = {}) {
   const ledger = { fronted: 0, gifted: 0, refunded: 0, giftRefunded: 0, paidBack: 0, purchases: 0, lastPayback: null, entries: [] };
   for (const tx of state.model.transactions) {
-    // With through, the balance as it stood at the end of that day (Stats → People Over Time).
+    // With through, the balance as it stood at the end of that day (Stats > People Over Time).
     if (through && tx.date > through) break;
     if (!peopleOf(tx).includes(personId)) continue;
     ledger.entries.push(tx);

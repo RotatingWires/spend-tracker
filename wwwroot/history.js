@@ -88,7 +88,7 @@ function renderHistory() {
     historyState.entries.map(entry => ({
       cells: [formatDateTime(entry.at), entry.action, ENTITY_LABELS[entry.entity] ?? entry.entity, historySubject(entry), historyDetails(entry)]
     })),
-    { empty: historyState.query ? `No change matches “${historyState.query}”.` : 'No changes recorded yet.' });
+    { empty: historyState.query ? `No change matches "${historyState.query}".` : 'No changes recorded yet.' });
   $('#historyMoreButton').hidden = !historyState.hasMore;
 }
 

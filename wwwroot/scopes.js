@@ -9,7 +9,7 @@
 const SCOPE_TITLES = { person: 'Person', tag: 'Tag', collection: 'Collection', merchant: 'Merchant', method: 'Payment method' };
 let scopeListTarget = null;
 
-/** With month ("YYYY-MM"), only that month's entries are listed (Stats → Heatmaps → Tags × Month). */
+/** With month ("YYYY-MM"), only that month's entries are listed (Stats > Heatmaps > Tags × Month). */
 function openScopeList(scope, scopeId, { month = null } = {}) {
   scopeListTarget = { scope, scopeId, month };
   renderScopeList();

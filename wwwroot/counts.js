@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Stats → Counts: how many entries rather than how much money. Purchases, refunds, and paybacks over time and by
+ * Stats > Counts: how many entries rather than how much money. Purchases, refunds, and paybacks over time and by
  * weekday, purchases by size, and the merchants and tags used most. Like the rest of Stats, archived entries count.
  */
 
@@ -35,7 +35,7 @@ function kindSeries(buckets) {
 
 /** Long names are cut short under a bar; the tooltip has the whole name. */
 function shortLabel(name) {
-  return name.length > 12 ? `${name.slice(0, 11)}…` : name;
+  return name.length > 12 ? `${name.slice(0, 11)}...` : name;
 }
 
 function renderCounts(stats) {

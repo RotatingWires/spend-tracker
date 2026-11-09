@@ -275,7 +275,7 @@ class BrowserTests(unittest.TestCase):
             page.fill("#ledgerSearch", query)
             page.click("#ledgerSearchForm button")
             expect(rows).to_have_count(expected)
-        expect(page.locator("#transactionsTable tbody")).to_contain_text("matches “zzz”")
+        expect(page.locator("#transactionsTable tbody")).to_contain_text('matches "zzz"')
         page.fill("#ledgerSearch", "inn")
         page.wait_for_timeout(200)
         expect(rows).to_have_count(0)  # still showing the last search ("zzz") until Search or Enter
@@ -285,7 +285,7 @@ class BrowserTests(unittest.TestCase):
         page.fill("#ledgerSearch", "")
         page.keyboard.press("Enter")
         expect(rows).to_have_count(4)
-        expect(page.locator("#fileMenu")).not_to_contain_text("Search")  # File → Search... is gone
+        expect(page.locator("#fileMenu")).not_to_contain_text("Search")  # File > Search... is gone
 
         # Invalid input shows the server's message and keeps the dialog open.
         page.click("#newTransactionButton")
@@ -633,7 +633,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#chooseMode .retro-select")).to_have_text("Add to the selected entries▼")  # one action per kind: add or remove
         self.set_checks(page, "#chooseMulti", ["Riley"])
         page.click("#chooseOkButton")
-        expect(page.locator("#confirmMessage")).to_have_text("Add “Riley” for 3 selected entries?")
+        expect(page.locator("#confirmMessage")).to_have_text('Add "Riley" for 3 selected entries?')
         expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']} — 06/03/2024 — Garage — $300.01")
         page.click("#confirmOkButton")
         expect(page.locator("#statusLeft")).to_have_text("People: 3 entries changed.")
@@ -879,7 +879,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#txCancelButton")
         page.click("#fileMenuButton")
         page.click("#freshStartMenuItem")
-        expect(page.locator("#freshStartDialog .fresh-start-actions button")).to_have_text(["Cancel", "Reset selected data"])
+        expect(page.locator("#freshStartDialog .fresh-start-actions button")).to_have_text(["Cancel", "Reset Selected Data"])
         page.locator("#freshStartDialog .fresh-start-actions button", has_text="Cancel").click()
         expect(page.locator("#freshStartDialog")).not_to_be_visible()
         page.click('.tabs [data-tab="merchants"]')
@@ -913,7 +913,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#historyTable tbody tr")).to_contain_text("Yak Shop")
         page.fill("#historySearch", "no such change anywhere")
         page.click("#historySearchForm button")
-        expect(page.locator("#historyTable tbody tr")).to_contain_text("No change matches “no such change anywhere”.")
+        expect(page.locator("#historyTable tbody tr")).to_contain_text('No change matches "no such change anywhere".')
 
     def test_stats_for_a_known_month(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})

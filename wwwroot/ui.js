@@ -42,7 +42,7 @@ function showStats() {
     renderStats();
     return;
   }
-  setStatus('Loading Stats...');
+  setStatus('Loading...');
   loadStatsScripts()
     .then(() => {
       setStatus('Ready');
@@ -231,8 +231,8 @@ async function downloadBackup() {
   try {
     const response = await fetch('/api/backup', { credentials: 'same-origin', cache: 'no-store' });
     if (response.status === 401) {
-      window.location.replace(loginUrl());
-      return;
+      window.location.replace('/login.html');
+      throw new Error('Your session has expired.');
     }
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const name = /filename="?([^";]+)"?/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `spendtracker-backup-${fileStamp()}.zip`;
@@ -258,8 +258,8 @@ async function restoreBackup(file) {
       body: file
     });
     if (response.status === 401) {
-      window.location.replace(loginUrl());
-      return;
+      window.location.replace('/login.html');
+      throw new Error('Your session has expired.');
     }
     const result = await response.json().catch(() => ({ error: `${response.status} ${response.statusText}` }));
     if (!response.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);

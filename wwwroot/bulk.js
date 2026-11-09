@@ -1,8 +1,8 @@
 'use strict';
 
 /*
- * Selection mode and bulk actions for the ledger, as in TaskList: File → Select... adds a checkbox to every row,
- * Shift-click selects a range, and Escape (or File → Select... again) leaves selection mode. Each action runs one ordinary API call per entry,
+ * Selection mode and bulk actions for the ledger, as in TaskList: File > Select... adds a checkbox to every row,
+ * Shift-click selects a range, and Escape (or File > Select... again) leaves selection mode. Each action runs one ordinary API call per entry,
  * so the server applies the same rules as a single edit. Entries a rule refuses are skipped and listed afterwards.
  */
 
@@ -109,7 +109,7 @@ const BULK_ACTIONS = {
     label: 'Merchant',
     // Like tags and people, merchants are chosen from a list, which can add a new one.
     choose: () => chooseFrom('Merchant', 'Set merchant to', [...state.snapshot.merchants.filter(merchant => !merchant.archived), { id: 0, name: 'No merchant' }], 'Set', 'merchants')
-      .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: `Set merchant to “${choice.label}”` }),
+      .then(choice => choice && { value: choice.value === 0 ? null : choice.value, label: `Set merchant to "${choice.label}"` }),
     request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
       : { body: transactionRequest(tx, { merchantId }) }
   },
@@ -132,7 +132,7 @@ async function chooseWithMode(title, label, path, items) {
   const choice = await chooseOption(title, label, items.map(item => ({ value: item.id, label: archivedLabel(item) })), 'OK', { modes: ADD_REMOVE, multiple: true, addPath: path });
   if (choice == null) return null;
   const chosen = state.snapshot[SNAPSHOT_LISTS[path]].filter(item => choice.value.includes(String(item.id)));
-  return { value: { ids: chosen.map(item => item.id), mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} ${chosen.map(item => `“${item.name}”`).join(', ')}` };
+  return { value: { ids: chosen.map(item => item.id), mode: choice.mode }, label: `${choice.mode === 'add' ? 'Add' : 'Remove'} ${chosen.map(item => `"${item.name}"`).join(', ')}` };
 }
 
 /** The IDs after adding or removing the chosen ones, or null when nothing would change. */

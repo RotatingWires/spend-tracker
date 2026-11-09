@@ -122,8 +122,8 @@ function renderTransactions() {
   const hidden = matching.length - rows.length;
   const empty = monthRows.length === 0
     ? `No entries in ${timeFrameLabel()}. Use New Transaction... to add one.`
-    : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches ${query ? `“${query}”` : ''}${query && state.ledgerFilters.length ? ' and ' : ''}${state.ledgerFilters.length ? 'the filters' : ''}.`
-      : rows.length === 0 ? `Every ${narrowed ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View → Show Archived to list them.` : '';
+    : matching.length === 0 ? `No entry in ${timeFrameLabel()} matches ${query ? `"${query}"` : ''}${query && state.ledgerFilters.length ? ' and ' : ''}${state.ledgerFilters.length ? 'the filters' : ''}.`
+      : rows.length === 0 ? `Every ${narrowed ? 'match' : 'entry'} in ${timeFrameLabel()} is archived. Turn on View > Show Archived to list them.` : '';
   renderTable($('#transactionsTable'), columns, tableRows, { empty, footer, onSort: () => renderTransactions() });
   const more = rows.length - shown.length;
   $('#ledgerMore').hidden = more === 0;
@@ -138,7 +138,7 @@ function renderTransactions() {
     renderTransactions();
   };
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
-  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in Stats. View → Show Archived lists them.`;
+  $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in Stats. View > Show Archived lists them.`;
   updateBulkControls();
 }
 

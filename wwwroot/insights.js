@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Stats → Trends (running total, average by month of year, purchase sizes, months), Compare (two periods side by side),
+ * Stats > Trends (running total, average by month of year, purchase sizes, months), Compare (two periods side by side),
  * and People & Places (breakdowns, balances over time, merchant loyalty, recurring purchases). Like the rest of
  * Stats, everything comes from recorded entries; recurring purchases are found from exact repeats only.
  */

@@ -74,9 +74,9 @@ const DAY_MS = 86_400_000;
 
 // ---------------------------------------------------------------- money
 
-const moneyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-const numberFormat = new Intl.NumberFormat('en-US');
-const percentFormat = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 });
+const moneyFormat = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' });
+const numberFormat = new Intl.NumberFormat();
+const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 });
 
 function formatMoney(cents) {
   return moneyFormat.format(cents / 100);
@@ -97,7 +97,7 @@ function centsToInput(cents) {
 
 const amountFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "1,234.50": an amount box's value, without the dollar sign. parseMoney reads it back. */
+/** "1,234.50": an amount box's value, without the dollar sign. Always US style, since parseMoney reads it back; everything else shown uses the browser's locale. */
 function formatAmount(cents) {
   return amountFormat.format(cents / 100);
 }
@@ -176,7 +176,7 @@ function formatDateTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const day = `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}/${date.getFullYear()}`;
-  return `${day} ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  return `${day} ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function plural(count, singular, pluralForm = `${singular}s`) {
@@ -184,12 +184,6 @@ function plural(count, singular, pluralForm = `${singular}s`) {
 }
 
 // ---------------------------------------------------------------- API
-
-function loginUrl() {
-  const returnUrl = `${location.pathname}${location.search}${location.hash}`;
-  // The home page needs no return address: plain /login.html, like NewsReview.
-  return !returnUrl || returnUrl === '/' ? '/login.html' : `/login.html?returnUrl=${encodeURIComponent(returnUrl)}`;
-}
 
 async function api(path, { method = 'GET', body } = {}) {
   const options = { method, credentials: 'same-origin', cache: 'no-store', headers: {} };
@@ -199,8 +193,8 @@ async function api(path, { method = 'GET', body } = {}) {
   }
   const response = await timedFetch(`/api${path}`, options);
   if (response.status === 401) {
-    window.location.replace(loginUrl());
-    throw new Error('Your session ended. Log in again.');
+    window.location.replace('/login.html');
+    throw new Error('Your session has expired.');
   }
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
@@ -240,7 +234,7 @@ function buildModel(snapshot) {
 /*
  * After a save, the server's answer is merged into the snapshot already in the browser instead of downloading every
  * entry again: a saved entry comes back whole (with its numbers), and saving one entry never changes another. Changes
- * that can touch many entries at once (deleting a list item, Fresh Start, Restore) and File → Refresh still load the
+ * that can touch many entries at once (deleting a list item, Fresh Start, Restore) and File > Refresh still load the
  * whole snapshot.
  */
 const SNAPSHOT_LISTS = { 'payment-methods': 'paymentMethods', people: 'people', tags: 'tags', merchants: 'merchants', collections: 'collections' };
@@ -367,7 +361,7 @@ function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
 }
 
-/** What the ledger and calendar list: archived entries stay hidden unless View → Show Archived is on. */
+/** What the ledger and calendar list: archived entries stay hidden unless View > Show Archived is on. */
 function listedTransactions(start, end) {
   return transactionsInRange(start, end).filter(tx => state.showArchived || !tx.archived);
 }
@@ -393,7 +387,7 @@ function inTimeFrame(date) {
   return state.timeFrame.all || state.timeFrame.months.includes(monthOf(date));
 }
 
-/** Entries in the time frame; listed: true leaves out archived ones unless View → Show Archived is on. */
+/** Entries in the time frame; listed: true leaves out archived ones unless View > Show Archived is on. */
 function timeFrameTransactions({ listed = false } = {}) {
   return state.model.transactions.filter(tx => inTimeFrame(tx.date) && (!listed || state.showArchived || !tx.archived));
 }
