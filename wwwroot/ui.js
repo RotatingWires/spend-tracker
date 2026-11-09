@@ -143,7 +143,12 @@ function shiftTimeFrame(delta) {
 
 function populateViewMenu() {
   const menu = $('#viewMenu');
-  menu.replaceChildren();
+  // A heading over each group, like TaskList's View menu.
+  const tabsHeading = document.createElement('div');
+  tabsHeading.className = 'menu-heading';
+  tabsHeading.setAttribute('role', 'presentation');
+  tabsHeading.textContent = 'Tabs';
+  menu.replaceChildren(tabsHeading);
   for (const tab of $$('.tabs [role="tab"]')) {
     menu.append(menuButton(tab.textContent, {
       role: 'menuitemradio',
