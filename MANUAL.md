@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.35 Manual
+# SpendTracker v1.2.36
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -14,11 +14,12 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - [Project layout](#project-layout)
 - [Version handling](#version-handling)
 - [Configuration and running](#configuration-and-running)
+- [Authentication](#authentication)
+- [First-run backup reminder](#first-run-backup-reminder)
 - [Concepts](#concepts)
 - [Using the app](#using-the-app)
 - [Statistics](#statistics)
-- [Data and backups](#data-and-backups)
-- [Authentication](#authentication)
+- [Import and export](#import-and-export)
 - [HTTP API](#http-api)
 - [Security and privacy](#security-and-privacy)
 - [Known limitations](#known-limitations)
@@ -134,6 +135,38 @@ There are no other settings. To keep SpendTracker running in the background, sta
 ### Updating
 
 Pull the new version and restart. Download a backup first. The database schema is upgraded automatically at startup when a release needs it.
+
+## Authentication
+
+On first run, SpendTracker prints a setup token in the server console:
+
+```text
+============================================================
+SPENDTRACKER FIRST-RUN SETUP TOKEN
+
+  ABCD-1234-EF56-7890
+
+Enter this token on the Create Password screen.
+It changes each time SpendTracker restarts until setup is complete.
+============================================================
+```
+
+Enter it on the **Create Password** screen with a password of at least 8 characters. The token is printed to the console only and is not written to `logs/console.log`.
+
+- Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes with 600,000 iterations. A hash saved with fewer iterations is upgraded at the next successful login.
+- Sessions use an HttpOnly, SameSite=Strict cookie named `SpendTracker.Auth`, valid up to 30 days and sliding while active. It is marked Secure when the request uses HTTPS.
+- `/api/auth/setup` and `/api/auth/login` allow 5 attempts per source IP per minute.
+- Every other `/api` endpoint and the app page require a session; unauthenticated API calls get HTTP 401.
+
+**Reset the password:** stop SpendTracker, delete `data/auth.json`, and start it again. A new setup token is printed. Your spending data is not affected.
+
+## First-run backup reminder
+
+When SpendTracker creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
+
+> If you have a SpendTracker backup ZIP, restore it before adding entries. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
+
+**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
 
 ## Concepts
 
@@ -354,15 +387,7 @@ Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show
 - The ledger draws 200 rows at a time (about 4 ms instead of about 75 ms for 5,000 rows).
 - The server compresses its responses with Brotli or gzip. With 2,000 entries the data download is 139 KB instead of 938 KB, and scripts and styles shrink about threefold. (Only plain HTTP is compressed, ASP.NET's default; behind an HTTPS reverse proxy, let the proxy compress.)
 
-## First-run backup reminder
-
-When SpendTracker creates a fresh database, it records a pending reminder outside SQLite, like TaskList. After password setup/login, the main application shows **Restore a Backup Before Starting**, the same box as TaskList's:
-
-> If you have a SpendTracker backup ZIP, restore it before adding entries. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
-
-**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
-
-## Data and backups
+## Import and export
 
 All persistent data is in the `data/` folder of the folder SpendTracker runs from (the project folder when started with `dotnet run`):
 
@@ -432,30 +457,6 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 The database records its schema version in `PRAGMA user_version` (currently 6). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spendtracker.db`.
 
 Schema 6 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares` (with `gift`), `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
-
-## Authentication
-
-On first run, SpendTracker prints a setup token in the server console:
-
-```text
-============================================================
-SPENDTRACKER FIRST-RUN SETUP TOKEN
-
-  ABCD-1234-EF56-7890
-
-Enter this token on the Create Password screen.
-It changes each time SpendTracker restarts until setup is complete.
-============================================================
-```
-
-Enter it on the **Create Password** screen with a password of at least 8 characters. The token is printed to the console only and is not written to `logs/console.log`.
-
-- Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes with 600,000 iterations. A hash saved with fewer iterations is upgraded at the next successful login.
-- Sessions use an HttpOnly, SameSite=Strict cookie named `SpendTracker.Auth`, valid up to 30 days and sliding while active. It is marked Secure when the request uses HTTPS.
-- `/api/auth/setup` and `/api/auth/login` allow 5 attempts per source IP per minute.
-- Every other `/api` endpoint and the app page require a session; unauthenticated API calls get HTTP 401.
-
-**Reset the password:** stop SpendTracker, delete `data/auth.json`, and start it again. A new setup token is printed. Your spending data is not affected.
 
 ## HTTP API
 
@@ -571,6 +572,14 @@ They run first-run setup, add purchases, refunds, and paybacks through the UI, d
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs every test file on every push and pull request; the Playwright browser tests skip there (no Playwright), so they stay a local, optional tool.
 
 ## Release notes
+
+Current release: **v1.2.36**.
+
+### v1.2.36
+
+- MANUAL.md uses the same section names and order as the other apps, with a contents list at the top and a **Current release** line under Release notes; no text was removed, only moved or retitled.
+- README.md has a **Sibling apps** section linking all four apps.
+- `.gitignore` has the same rules in every app.
 
 ### v1.2.35
 

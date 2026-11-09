@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.35
+# SpendTracker v1.2.36
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -23,7 +23,7 @@ SpendTracker listens on **http://127.0.0.1:8715** unless `--urls` (or `ASPNETCOR
 
 A new database starts with you ("Me") and three payment methods: Cash, Credit Card, and Debit Card. Rename, add, or archive them on the **People** and **Payment Methods** tabs.
 
-All data lives in the `data/` folder next to the project (`data/spendtracker.db`); logs go to `logs/console.log`. Use **File > Import/Export... > Download Backup** regularly. See [Data and backups](MANUAL.md#data-and-backups).
+All data lives in the `data/` folder next to the project (`data/spendtracker.db`); logs go to `logs/console.log`. Use **File > Import/Export... > Download Backup** regularly. See [Data and backups](MANUAL.md#import-and-export).
 
 To free disk space later, **File > Fresh Start...** clears only what you pick (archived entries, every entry, unused labels, change history, or pre-restore recovery backups) and compacts the database. Download a backup first if you might want that data back. See [Fresh Start](MANUAL.md#fresh-start).
 
@@ -44,6 +44,15 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 - **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).
+
+## Sibling apps
+
+TaskList, TaskList Stats, NewsReview, and SpendTracker are four small self-hosted apps with the same Windows 95 look, sign-in, backups, and keyboard use. Each runs on its own and keeps its own data.
+
+- [TaskList](https://github.com/RotatingWires/task-list): tasks, nested subtasks, and lists.
+- [TaskList Stats](https://github.com/RotatingWires/task-list-stats): statistics and history for TaskList, read without changing it.
+- [NewsReview](https://github.com/RotatingWires/news-review): a personal news reader with AI review of your sources.
+- [SpendTracker](https://github.com/RotatingWires/spend-tracker): purchases, refunds, shared costs, and paybacks.
 
 ## Credits
 
