@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.34 Manual
+# SpendTracker v1.2.35 Manual
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -90,6 +90,7 @@ wwwroot/
 tests/
   server.py             starts a real server on a temporary data folder
   test_api.py           API, validation, history, backup/restore, and Fresh start tests
+  test_sign_in.py       setup, login, logout, and the password file (the same file in TaskList and TaskList Stats)
   test_browser.py       optional Playwright browser tests
 ```
 
@@ -554,10 +555,10 @@ The server is unreachable or the database could not be read. Check that SpendTra
 
 ```sh
 dotnet build
-python3 -m unittest discover -s tests -p "test_api.py"
+python3 -m unittest discover -s tests
 ```
 
-`test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, Fresh start (confirmation, archived entries kept while an active entry links to them, every entry and unused labels keeping Me and one payment method, history and recovery-backup removal, and compaction), and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
+`tests/server.py` (the same file in TaskList, TaskList Stats, and SpendTracker) builds the app and starts the real server on a temporary data folder; `tests/test_sign_in.py` (also the same in all three) checks first-run setup, login, logout, and the saved password file. `test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, Fresh start (confirmation, archived entries kept while an active entry links to them, every entry and unused labels keeping Me and one payment method, history and recovery-backup removal, and compaction), and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -567,9 +568,15 @@ python3 -m unittest discover -s tests -p "test_browser.py"
 
 They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, check the Fresh Start dialog's choices, confirmation, and phone-width fit while clearing only history, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
-GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs `test_api.py` on every push and pull request. The Playwright browser tests stay a local, optional tool.
+GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs every test file on every push and pull request; the Playwright browser tests skip there (no Playwright), so they stay a local, optional tool.
 
 ## Release notes
+
+### v1.2.35
+
+- Tests start the real server on a temporary data folder with `tests/server.py`, and `tests/test_sign_in.py` checks setup, login, logout, and the password file; both files are the same in TaskList, TaskList Stats, and SpendTracker.
+- An unknown API address answers 404 `{ "error": "Not found" }` like NewsReview, instead of the app page (GET) or 405 (POST).
+- CI runs every test file (the browser tests skip there), not only test_api.py.
 
 ### v1.2.34
 

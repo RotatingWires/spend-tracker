@@ -1,4 +1,6 @@
-"""Starts a real SpendTracker server against a throwaway data folder for tests. Standard library only."""
+"""Starts the real app server against a throwaway data folder for tests. Standard library only.
+
+The same file in TaskList, TaskList Stats, and SpendTracker: the app comes from the .csproj beside tests/."""
 
 import http.cookiejar
 import json
@@ -14,6 +16,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+APP = next(ROOT.glob("*.csproj")).stem
 PASSWORD = "test-password-123"
 
 
@@ -32,7 +35,7 @@ class Server:
 
     def __init__(self, prepare=None, args=()):
         """`prepare(data_dir)` can put files in the data folder before the server starts; `args` are extra options."""
-        self.data_root = tempfile.TemporaryDirectory(prefix="spend-tracker-test-")
+        self.data_root = tempfile.TemporaryDirectory(prefix=f"{APP.lower()}-test-")
         if prepare:
             self.data_dir.mkdir(parents=True)
             prepare(self.data_dir)
@@ -40,7 +43,7 @@ class Server:
         self.url = f"http://127.0.0.1:{self.port}"
         self.output = []
         self.token = None
-        dll = ROOT / "bin" / "Debug" / "net10.0" / "SpendTracker.dll"
+        dll = ROOT / "bin" / "Debug" / "net10.0" / f"{APP}.dll"
         self.process = subprocess.Popen(
             ["dotnet", str(dll), "--urls", self.url, "--contentRoot", self.data_root.name, "--webroot", str(ROOT / "wwwroot"), *args],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -59,7 +62,7 @@ class Server:
         deadline = time.time() + 30
         while time.time() < deadline:
             if self.process.poll() is not None:
-                raise RuntimeError("SpendTracker exited:\n" + "".join(self.output))
+                raise RuntimeError(f"{APP} exited:\n" + "".join(self.output))
             try:
                 with urllib.request.urlopen(f"{self.url}/api/auth/status", timeout=1):
                     pass
@@ -68,7 +71,7 @@ class Server:
             except OSError:
                 pass
             time.sleep(0.2)
-        raise RuntimeError("SpendTracker did not start:\n" + "".join(self.output))
+        raise RuntimeError(f"{APP} did not start:\n" + "".join(self.output))
 
     @property
     def data_dir(self):
@@ -82,7 +85,11 @@ class Server:
         if not (self.data_dir / "auth.json").exists():
             client.post("/api/auth/setup", {"setupToken": self.token, "password": PASSWORD, "confirmPassword": PASSWORD})
             # Answer the first-start backup prompt, so pages opened with this session go straight to the app.
-            client.post("/api/onboarding/acknowledge", {})
+            try:
+                client.post("/api/onboarding/acknowledge", {})
+            except ApiError as error:
+                if error.status != 404:  # TaskList Stats keeps no data, so it has no first-start prompt.
+                    raise
         else:
             client.post("/api/auth/login", {"password": PASSWORD})
         return client

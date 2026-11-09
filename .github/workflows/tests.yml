@@ -11,4 +11,5 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet build SpendTracker.csproj --nologo
-      - run: python3 -m unittest discover -s tests -p "test_api.py" -v
+      # Server and sign-in tests against the real app; the browser tests skip without Playwright, like the other apps.
+      - run: python3 -m unittest discover -s tests -v
