@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.41
+# SpendTracker v1.2.42
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -576,7 +576,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.41**.
+Current release: **v1.2.42**.
+
+### v1.2.42
+
+- Fix: a dropdown inside a dialog that opens upward (when there is more room above it, as on a phone) no longer collapses out of sight below the screen; `dropdown.js`, the same in every app, now clears the stylesheet's position when it opens a menu upward. This is what made Tags (and other pickers low in the New Transaction dialog) impossible to use on a phone.
 
 ### v1.2.41
 
