@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.39
+# SpendTracker v1.2.40
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -53,7 +53,8 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 SpendTracker.csproj     .NET project, dependency, and release version
 src/
   Program.cs            hosting, authentication, error responses, and API routes
-  Store.cs              SQLite schema, validation rules, history, restoring rows, and Fresh start
+  Store.cs              SQLite schema, validation rules, history, and restoring rows
+  FreshStart.cs         File > Fresh Start...: counts, clearing chosen data, and compaction (like TaskList's and NewsReview's)
   Transfer.cs           backup ZIP creation and restore verification
   SingleFileLogger.cs   capped logs/console.log writer
   PasswordAuth.cs       setup token, password file, and sign-in cookie (the same file in all four apps)
@@ -573,7 +574,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.39**.
+Current release: **v1.2.40**.
+
+### v1.2.40
+
+- Code: Fresh Start moved out of `Store.cs` into its own `FreshStart.cs`, like TaskList's and NewsReview's.
 
 ### v1.2.39
 
