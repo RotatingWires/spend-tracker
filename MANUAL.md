@@ -509,40 +509,152 @@ Spaces around an alias are trimmed and runs of spaces become one, in aliases and
 
 ### Building the Shortcuts
 
-In the Shortcuts app on the iPhone, make these three. Action names are as the Shortcuts app shows them; dictionary keys must be typed exactly, in lowercase as shown.
+In the Shortcuts app on the iPhone, make the three below, in this order. Each step is one action, added with the search box at the bottom of the editor; its settings are listed under it. Type dictionary keys and file paths exactly as shown.
 
-**1. Send to SpendTracker.** The only one that talks to SpendTracker. It saves its input (if any) to the queue, then sends the queue.
+Before you start:
 
-1. **If** *Shortcut Input* **has any value**:
-   - **Append to Text File**: append *Shortcut Input* to `SpendTracker/queue.txt` in the Shortcuts folder, with **Make New Line** on.
-2. **End If**.
-3. **Get File** `SpendTracker/queue.txt` from the Shortcuts folder, with **Error If Not Found** off.
-4. **If** *File* **has any value**:
-   - **Get Contents of URL**: the address from File > iPhone Shortcut..., **Method** POST, a **Header** `Authorization` with the value `Bearer ` followed by the key, and **Request Body** *File* set to *File*.
-   - **Get Dictionary Value**: *Value* for `message` in *Contents of URL*.
-   - **If** *Dictionary Value* **has any value**: **Delete Files** *File* with **Confirm Before Deleting** off, then **Show Notification** *Dictionary Value*.
-   - **Otherwise**: **Get Dictionary Value** for `error` in *Contents of URL*, then **Show Notification** "SpendTracker kept the entries on this phone:" followed by that value.
-   - **End If**.
-5. **End If**.
+- **Choosing a variable.** Tap a field, then **Select Variable** in the bar above the keyboard, and tap the action whose result you want; "step 2" below means the result of step 2.
+- **Choosing a part of the Apple Pay purchase.** In the automation, tap the *Shortcut Input* bubble you inserted, set **Type** to **Transaction**, and pick the part (**Amount**, **Merchant**, or **Card or Pass**) from the list. The bubble then shows that part's name.
+- **If** actions come with their own **Otherwise** and **End If**. Put the actions a step says are "inside" an If between the If and its Otherwise; leave an Otherwise empty unless a step goes there.
 
-**2. The Apple Pay automation.** In **Automation**, add a **Transaction** automation, choose the cards it is for, set it to **Run Immediately**, and give it these actions:
+#### Shortcut 1: Send to SpendTracker
 
-1. **Format Date** *Current Date*, custom format `yyyy-MM-dd`.
-2. **Format Date** *Current Date*, custom format `yyyyMMdd-HHmmss`; **Random Number** between 100000 and 999999; **Text** with the second formatted date, `-`, and the random number. This is the entry's ID; every entry needs a different one.
-3. **Dictionary** with `id` set to that Text, `date` to the first formatted date, `amount` to *Shortcut Input*'s **Amount**, `merchant` to its **Merchant**, and `paymentMethod` to its **Card or Pass** (the card's name in Wallet), or type the name of a SpendTracker payment method instead.
-4. **Run Shortcut** *Send to SpendTracker* with the *Dictionary* as input.
+The only Shortcut that talks to SpendTracker. It adds the entry it is given (if any) to the queue file, then sends the whole queue. Name it exactly **Send to SpendTracker**.
+
+1. **If**
+   - Input: *Shortcut Input*
+   - Condition: **has any value**
+2. **Append to Text File**, inside the If from step 1
+   - Text: *Shortcut Input*
+   - File Path: `SpendTracker/queue.txt` (in the Shortcuts folder)
+   - **Make New Line**: on
+3. **Get File**, after the End If of step 1
+   - Folder: Shortcuts
+   - Path: `SpendTracker/queue.txt`
+   - **Error If Not Found**: off
+4. **If**
+   - Input: *File* (step 3)
+   - Condition: **has any value**
+5. **Get Contents of URL**, inside the If from step 4
+   - URL: the address shown in File > iPhone Shortcut...
+   - Method: **POST**
+   - Headers: add one, key `Authorization`, value `Bearer ` (with the space) followed by the key
+   - Request Body: **File**, set to *File* (step 3)
+6. **Get Dictionary Value**
+   - Get: **Value** for key `message`
+   - Dictionary: *Contents of URL* (step 5)
+7. **If**
+   - Input: *Dictionary Value* (step 6)
+   - Condition: **has any value**
+8. **Delete Files**, inside the If from step 7
+   - Files: *File* (step 3)
+   - **Confirm Before Deleting**: off
+9. **Show Notification**, inside the If from step 7
+   - Text: *Dictionary Value* (step 6)
+10. **Get Dictionary Value**, in the Otherwise of step 7
+    - Get: **Value** for key `error`
+    - Dictionary: *Contents of URL* (step 5)
+11. **Show Notification**, in the Otherwise of step 7
+    - Text: `SpendTracker kept the entries on this phone: ` followed by *Dictionary Value* (step 10)
+
+Finished, it reads:
+
+```text
+If Shortcut Input has any value
+    Append Shortcut Input to SpendTracker/queue.txt
+End If
+Get file SpendTracker/queue.txt
+If File has any value
+    Get contents of <address>
+    Get value for message in Contents of URL
+    If Dictionary Value has any value
+        Delete File
+        Show notification: Dictionary Value
+    Otherwise
+        Get value for error in Contents of URL
+        Show notification: SpendTracker kept the entries on this phone: Dictionary Value
+    End If
+End If
+```
+
+#### Shortcut 2: the Apple Pay automation
+
+In the **Automation** tab, tap **+**, choose **Transaction**, choose the cards it is for, choose **Run Immediately**, then **New Blank Automation**, and add:
+
+1. **Format Date**: the purchase date
+   - Date: *Current Date*
+   - Date Format: **Custom**, `yyyy-MM-dd`
+2. **Format Date**: the first half of the entry's ID
+   - Date: *Current Date*
+   - Date Format: **Custom**, `yyyyMMdd-HHmmss`
+3. **Random Number**: the second half of the ID, so two entries in the same second still differ
+   - Minimum: `100000`
+   - Maximum: `999999`
+4. **Text**: the entry's ID
+   - *Formatted Date* (step 2), then `-`, then *Random Number* (step 3), with no spaces
+5. **Dictionary**, with five items (**Add New Item**, then **Text** for each):
+
+   | Key | Value |
+   | --- | --- |
+   | `id` | *Text* (step 4) |
+   | `date` | *Formatted Date* (step 1) |
+   | `amount` | *Shortcut Input*, Type **Transaction**, **Amount** |
+   | `merchant` | *Shortcut Input*, Type **Transaction**, **Merchant** |
+   | `paymentMethod` | *Shortcut Input*, Type **Transaction**, **Card or Pass**; or type a SpendTracker payment method's name |
+
+6. **Run Shortcut**
+   - Shortcut: **Send to SpendTracker**
+   - Input: *Dictionary* (step 5)
+   - **Show While Running**: off
 
 `paymentMethod` must be the name of an active payment method in SpendTracker (ignoring case). If your cards are called differently in Wallet, rename the payment method to match, or make one automation per card with that payment method's name typed in.
 
-**3. Quick Add.** For cash and anything else, run it from the home screen, a widget, or Siri:
+To check it the first time, add **Show Result** with *Dictionary* (step 5) just before step 6 and pay once. It should show something like `{"id":"20261110-180412-483920","date":"2026-11-10","amount":"$4.50","merchant":"BURGER KING #1234","paymentMethod":"Apple Card"}`. Remove Show Result afterwards.
 
-1. **Ask for Input** a Number, "Amount", and **Ask for Input** Text, "What".
-2. **Choose from List** with a List of your payment methods' names, as they are in SpendTracker.
-3. The same two **Format Date** actions, **Random Number**, and **Text** as the automation.
-4. **Dictionary** with `id`, `date`, `amount` (the number), `description` (what you typed), and `paymentMethod` (the chosen item). Add `merchant` too, from another Ask for Input, if you like.
-5. **Run Shortcut** *Send to SpendTracker* with the *Dictionary* as input.
+#### Shortcut 3: Quick Add
 
-To send what is waiting without adding anything, run **Send to SpendTracker** by itself: put it on the home screen, or add an automation that runs it, say when the phone joins your home Wi-Fi or at a time each evening. Every Apple Pay purchase and Quick Add sends the waiting entries too.
+For cash and anything else; run it from the home screen, a widget, or Siri.
+
+1. **Ask for Input**: the amount
+   - Input Type: **Number**
+   - Prompt: `Amount`
+2. **Ask for Input**: what it was
+   - Input Type: **Text**
+   - Prompt: `What`
+3. **List**: your payment methods
+   - One item per payment method, named exactly as in SpendTracker
+4. **Choose from List**
+   - List: *List* (step 3)
+   - Prompt: `Paid with`
+5. **Format Date**: the purchase date
+   - Date: *Current Date*
+   - Date Format: **Custom**, `yyyy-MM-dd`
+6. **Format Date**: the first half of the entry's ID
+   - Date: *Current Date*
+   - Date Format: **Custom**, `yyyyMMdd-HHmmss`
+7. **Random Number**
+   - Minimum: `100000`
+   - Maximum: `999999`
+8. **Text**: the entry's ID
+   - *Formatted Date* (step 6), then `-`, then *Random Number* (step 7), with no spaces
+9. **Dictionary**, with five items:
+
+   | Key | Value |
+   | --- | --- |
+   | `id` | *Text* (step 8) |
+   | `date` | *Formatted Date* (step 5) |
+   | `amount` | *Provided Input* (step 1) |
+   | `description` | *Provided Input* (step 2) |
+   | `paymentMethod` | *Chosen Item* (step 4) |
+
+   To record a merchant too, add another **Ask for Input** before the Dictionary and a `merchant` item set to its answer.
+10. **Run Shortcut**
+    - Shortcut: **Send to SpendTracker**
+    - Input: *Dictionary* (step 9)
+
+#### Sending what is waiting
+
+Every Apple Pay purchase and Quick Add also sends the entries still waiting on the phone. To send them without adding anything, run **Send to SpendTracker** by itself: put it on the home screen, or add a personal automation that runs it, such as when the phone joins your home Wi-Fi or at a time each evening.
 
 ### What the Shortcut sends
 
