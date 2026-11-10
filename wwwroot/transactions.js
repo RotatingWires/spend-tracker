@@ -324,7 +324,10 @@ const editor = {
   linked: null,
   tags: null,
   collections: null,
+  payers: null,
   shareInputs: new Map(),
+  // The person whose amount box still follows the entry's amount: the whole amount goes to them until anyone edits a box.
+  autoShare: null,
   // People whose share of the purchase is a gift (person IDs as strings, like the dropdown values).
   gifts: new Set()
 };
@@ -355,6 +358,16 @@ export function initializeTransactionEditor() {
       onEditorPersonChange();
     })
   });
+  // Several people can pay back at once; each gets their own payback entry when saved.
+  editor.payers = createMultiSelect($('#txPayers'), {
+    empty: 'Choose people',
+    deferChange: true,
+    onChange: () => onPayersChange(),
+    onAdd: () => addFromEditor('people', id => {
+      editor.payers.setOptions(payerOptions(editor.payers.values.map(Number)), [...editor.payers.values, id]);
+      onPayersChange();
+    })
+  });
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), {
     empty: 'No tags',
@@ -378,7 +391,10 @@ export function initializeTransactionEditor() {
   });
   $('#txDeleteButton').addEventListener('click', () => deleteTransaction());
   $('#txArchiveButton').addEventListener('click', () => saveTransaction({ archived: !editor.transaction.archived }));
-  $('#txAmount').addEventListener('input', () => updateShareTotal());
+  $('#txAmount').addEventListener('input', () => {
+    followAmount();
+    updateShareTotal();
+  });
   $('#txAmount').addEventListener('change', () => formatAmountInput($('#txAmount')));
   ledgerSearch = bindSearchForm($('#ledgerSearchForm'), query => {
     state.ledgerQuery = query;
@@ -471,7 +487,13 @@ export function openTransactionEditor(tx = null, defaults = {}) {
   editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), formatAmount(share.amountCents)]));
   editor.gifts = new Set((tx?.shares ?? []).filter(share => share.gift).map(share => String(share.personId)));
   editor.people.setOptions(peopleOptions(tx), tx?.shares?.length ? tx.shares.map(share => share.personId) : [state.model.self.id]);
+  editor.autoShare = null;
+  // The last entry's amount rows are still on screen; clear them so they are not read back into this one.
+  $('#txShares').replaceChildren();
+  $('#txPayerShares').replaceChildren();
   editor.person.setOptions([], null);
+  const payer = tx?.kind === 'Payback' ? tx.personId : defaults.personId;
+  editor.payers.setOptions(payerOptions(payer == null ? [] : [payer]), payer == null ? [] : [payer]);
   editor.linked.setOptions([], null);
   applyEditorKind({ personId: tx?.personId ?? defaults.personId, linkedId: tx?.linkedId ?? defaults.linkedId });
 
@@ -510,6 +532,10 @@ function applyEditorKind(preferred = {}) {
 
   $('#txPeopleLabel').hidden = !isPurchase;
   $('#txPeopleRow').hidden = !isPurchase;
+  $('#txPayersLabel').hidden = kind !== 'Payback';
+  $('#txPayersRow').hidden = kind !== 'Payback';
+  // Only the rows of the kind on screen hold amount boxes, so the share code always reads the right ones.
+  (isPurchase ? $('#txPayerShares') : $('#txShares')).replaceChildren();
   $('#txLinkedLabel').textContent = isRefund ? 'Refund of' : 'For purchase';
   $('#txLinkedLabel').hidden = isPurchase;
   $('#txLinkedRow').hidden = isPurchase;
@@ -523,10 +549,8 @@ function applyEditorKind(preferred = {}) {
   } else if (isRefund) {
     refreshLinkedOptions(preferred.linkedId ?? null, preferred.personId ?? null);
   } else {
-    $('#txPersonLabel').textContent = 'Paid back by';
-    showEditorRow('txPerson', true);
-    const current = preferred.personId ?? (editor.person.value ? Number(editor.person.value) : null);
-    editor.person.setOptions(payerOptions(current), current);
+    showEditorRow('txPerson', false);
+    renderShareRows();
     refreshLinkedOptions(preferred.linkedId ?? null);
   }
 }
@@ -556,34 +580,75 @@ function peopleOptions(tx) {
     .map(person => ({ value: person.id, label: archivedLabel(person) }));
 }
 
-function payerOptions(currentId) {
+function payerOptions(currentIds = []) {
   return state.snapshot.people
-    .filter(person => !person.isSelf && (!person.archived || person.id === currentId))
+    .filter(person => !person.isSelf && (!person.archived || currentIds.includes(person.id)))
     .map(person => ({ value: person.id, label: archivedLabel(person) }));
 }
 
-// ---- who a purchase was for
+// ---- who a purchase was for, and who paid back
 
 function selectedPeople() {
   return editor.people.values.map(Number);
 }
 
+function selectedPayers() {
+  return editor.payers.values.map(Number);
+}
+
+/** The amount boxes on screen: a purchase's people, or a payback's payers. */
+function shareContainer() {
+  return editorKind() === 'Payback' ? $('#txPayerShares') : $('#txShares');
+}
+
+/** A share box's cents: blank means $0.00, so only the people who had a part need typing. Null when not an amount. */
+function shareCents(text) {
+  return String(text ?? '').trim() === '' ? 0 : parseMoney(text, { allowZero: true });
+}
+
+/** Rewrites a share box as "12.50" (or "0.00") once the user leaves it. */
+function formatShareInput(input) {
+  const cents = shareCents(input.value);
+  if (cents != null) input.value = formatAmount(cents);
+}
+
+/** The box that still takes the whole amount follows the amount as it is typed. */
+function followAmount() {
+  if (editor.autoShare == null) return;
+  const input = shareContainer().querySelector(`input[data-person="${editor.autoShare}"]`);
+  const cents = parseMoney($('#txAmount').value);
+  if (input && cents != null) input.value = formatAmount(cents);
+}
+
 /**
- * One person takes the whole amount; several people each get an amount box that must add up to the total. Everyone
- * but you also gets a Gift box: a gift share is bought for them but not owed back.
+ * One person takes the whole amount; several people each get an amount box that must add up to the total. When a
+ * purchase becomes split, you start with the whole amount and everyone else with $0.00, ready for Split Evenly; a
+ * payback starts with its first payer. Everyone but you also gets a Gift box on a purchase: a gift share is bought for
+ * them but not owed back.
  */
 function renderShareRows() {
-  const container = $('#txShares');
+  const payback = editorKind() === 'Payback';
+  const container = shareContainer();
   for (const input of container.querySelectorAll('input[data-person]')) editor.shareInputs.set(input.dataset.person, input.value);
   for (const box of container.querySelectorAll('input[data-gift]')) {
     if (box.checked) editor.gifts.add(box.dataset.gift);
     else editor.gifts.delete(box.dataset.gift);
   }
-  const people = selectedPeople();
+  const people = payback ? selectedPayers() : selectedPeople();
   const split = people.length > 1;
   container.replaceChildren();
-  container.hidden = !split && people.every(id => id === state.model.self.id);
-  if (container.hidden) return;
+  container.hidden = !split && (payback || people.every(id => id === state.model.self.id));
+  if (container.hidden) {
+    if (payback) onPayersChanged();
+    return;
+  }
+
+  if (split && editor.autoShare == null && !people.some(id => editor.shareInputs.get(String(id))?.trim())) {
+    const first = !payback && people.includes(state.model.self.id) ? state.model.self.id : people[0];
+    editor.autoShare = String(first);
+  }
+  if (editor.autoShare != null && !people.map(String).includes(editor.autoShare)) editor.autoShare = null;
+  const amountCents = parseMoney($('#txAmount').value);
 
   for (const personId of people) {
     const name = el('label', 'share-name');
@@ -598,9 +663,16 @@ function renderShareRows() {
       amount.autocomplete = 'off';
       amount.placeholder = '0.00';
       amount.dataset.person = String(personId);
-      amount.value = editor.shareInputs.get(String(personId)) ?? '';
-      amount.addEventListener('input', () => updateShareTotal());
-      amount.addEventListener('change', () => formatAmountInput(amount));
+      const auto = editor.autoShare === String(personId);
+      amount.value = auto ? (amountCents == null ? '' : formatAmount(amountCents)) : editor.shareInputs.get(String(personId)) ?? '0.00';
+      amount.addEventListener('input', () => {
+        editor.autoShare = null; // typed amounts stay as typed
+        updateShareTotal();
+      });
+      amount.addEventListener('change', () => {
+        formatShareInput(amount);
+        updateShareTotal();
+      });
     }
     const amountBox = split ? document.createElement('span') : amount;
     if (split) {
@@ -608,7 +680,7 @@ function renderShareRows() {
       amountBox.append(amount);
     }
     const gift = el('label', 'share-gift');
-    if (personId !== state.model.self.id) {
+    if (!payback && personId !== state.model.self.id) {
       const box = el('input');
       box.type = 'checkbox';
       box.className = 'retro-check';
@@ -623,27 +695,28 @@ function renderShareRows() {
     row.append(name, amountBox, gift);
     container.append(row);
   }
-  if (!split) return;
-
-  const footer = el('div', 'share-footer');
-  const button = el('button', '', 'Split Evenly');
-  button.addEventListener('click', () => splitEvenly());
-  const total = el('span');
-  total.id = 'txShareTotal';
-  total.className = 'form-hint';
-  footer.append(button, total);
-  container.append(footer);
-  updateShareTotal();
+  if (split) {
+    const footer = el('div', 'share-footer');
+    const button = el('button', '', 'Split Evenly');
+    button.addEventListener('click', () => splitEvenly());
+    const total = el('span');
+    total.id = 'txShareTotal';
+    total.className = 'form-hint';
+    footer.append(button, total);
+    container.append(footer);
+    updateShareTotal();
+  }
+  if (payback) onPayersChanged();
 }
 
 function shareInputs() {
-  return [...$('#txShares').querySelectorAll('input[data-person]')];
+  return [...shareContainer().querySelectorAll('input[data-person]')];
 }
 
 function updateShareTotal() {
   const total = $('#txShareTotal');
   if (!total) return;
-  const assigned = shareInputs().reduce((sum, input) => sum + (parseMoney(input.value) ?? 0), 0);
+  const assigned = shareInputs().reduce((sum, input) => sum + (shareCents(input.value) ?? 0), 0);
   const amount = parseMoney($('#txAmount').value);
   total.textContent = amount == null
     ? `Assigned ${formatMoney(assigned)}`
@@ -657,6 +730,7 @@ function splitEvenly() {
     $('#txAmount').focus();
     return;
   }
+  editor.autoShare = null;
   const inputs = shareInputs();
   evenShares(amount, inputs.map(input => input.dataset.person))
     .forEach((share, index) => { inputs[index].value = formatAmount(share.amountCents); });
@@ -664,17 +738,39 @@ function splitEvenly() {
   updateShareTotal();
 }
 
+/**
+ * Who a purchase was for, or how much each payer paid back. People left at $0.00 are not saved on it: a share is a
+ * part of the amount, so someone with no part is simply not on the purchase.
+ */
 function collectShares(amountCents) {
-  const people = selectedPeople();
-  if (people.length === 0) throw new Error('Choose who this purchase was for.');
+  const payback = editorKind() === 'Payback';
+  const people = payback ? selectedPayers() : selectedPeople();
+  if (people.length === 0) throw new Error(payback ? 'Choose who paid you back.' : 'Choose who this purchase was for.');
   const gift = personId => $(`#txGift${personId}`)?.checked ?? false;
   if (people.length === 1) return [{ personId: people[0], amountCents, gift: gift(people[0]) }];
-  return shareInputs().map(input => {
+  const shares = shareInputs().map(input => {
     const personId = Number(input.dataset.person);
-    const cents = parseMoney(input.value);
-    if (cents == null) throw new Error(`Enter ${personName(personId)}'s share, or use Split Evenly.`);
+    const cents = shareCents(input.value);
+    if (cents == null) throw new Error(`${personName(personId)}'s amount should be like 12.34, or leave it blank for $0.00.`);
     return { personId, amountCents: cents, gift: gift(personId) };
   });
+  const assigned = shares.reduce((sum, share) => sum + share.amountCents, 0);
+  if (assigned !== amountCents) {
+    throw new Error(`The amounts add up to ${formatMoney(assigned)}, but the ${payback ? 'payback' : 'purchase'} is ${formatMoney(amountCents)}. Use Split Evenly, or change an amount.`);
+  }
+  return shares.filter(share => share.amountCents > 0);
+}
+
+/** A payback's payers changed: the purchases it can be for, and the hint, follow them. */
+function onPayersChange() {
+  renderShareRows();
+  refreshLinkedOptions();
+}
+
+/** The first payer is the payback's person, as with a single payer; the others get their own paybacks when saved. */
+function onPayersChanged() {
+  const payers = selectedPayers();
+  editor.person.setOptions(payers.map(id => ({ value: id, label: personName(id) })), payers[0] ?? null);
 }
 
 // ---- refunds and paybacks
@@ -687,13 +783,13 @@ function purchaseLabel(purchase) {
 function refreshLinkedOptions(preferredId = null, preferredPersonId = null) {
   const kind = editorKind();
   const selfId = editor.transaction?.id ?? null;
-  const payer = editor.person.value ? Number(editor.person.value) : null;
+  const payers = kind === 'Payback' ? selectedPayers() : [];
   const wanted = preferredId ?? (editor.linked.value ? Number(editor.linked.value) : null);
   const candidates = state.model.transactions
     .filter(tx => tx.kind === 'Purchase')
     .filter(tx => kind === 'Refund'
       ? purchaseRemaining(tx, selfId) > 0 || tx.id === wanted
-      : shareOf(tx, payer) > 0 && (shareRemaining(tx, payer, selfId) > 0 || tx.id === wanted))
+      : payers.length > 0 && payers.every(payer => shareOf(tx, payer) > 0 && (shareRemaining(tx, payer, selfId) > 0 || tx.id === wanted)))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
     .map(tx => ({ value: tx.id, label: purchaseLabel(tx) }));
 
@@ -734,7 +830,13 @@ function updateLinkedHint() {
   const hint = $('#txLinkedHint');
   const personId = editor.person.value ? Number(editor.person.value) : null;
   if (!purchase || personId == null) {
-    hint.textContent = kind === 'Payback' ? 'Unlinked paybacks still reduce what this person owes overall.' : '';
+    hint.textContent = kind === 'Payback' ? 'Unlinked paybacks still reduce what each person owes overall.' : '';
+    return;
+  }
+  const payers = kind === 'Payback' ? selectedPayers() : [];
+  if (payers.length > 1) {
+    const unpaid = payers.map(id => `${formatMoney(shareRemaining(purchase, id, editor.transaction?.id ?? null))} of ${personName(id)}'s share`);
+    hint.textContent = `${unpaid.join(', ')} still unpaid.`;
     return;
   }
   const remaining = shareRemaining(purchase, personId, editor.transaction?.id ?? null);
@@ -758,7 +860,17 @@ function prefillFromLinkedPurchase() {
   const purchase = linkedPurchase();
   const personId = editor.person.value ? Number(editor.person.value) : null;
   if (!purchase || editor.transaction) return;
-  if (!$('#txAmount').value.trim() && personId != null) $('#txAmount').value = centsToInput(shareRemaining(purchase, personId));
+  const payers = editorKind() === 'Payback' ? selectedPayers() : [];
+  if (payers.length > 1) {
+    // Several payers: each pays back what is left of their own share, and the amount is the total.
+    if (!$('#txAmount').value.trim()) {
+      const remaining = payers.map(id => shareRemaining(purchase, id));
+      $('#txAmount').value = centsToInput(remaining.reduce((sum, cents) => sum + cents, 0));
+      editor.autoShare = null;
+      shareInputs().forEach((input, index) => { input.value = formatAmount(remaining[index]); });
+      updateShareTotal();
+    }
+  } else if (!$('#txAmount').value.trim() && personId != null) $('#txAmount').value = centsToInput(shareRemaining(purchase, personId));
   if (editorKind() === 'Refund') {
     if (!editor.merchant.value && !$('#txDescription').value.trim()) {
       editor.merchant.value = purchase.merchantId ?? '';
@@ -791,10 +903,17 @@ async function saveTransaction(changes = {}) {
   }
 
   let shares = [];
+  // A payback from several people is saved as one payback each; the first keeps an edited entry.
+  let payments = null;
   try {
     if (kind === 'Purchase') shares = collectShares(amountCents);
+    if (kind === 'Payback') payments = collectShares(amountCents);
   } catch (shareError) {
     error.textContent = shareError.message;
+    return;
+  }
+  if (payments && payments.length > 1) {
+    await savePaybacks(payments, changes);
     return;
   }
 
@@ -803,7 +922,7 @@ async function saveTransaction(changes = {}) {
     date: parseTypedDate($('#txDate').value),
     amountCents,
     paymentMethodId: editor.method.value ? Number(editor.method.value) : null,
-    personId: kind === 'Purchase' || !editor.person.value ? null : Number(editor.person.value),
+    personId: kind === 'Payback' ? payments[0]?.personId ?? null : kind === 'Purchase' || !editor.person.value ? null : Number(editor.person.value),
     linkedId: kind === 'Purchase' || !editor.linked.value ? null : Number(editor.linked.value),
     merchantId: editor.merchant.value ? Number(editor.merchant.value) : null,
     description: $('#txDescription').value,
@@ -827,6 +946,47 @@ async function saveTransaction(changes = {}) {
     setStatus(`${verb} ${KIND_LABELS[saved.kind].toLowerCase()} #${saved.id}, ${formatMoney(saved.amountCents)} on ${formatDate(saved.date)}.`);
   } catch (saveError) {
     error.textContent = saveError.message;
+  } finally {
+    $('#txSaveButton').disabled = false;
+  }
+}
+
+/** Saves a payback from several people as one payback per person, all for the same purchase if one is chosen. */
+async function savePaybacks(payments, changes) {
+  const error = $('#txError');
+  const existing = editor.transaction;
+  const base = {
+    kind: 'Payback',
+    date: parseTypedDate($('#txDate').value),
+    paymentMethodId: editor.method.value ? Number(editor.method.value) : null,
+    linkedId: editor.linked.value ? Number(editor.linked.value) : null,
+    merchantId: editor.merchant.value ? Number(editor.merchant.value) : null,
+    description: $('#txDescription').value,
+    note: $('#txNote').value,
+    tagIds: [],
+    collectionIds: [],
+    shares: [],
+    archived: existing?.archived ?? false,
+    ...changes
+  };
+  const saved = [];
+  $('#txSaveButton').disabled = true;
+  try {
+    for (const [index, payment] of payments.entries()) {
+      const body = { ...base, personId: payment.personId, amountCents: payment.amountCents };
+      saved.push(existing && index === 0
+        ? await api(`/transactions/${existing.id}`, { method: 'PUT', body })
+        : await api('/transactions', { method: 'POST', body }));
+    }
+    $('#transactionDialog').close();
+    applyTransactionChanges({ saved });
+    const total = saved.reduce((sum, tx) => sum + tx.amountCents, 0);
+    setStatus(`Saved ${saved.length} paybacks (${saved.map(tx => `#${tx.id}`).join(', ')}), ${formatMoney(total)} on ${formatDate(saved[0].date)}.`);
+  } catch (saveError) {
+    // Some may already be saved; show them, and say which person failed.
+    if (saved.length) applyTransactionChanges({ saved });
+    const failed = payments[saved.length];
+    error.textContent = `${saved.length ? `Saved ${saved.length} of ${payments.length} paybacks. ` : ''}${personName(failed.personId)}: ${saveError.message}`;
   } finally {
     $('#txSaveButton').disabled = false;
   }

@@ -91,13 +91,16 @@ export function formatMoney(cents) {
   return moneyFormat.format(cents / 100);
 }
 
-/** Parses "12", "12.5", "$1,234.56" into whole cents without floating-point rounding. Returns null when invalid. */
-export function parseMoney(text) {
+/**
+ * Parses "12", "12.5", "$1,234.56" into whole cents without floating-point rounding. Returns null when invalid, and for
+ * zero unless allowZero (a person's share of a split can be $0.00; an entry's amount cannot).
+ */
+export function parseMoney(text, { allowZero = false } = {}) {
   const clean = String(text ?? '').trim().replace(/^\$/, '').replace(/,/g, '').trim();
   const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(clean);
   if (!match || clean === '' || clean === '.') return null;
   const cents = Number(match[1] || '0') * 100 + Number((match[2] ?? '').padEnd(2, '0'));
-  return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+  return Number.isSafeInteger(cents) && (cents > 0 || (allowZero && cents === 0)) ? cents : null;
 }
 
 export function centsToInput(cents) {

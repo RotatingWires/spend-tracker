@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.43
+# SpendTracker v1.2.44
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -189,13 +189,13 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View > Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
-**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
+**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. When you add a second person, you start with the whole amount and everyone else with 0.00; your box follows the amount until you change any box. A blank box counts as $0.00, and anyone left at $0.00 is not saved on the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
 **Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts in their shares (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
 
 **Refunds** never have their own tags; they count under the tags and merchant of the purchase they refund, so a refund on a purchase tagged *food* reduces *food*. Each refund is for one person's share of the purchase: picked automatically when the purchase was for one person, and chosen by you when it was split, so a refund on a friend's share reduces what that friend owes. Refunds are dated on the day the money came back, so they reduce net spent in that day's period, not the purchase's.
 
-**Paybacks** come from someone other than you. Linking a payback to a purchase marks that person's share as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
+**Paybacks** come from someone other than you. **Paid back by** can list several people (say, two friends who each sent their part); each gets an amount box, like a split purchase, and saving makes one payback per person, all for the same purchase if one is chosen. Linking a payback to a purchase marks that person's share as (partly) paid back; an unlinked payback still reduces the person's overall balance. Paybacks never change *net spent*, because the purchase still happened; Stats shows them separately as *Paid back to you* and *Net after paybacks*.
 
 The server enforces these rules on every save:
 
@@ -576,7 +576,16 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.43**.
+Current release: **v1.2.44**.
+
+### v1.2.44
+
+- Adding a second person to a purchase starts you with the whole amount and everyone else with 0.00, ready for Split Evenly; your box follows the amount until you change a box.
+- A blank share counts as $0.00 (no need to type 0), 0 is accepted and formats to 0.00, and anyone at $0.00 is not saved on the purchase.
+- **Paid back by** takes several people: each gets an amount box with Split Evenly, and saving makes one payback per person.
+- Dropdowns open scrolled to the top each time, instead of where the list was left after a choice or in an earlier dialog.
+- On a phone, a dropdown's search box inside a dialog works: when the keyboard opens and the dialog scrolls, the dropdown moves with its button instead of closing (which also put the keyboard away).
+- Fix: amount rows from the previous entry no longer carry into the next New Transaction.
 
 ### v1.2.43
 

@@ -138,7 +138,11 @@ class BrowserTests(unittest.TestCase):
         if people:
             self.set_checks(page, "#txPeople", people)
         if person:
-            self.pick(page, "#txPerson", person)
+            # A payback's payers are a multi-select (several people can pay back at once); a refund picks one share.
+            if kind == "Payback":
+                self.set_checks(page, "#txPayers", [person])
+            else:
+                self.pick(page, "#txPerson", person)
         if linked:
             self.pick(page, "#txLinked", linked)
         if merchant:
@@ -371,6 +375,50 @@ class BrowserTests(unittest.TestCase):
         page.wait_for_url(re.compile(r"/login\.html"))
         page.goto(self.server.url + "/")
         page.wait_for_url(re.compile(r"/login\.html"))
+
+    def test_split_defaults_zero_shares_and_paybacks_from_several_people(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        api = self.api_client()
+        for name in ("Dana", "Eli"):
+            api.post("/api/people", {"name": name})
+        page.reload()
+        expect(page.locator("#statusLeft")).to_have_text("Ready")
+
+        # Adding someone gives you the whole amount and them $0.00; your box follows the amount until you change one.
+        page.click("#newTransactionButton")
+        page.fill("#txAmount", "30")
+        self.set_checks(page, "#txPeople", ["Me (you)", "Dana"] if page.locator("#txPeople .menu-dropdown button", has_text="(you)").count() else ["Me", "Dana"])
+        shares = page.locator("#txShares input[data-person]")
+        expect(shares.nth(0)).to_have_value("30.00")
+        expect(shares.nth(1)).to_have_value("0.00")
+        page.fill("#txAmount", "40")
+        expect(shares.nth(0)).to_have_value("40.00")
+        # 0 is a valid share and formats like any amount; a blank share is $0.00 too.
+        shares.nth(1).fill("0")
+        shares.nth(1).blur()
+        expect(shares.nth(1)).to_have_value("0.00")
+        shares.nth(1).fill("")
+        page.fill("#txDescription", "Groceries")
+        page.click("#txSaveButton")
+        expect(page.locator("#statusLeft")).to_contain_text("Added purchase")
+        purchase = max(api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])
+        self.assertEqual([share["amountCents"] for share in purchase["shares"]], [4000])  # Dana at $0.00 is not on it
+
+        # A payback from two people saves one payback each.
+        page.click("#newTransactionButton")
+        self.pick(page, "#txKind", "Payback to me")
+        page.fill("#txAmount", "25")
+        self.set_checks(page, "#txPayers", ["Dana", "Eli"])
+        payers = page.locator("#txPayerShares input[data-person]")
+        expect(payers.nth(0)).to_have_value("25.00")
+        expect(payers.nth(1)).to_have_value("0.00")
+        page.click("#txPayerShares button:has-text('Split Evenly')")
+        page.fill("#txDescription", "Venmo")
+        page.click("#txSaveButton")
+        expect(page.locator("#statusLeft")).to_contain_text("Saved 2 paybacks")
+        paybacks = [tx for tx in api.get("/api/snapshot")["transactions"] if tx["kind"] == "Payback"]
+        self.assertEqual(sorted(tx["amountCents"] for tx in paybacks), [1250, 1250])
 
     def test_split_purchase_in_editor(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
