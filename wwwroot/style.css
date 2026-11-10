@@ -574,9 +574,9 @@ input[type="date"] { min-width: 0; max-width: 100%; }
   -webkit-overflow-scrolling: touch;
 }
 .year-heatmap { padding: 6px 2px 3px; }
-/* With several years checked, each grid has its year over it. */
-.year-heatmap-title { margin: 10px 0 2px; font-weight: 700; }
-.year-heatmap-title:first-child { margin-top: 0; }
+/* With several years or measures checked, each heatmap has its year and measure over it. */
+.heatmap-title { margin: 10px 0 2px; font-weight: 700; }
+.heatmap-title:first-child { margin-top: 0; }
 .heatmap-grid {
   display: grid;
   grid-template-rows: 20px repeat(7, 24px);

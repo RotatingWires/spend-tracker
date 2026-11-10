@@ -1089,8 +1089,14 @@ class BrowserTests(unittest.TestCase):
         # Years are check boxes: two checked draw two grids, each under its year.
         this_year = str(date.today().year)
         self.set_checks(page, "#heatYear", [this_year, "2025"])
-        expect(page.locator("#yearHeatmap .year-heatmap-title")).to_have_text([this_year, "2025"])
+        expect(page.locator("#yearHeatmap .heatmap-title")).to_have_text([this_year, "2025"])
         expect(page.locator("#yearHeatmap .heatmap-grid")).to_have_count(2)
+        # Show is check boxes too: each heatmap is drawn once per measure, under its name.
+        self.set_checks(page, "#heatMeasure", ["Net spent", "Purchases"])
+        expect(page.locator("#weekHeatmap .heatmap-title")).to_have_text(["Net spent", "Purchases"])
+        expect(page.locator("#yearHeatmap .heatmap-title")).to_have_text([f"{this_year} · Net spent", f"{this_year} · Purchases", "2025 · Net spent", "2025 · Purchases"])
+        self.set_checks(page, "#heatMeasure", ["Net spent"])
+        self.set_checks(page, "#heatYear", ["2025"])
         expect(page.locator('#yearHeatmap span[data-date="2025-03-11"]')).to_have_count(1)
         expect(page.locator('#monthYearHeatmap [data-month="2025-03"]')).to_have_text("$31")
         expect(page.locator("#labelMonthHeatmap")).to_contain_text("groceries")

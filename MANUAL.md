@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.49
+# SpendTracker v1.2.50
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -376,7 +376,7 @@ The chart shows one bar per day for periods of 62 counted days or fewer, otherwi
 
 ### Heatmaps
 
-Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show** picks what every heatmap measures: net spent (the default), spent, refunds, or number of purchases. Darker cells hold more. The darkest shade starts at the 90th percentile of the heatmap's cells, so one very large purchase does not wash out everything else; a cell with nothing (or a net of zero or less, from refunds only) is the lightest. Hover a cell for its exact value.
+Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show** picks what every heatmap measures: net spent (the default), spent, refunds, or number of purchases. It is a dropdown of check boxes, applied when it closes: with several checked, each heatmap is drawn once per measure, one under another, each under the measure's name (and its year, on the Year Heatmap with several years). Closing it with none checked goes back to net spent. Darker cells hold more. The darkest shade starts at the 90th percentile of the heatmap's cells, so one very large purchase does not wash out everything else; a cell with nothing (or a net of zero or less, from refunds only) is the lightest. Hover a cell for its exact value.
 
 - **Year Heatmap:** every day of each year checked in **Years** (this year to start), a column per week, Sunday first, whatever the Period. **Years** is a dropdown of check boxes, applied when it closes: check several to see their grids one under another, newest first, each under its year (closing it with none checked goes back to this year). Purchase counts show inside the squares. Select a day with entries to open its day dialog, as on the Calendar; empty days cannot be selected.
 - **Month × Year:** every month of every year with entries, all time. Select a month to open it on the Transactions tab.
@@ -576,7 +576,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.49**.
+Current release: **v1.2.50**.
+
+### v1.2.50
+
+- Stats > Heatmaps: **Show** is a dropdown of check boxes too: check several measures (say Net spent and Purchases) and each heatmap is drawn once per measure, under its name.
 
 ### v1.2.49
 

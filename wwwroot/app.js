@@ -41,7 +41,7 @@ export const state = {
   statsTab: readSetting('spend-tracker-stats-tab') || 'overview',
   // Bars or lines for charts over time, remembered in this browser.
   chartStyle: readSetting('spend-tracker-chart-style') === 'lines' ? 'lines' : 'bars',
-  heat: { measure: 'net', years: [], rows: 'tags' },
+  heat: { measures: ['net'], years: [], rows: 'tags' },
   // Searches applied with a Search button (or Enter), not while typing; empty means none.
   ledgerQuery: '',
   // Ledger filters checked in the Filters dropdown, such as "method:2" or "tag:5".

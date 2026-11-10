@@ -1,7 +1,7 @@
 /*
  * Stats > Heatmaps, drawn like TaskList Stats' heatmaps: a year of days, months by year, tags or merchants by month,
- * and weekdays by week of the month. The year grid shows each year checked in its dropdown, newest first. One Show
- * choice applies to all four. Darker cells hold more; the darkest shade
+ * and weekdays by week of the month. The year grid shows each year checked in its dropdown, newest first. Show is a
+ * list of check boxes that applies to all four: each heatmap is drawn once per checked measure, under its name. Darker cells hold more; the darkest shade
  * starts at the 90th percentile of the heatmap's cells, so one huge purchase does not wash out every other day. A net
  * of zero or less (refunds only) is the lightest.
  */
@@ -25,8 +25,18 @@ let heatMeasureSelect = null;
 let heatYearSelect = null;
 let heatRowsSelect = null;
 
-function heatMeasure() {
-  return HEAT_MEASURES.find(measure => measure.value === state.heat.measure) ?? HEAT_MEASURES[0];
+function heatMeasures() {
+  const checked = HEAT_MEASURES.filter(measure => state.heat.measures.includes(measure.value));
+  return checked.length ? checked : [HEAT_MEASURES[0]];
+}
+
+/** A heatmap per checked measure, each under a title naming it (and the prefix, such as its year) when needed. */
+function perMeasure(build, prefix = '') {
+  const measures = heatMeasures();
+  return measures.flatMap(measure => {
+    const title = [prefix, measures.length > 1 ? measure.label : ''].filter(Boolean).join(' · ');
+    return [...(title ? [el('div', 'heatmap-title', title)] : []), build(measure)];
+  });
 }
 
 /** The value that earns the darkest shade: the 90th percentile of the cells holding anything. */
@@ -87,7 +97,7 @@ function defaultHeatYear() {
 }
 
 export function renderHeatmaps(stats) {
-  heatMeasureSelect.setOptions(HEAT_MEASURES, state.heat.measure);
+  heatMeasureSelect.setOptions(HEAT_MEASURES, heatMeasures().map(measure => measure.value));
   heatRowsSelect.setOptions(HEAT_ROWS, state.heat.rows);
   const years = heatYears();
   state.heat.years = state.heat.years.filter(year => years.includes(year));
@@ -103,15 +113,11 @@ export function renderHeatmaps(stats) {
 /** Each checked year, newest first, under its own heading when there are several. */
 function renderYearHeatmap() {
   const years = [...state.heat.years].sort((a, b) => b - a);
-  $('#yearHeatmap').replaceChildren(...years.flatMap(year => [
-    ...(years.length > 1 ? [el('div', 'year-heatmap-title', String(year))] : []),
-    yearGrid(year)
-  ]));
+  $('#yearHeatmap').replaceChildren(...years.flatMap(year => perMeasure(measure => yearGrid(year, measure), years.length > 1 ? String(year) : '')));
 }
 
 /** One square per day of a year, a column per week (Sunday first), as on TaskList Stats. */
-function yearGrid(year) {
-  const measure = heatMeasure();
+function yearGrid(year, measure) {
   const days = dailyNet(transactionsInRange(`${year}-01-01`, `${year}-12-31`));
   const max = heatScale([...days.values()].map(measure.of));
   const first = `${year}-01-01`;
@@ -151,9 +157,12 @@ function yearGrid(year) {
   return grid;
 }
 
-/** Every month of every year with entries, all time. */
 function renderMonthYearHeatmap() {
-  const measure = heatMeasure();
+  $('#monthYearHeatmap').replaceChildren(...perMeasure(monthYearGrid));
+}
+
+/** Every month of every year with entries, all time. */
+function monthYearGrid(measure) {
   const months = new Map();
   for (const [key, day] of dailyNet(state.model.transactions)) {
     const month = monthOf(key);
@@ -190,12 +199,11 @@ function renderMonthYearHeatmap() {
       grid.append(cell);
     }
   }
-  $('#monthYearHeatmap').replaceChildren(grid);
+  return grid;
 }
 
 /** Tags (or merchants) by month, over the months in the period. Refunds count under their purchase's tags and merchant. */
 function renderLabelMonthHeatmap(stats) {
-  const measure = heatMeasure();
   const byMerchant = state.heat.rows === 'merchants';
   $('#labelMonthLegend').textContent = `${byMerchant ? 'Merchants' : 'Tags'} × Month`;
   const idsOf = byMerchant ? merchantIdsOf : tagIdsOf;
@@ -218,18 +226,23 @@ function renderLabelMonthHeatmap(stats) {
       cells.set(key, bucket);
     }
   }
+  if (!cells.size || !months.length) {
+    const empty = el('div', 'note');
+    empty.textContent = byMerchant ? 'No purchases at a merchant in this period.' : 'No tagged purchases in this period.';
+    $('#labelMonthHeatmap').replaceChildren(empty);
+    return;
+  }
+  $('#labelMonthHeatmap').replaceChildren(...perMeasure(measure => labelMonthGrid(cells, months, scope, measure)));
+}
+
+/** Rows ordered by the measure's total, highest first. */
+function labelMonthGrid(cells, months, scope, measure) {
   const totals = new Map();
   for (const [key, bucket] of cells) {
     const id = Number(key.split('|')[0]);
     totals.set(id, (totals.get(id) ?? 0) + measure.of(bucket));
   }
   const ids = [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a) || compareNames(SCOPE_NAMES[scope](a), SCOPE_NAMES[scope](b)));
-  if (!ids.length || !months.length) {
-    const empty = el('div', 'note');
-    empty.textContent = byMerchant ? 'No purchases at a merchant in this period.' : 'No tagged purchases in this period.';
-    $('#labelMonthHeatmap').replaceChildren(empty);
-    return;
-  }
   const max = heatScale([...cells.values()].map(measure.of));
 
   const grid = el('div', 'month-year-grid label-month-grid');
@@ -252,12 +265,15 @@ function renderLabelMonthHeatmap(stats) {
       grid.append(heatCell(`month-year-cell ${heatClass(value, max)}`, title, heatShort(value, measure), bucket ? () => openScopeList(scope, id, { month }) : null));
     }
   }
-  $('#labelMonthHeatmap').replaceChildren(grid);
+  return grid;
 }
 
 /** Weekdays by week of the month (days 1–7, 8–14, ...), averaged per day so the short fifth week compares fairly. */
 function renderWeekHeatmap(stats) {
-  const measure = heatMeasure();
+  $('#weekHeatmap').replaceChildren(...perMeasure(measure => weekGrid(stats, measure)));
+}
+
+function weekGrid(stats, measure) {
   const sums = Array.from({ length: 7 }, () => Array(5).fill(0));
   const occurrences = Array.from({ length: 7 }, () => Array(5).fill(0));
   for (let number = dayNumber(stats.range.start); stats.countedDays > 0 && number <= dayNumber(stats.countedEnd); number++) {
@@ -291,13 +307,16 @@ function renderWeekHeatmap(stats) {
       grid.append(heatCell(`month-year-cell week-cell ${heatClass(value, max)}`, title, heatShort(measure.count ? value : Math.round(value), measure, { averaged: true }), null));
     });
   });
-  $('#weekHeatmap').replaceChildren(grid);
+  return grid;
 }
 
 export function initializeHeatmaps() {
-  heatMeasureSelect = createSingleSelect($('#heatMeasure'), {
-    onChange: value => {
-      state.heat.measure = value;
+  // Check boxes like Years, applied when the dropdown closes; closing it with none checked goes back to Net spent.
+  heatMeasureSelect = createMultiSelect($('#heatMeasure'), {
+    deferChange: true,
+    summary: names => (names.length > 2 ? `${names.length} measures` : names.join(', ')),
+    onChange: values => {
+      state.heat.measures = values;
       renderStats();
     }
   });

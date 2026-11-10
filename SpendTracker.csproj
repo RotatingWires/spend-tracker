@@ -5,7 +5,7 @@
     <RootNamespace>SpendTracker</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.2.49</Version>
+    <Version>1.2.50</Version>
     <Product>SpendTracker</Product>
   </PropertyGroup>
   <ItemGroup>
