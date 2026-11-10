@@ -205,14 +205,15 @@ async function runBulkAction(name) {
         continue;
       }
       try {
+        // Changed entries stay selected, so another action can follow; deleted ones are gone.
         if (plan.method === 'DELETE') {
           await api(`/transactions/${tx.id}`, { method: 'DELETE' });
           deleted.push(tx.id);
+          selectedIds.delete(tx.id);
         } else {
           saved.push(await api(`/transactions/${tx.id}`, { method: 'PUT', body: plan.body }));
         }
         changed++;
-        selectedIds.delete(tx.id);
       } catch (error) {
         skipped.push(`#${tx.id}: ${error.message}`);
       }
@@ -226,7 +227,7 @@ async function runBulkAction(name) {
   const summary = `${action.label}: ${plural(changed, 'entry', 'entries')} changed${skipped.length ? `, ${skipped.length} skipped` : ''}.`;
   setStatus(summary);
   if (skipped.length)
-    await confirmAction(`${action.label} Selected`, `${summary} Skipped entries stay selected.`, 'OK', { detail: skipped.join('\n'), notice: true });
+    await confirmAction(`${action.label} Selected`, `${summary} The entries stay selected.`, 'OK', { detail: skipped.join('\n'), notice: true });
 }
 
 // ---------------------------------------------------------------- toolbar

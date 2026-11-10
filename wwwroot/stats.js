@@ -463,10 +463,10 @@ function renderStatsTables(stats) {
 
 /** People, tags, collections, and merchants on the People & Places sub-tab. */
 export function renderBreakdowns(stats) {
-  renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true });
-  renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged' });
-  renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection' });
-  renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits' });
+  renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true, chart: $('#statsPeopleChart'), color: 4 });
+  renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged', chart: $('#statsTagsChart'), color: 2 });
+  renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection', chart: $('#statsCollectionsChart'), color: 6 });
+  renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits', chart: $('#statsMerchantsChart'), color: 5 });
 }
 
 export function renderMonthsTable(stats) {
@@ -487,11 +487,25 @@ export function renderMonthsTable(stats) {
 }
 
 /**
- * People, tags, collections, and merchants share one table layout, highest net first. Selecting a row lists that scope's
- * entries; the "none" row (untagged, no collection, no merchant) is listed last and is not selectable.
+ * People, tags, collections, and merchants share one table layout, highest net first, under a bar chart of the twelve
+ * with the most net spent. Selecting a row or a bar lists that scope's entries; the "none" row (untagged, no
+ * collection, no merchant) is listed last, is not selectable, and is left out of the chart.
  */
-function renderBreakdown(table, label, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false } = {}) {
+function renderBreakdown(table, label, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false, chart = null, color = 1 } = {}) {
   const net = group => group.spent - group.refunded;
+  if (chart) {
+    const top = [...groups].filter(([id, group]) => id != null && net(group) > 0).sort((a, b) => net(b[1]) - net(a[1])).slice(0, 12);
+    chart.closest('.chart-frame').hidden = top.length === 0;
+    if (top.length) {
+      const names = top.map(([id]) => SCOPE_NAMES[scope](id));
+      Charts.bars(chart, {
+        labels: names.map(name => (name.length > 10 ? `${name.slice(0, 9)}…` : name)),
+        titles: names,
+        series: [{ label: scope === 'person' ? 'Net share' : 'Net spent', color, format: formatMoney, values: top.map(([, group]) => net(group)) }],
+        onSelect: index => openScopeList(scope, top[index][0])
+      });
+    }
+  }
   const rows = [...groups]
     .filter(([id, group]) => (id != null || none) && (group.purchases || group.refunded || group.paidBack))
     .sort((a, b) => (a[0] == null) - (b[0] == null) || net(b[1]) - net(a[1]))

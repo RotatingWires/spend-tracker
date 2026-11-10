@@ -1,5 +1,5 @@
 /* Transactions tab (the monthly ledger) and the shared transaction editor dialog. */
-import { $, TAG_SEPARATOR, api, applyTransactionChanges, centsToInput, collectionIdsOf, collectionName, describeTransaction, el, evenShares, fileStamp, formatAmount, formatDate, formatMoney, formatMonth, matchesSearch, methodName, monthOf, numberFormat, othersShare, parseMoney, parseTypedDate, peopleOf, personName, plural, purchaseRefundable, scopeNumbers, shareOf, shareRefundable, shareRemaining, state, tagIdsOf, tagName, timeFrameLabel, timeFrameTransactions, todayKey, typedDate, whoLabel, writeSetting } from './app.js';
+import { $, TAG_SEPARATOR, api, applyTransactionChanges, centsToInput, collectionIdsOf, collectionName, describeTransaction, el, evenShares, fileStamp, formatAmount, formatDate, formatMoney, formatMonth, matchesSearch, methodName, monthOf, numberFormat, othersShare, parseMoney, parseTypedDate, peopleOf, personName, plural, scopeNumbers, shareRefundable, shareRemaining, state, tagIdsOf, tagName, timeFrameLabel, timeFrameTransactions, todayKey, typedDate, whoLabel, writeSetting } from './app.js';
 import { bindSearchForm, confirmAction, createMultiSelect, createSingleSelect, moneyCell, renderTable, setStatus, sortByValue, tableSorts } from './widgets.js';
 import { calendarCollectionId, setCalendarCollectionId } from './calendar.js';
 import { merchantIdsOf } from './summaries.js';
@@ -371,7 +371,7 @@ export function initializeTransactionEditor() {
       onPayersChange();
     })
   });
-  editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
+  editor.linked = createSingleSelect($('#txLinked'), { searchOver: 0, onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), {
     empty: 'No tags',
     selectAll: true,
@@ -795,9 +795,10 @@ function onPayersChanged() {
 
 // ---- refunds and paybacks
 
+/** "#12 · 11/02/2026 · Diner — dinner · $40.00 · for Alex", so the search box finds a purchase by any of these. */
 function purchaseLabel(purchase) {
   const forWho = othersShare(purchase) > 0 ? ` · for ${whoLabel(purchase)}` : '';
-  return `${formatDate(purchase.date)} · ${describeTransaction(purchase) || '(no description)'} · ${formatMoney(purchase.amountCents)}${forWho}`;
+  return `#${purchase.id} · ${formatDate(purchase.date)} · ${describeTransaction(purchase) || '(no description)'} · ${formatMoney(purchase.amountCents)}${forWho}`;
 }
 
 function refreshLinkedOptions(preferredId = null, preferredPersonId = null) {
@@ -805,16 +806,17 @@ function refreshLinkedOptions(preferredId = null, preferredPersonId = null) {
   const selfId = editor.transaction?.id ?? null;
   const payers = kind === 'Payback' ? selectedPayers() : [];
   const wanted = preferredId ?? (editor.linked.value ? Number(editor.linked.value) : null);
+  // Any purchase can be chosen, paid off or not (the dropdown has a search box): a refund is checked against what is
+  // left when saved, and a payback can go past the share. A payback still needs every payer on the purchase, not as a gift.
   const candidates = state.model.transactions
     .filter(tx => tx.kind === 'Purchase')
-    .filter(tx => kind === 'Refund'
-      ? purchaseRefundable(tx, selfId) > 0 || tx.id === wanted
-      : payers.length > 0 && payers.every(payer => shareOf(tx, payer) > 0 && (shareRemaining(tx, payer, selfId) > 0 || tx.id === wanted)))
+    .filter(tx => kind === 'Refund' || tx.id === wanted
+      || (payers.length > 0 && payers.every(payer => tx.shares.some(share => share.personId === payer && !share.gift))))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
     .map(tx => ({ value: tx.id, label: purchaseLabel(tx) }));
 
   const options = kind === 'Payback' ? [{ value: '', label: 'Not linked to a purchase' }, ...candidates] : candidates;
-  if (kind === 'Refund' && candidates.length === 0) options.push({ value: '', label: 'No purchases left to refund' });
+  if (kind === 'Refund' && candidates.length === 0) options.push({ value: '', label: 'No purchases yet' });
   editor.linked.setOptions(options, wanted ?? '');
   if (kind === 'Refund') refreshRefundPerson(preferredPersonId);
   updateLinkedHint();

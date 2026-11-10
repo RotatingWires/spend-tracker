@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.2
+# SpendTracker v1.3.3
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -259,10 +259,10 @@ Double-click a row (or focus it and press Enter) to edit it; a single click does
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown with more than ten choices (merchants, tags, people, months, filters) starts with a search box that narrows the list as you type, and so does **Paid with**, however few payment methods there are; Enter picks the first match in a one-choice list. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it. On a touch screen it opens in place under its box instead, pushing the fields below it down, so it stays put while the phone's keyboard opens and the dialog scrolls. A dialog always opens scrolled to its top.
 
-- **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
+- **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Its list holds every purchase, with a search box: type a merchant, description, date, amount, or ID such as `#12`. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
 - **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person under **Share of the cost**, with a note on what it means: how much of the purchase was for that person (you paid it all; their shares are what they owe you unless **Gift** is checked, and what they pay you is recorded as a Payback), not how much they paid. **Split Evenly** and a running total sit under the boxes; Save refuses shares that do not add up to the amount.
 - **Refund / return** on a split purchase also asks **Whose share** it refunds.
-- **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid.
+- **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid. The list holds every purchase they are on (not as a gift), paid off or not, and has the same search box.
 - Every dropdown that lists your own items (**For who**, **Paid back by**, **Paid with**, **Merchant**, **Tags**, and **Collections**) ends with **Add New...**: it asks for a name, adds the item exactly as the Add form on its tab would, and chooses it in the editor.
 - **For who** shows a **Gift** box for everyone but you (see *Gifts* above); with several people it sits next to each amount box.
 - **Tags** is a dropdown of check items, so a purchase can have several. Tags are created, renamed, archived, and deleted only on the **Tags** tab.
@@ -284,7 +284,7 @@ The split button's main action is **Archive** (or **Restore** when every selecte
 | **Merchant...** | sets one merchant, chosen from a dropdown of your active merchants (**No merchant** clears it; merchants are added on the Merchants tab) | already has that merchant |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
 
-Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Skipped entries stay selected.
+Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Entries stay selected after an action, changed or skipped, so another action can follow; deleted entries leave the selection, and entries an action hides (archived, with Show Archived off) drop out of it.
 
 ### Calendar
 
@@ -371,7 +371,9 @@ Breakdown tables:
 - **Collections:** plus **No collection**, the same way as tags.
 - **Merchants:** grouped by merchant ID, so a renamed merchant keeps its whole history under its current name, plus *(no merchant)*.
 
-Refunds count under the tags, collections, and merchant of their purchase.
+Refunds count under the tags, collections, and merchant of their purchase. Each of the four has a bar chart over its table of the twelve with the most net spent; select a bar for that one's list of entries.
+
+- **Tags Over Time** and **Merchants Over Time:** net spent each month of the period for the six tags (or merchants) with the most, one line each. Select a month to open it on the Transactions tab.
 
 - **People Over Time:** each other person's balance (as on the People tab, following **Include gifts in Balance**) at the end of every month in the period, counting all earlier history too, as a line chart (up to eight people) and a table: the balance just before the period, at its end, the change, and the highest month-end balance. Select a row for the person's dialog.
 - **Merchant Loyalty:** for merchants with purchases in the period: visits, first and last visit, months of the period with a visit, the average days between visits on different days, days since your latest purchase there ever, spent, and average visit.
@@ -586,7 +588,14 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.3.2**.
+Current release: **v1.3.3**.
+
+### v1.3.3
+
+- Rows no longer shift a little when selected: a checked box's tick moved the row's baseline.
+- Entries stay selected after a bulk action, so another can follow (deleted entries, and ones an action hides, leave the selection).
+- Refunds and paybacks can link to any purchase, not only ones with money left, and the purchase list has a search box (merchant, description, date, amount, or `#ID`).
+- Stats > People & Places: bar charts over the People, Tags, Collections, and Merchants tables (select a bar for its list), and new Tags Over Time and Merchants Over Time line charts.
 
 ### v1.3.2
 

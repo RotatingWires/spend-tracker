@@ -3,12 +3,13 @@
  * and People & Places (breakdowns, balances over time, merchant loyalty, recurring purchases). Like the rest of
  * Stats, everything comes from recorded entries; recurring purchases are found from exact repeats only.
  */
-import { $, MONTH_NAMES, SCOPE_NAMES, addDays, dayNumber, daysInMonth, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthEnd, monthOf, numberFormat, pad2, percentFormat, plural, shiftMonth, shortMonth, state, todayKey, transactionsInRange } from './app.js';
+import { $, MONTH_NAMES, SCOPE_NAMES, addDays, dayNumber, daysInMonth, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthEnd, monthOf, numberFormat, pad2, percentFormat, plural, shiftMonth, shortMonth, state, tagIdsOf, todayKey, transactionsInRange } from './app.js';
 import { createSingleSelect, renderMetrics, renderTable } from './widgets.js';
 import { openTransactionEditor } from './transactions.js';
 import { dailyNet } from './calendar.js';
 import { openPersonDialog, outstandingText, personLedger } from './people.js';
 import { openScopeList } from './scopes.js';
+import { merchantIdsOf } from './summaries.js';
 import { Charts } from './charts.js';
 import { averageMoney, computeStats, drawTimeChart, openPeriodKey, periodRange, renderBreakdowns, renderMonthsTable, renderStatsChart, share, statsPeriodOptions } from './stats.js';
 
@@ -243,8 +244,42 @@ export function initializeCompare() {
 export function renderPlaces(stats) {
   renderBreakdowns(stats);
   renderBalancesOverTime(stats);
+  renderLabelTrend(stats, 'tag', tagIdsOf, $('#tagTrendChart'), $('#tagTrendKey'));
+  renderLabelTrend(stats, 'merchant', merchantIdsOf, $('#merchantTrendChart'), $('#merchantTrendKey'));
   renderLoyalty(stats);
   renderRecurring();
+}
+
+/**
+ * Net spent each month (purchases minus refunds, which count under their purchase's tags and merchant) for the six
+ * tags or merchants with the most in the period, one line each.
+ */
+function renderLabelTrend(stats, scope, idsOf, canvas, key) {
+  const months = stats.months.map(month => month.month);
+  const totals = new Map();
+  for (const tx of stats.transactions) {
+    if (tx.kind === 'Payback') continue;
+    const signed = tx.kind === 'Refund' ? -tx.amountCents : tx.amountCents;
+    const index = months.indexOf(monthOf(tx.date));
+    if (index < 0) continue;
+    for (const id of idsOf(tx)) {
+      if (!totals.has(id)) totals.set(id, Array(months.length).fill(0));
+      totals.get(id)[index] += signed;
+    }
+  }
+  const sum = values => values.reduce((total, value) => total + value, 0);
+  const top = [...totals].filter(([, values]) => sum(values) > 0).sort((a, b) => sum(b[1]) - sum(a[1])).slice(0, 6);
+  const money = value => formatMoney(Math.round(value));
+  const series = top.map(([id, values], index) => ({ label: SCOPE_NAMES[scope](id), color: index + 1, format: money, values }));
+  key.replaceChildren(...series.map(s => {
+    const item = el('span', 'chart-key-item');
+    item.append(el('span', `chart-swatch series-${s.color}`), s.label);
+    return item;
+  }));
+  canvas.closest('.chart-frame').hidden = series.length === 0;
+  key.hidden = series.length === 0;
+  if (series.length)
+    Charts.lines(canvas, { labels: months.map(shortMonth), titles: months.map(formatMonth), series, onSelect: index => openPeriodKey(months[index]) });
 }
 
 /** Each other person's balance at the end of every month in the period, counting all earlier history too. */

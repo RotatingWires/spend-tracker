@@ -430,6 +430,18 @@ class BrowserTests(unittest.TestCase):
         paybacks = [tx for tx in api.get("/api/snapshot")["transactions"] if tx["kind"] == "Payback" and tx["personId"] in new_people]
         self.assertEqual(sorted(tx["amountCents"] for tx in paybacks), [1250, 1250])
 
+        # Any purchase the payer is on can be linked, paid off or not, and the list has a search box (by #ID too).
+        page.click("#newTransactionButton")
+        self.pick(page, "#txKind", "Payback to me")
+        self.set_checks(page, "#txPayers", ["Dana"])
+        page.click("#txLinked .retro-select")
+        expect(page.locator("#txLinked .menu-search")).to_be_visible()
+        page.fill("#txLinked .menu-search input", f"#{purchase['id']}")
+        expect(page.locator("#txLinked .menu-list [role=menuitemradio]")).to_have_count(1)
+        expect(page.locator("#txLinked .menu-list [role=menuitemradio]")).to_contain_text("Groceries")
+        page.keyboard.press("Escape")
+        page.click("#txCancelButton")
+
     def test_phone_menus_open_in_place_and_dialogs_open_at_the_top(self):
         page = self.new_page(viewport={"width": 390, "height": 700}, has_touch=True)
         self.log_in(page)
@@ -734,17 +746,20 @@ class BrowserTests(unittest.TestCase):
             "merchantId": None, "description": "Venmo", "note": "", "tagIds": [], "shares": []})
         page.click("#fileMenuButton")
         page.click("#refreshButton")
-        for tx in (first, second, third):
-            page.click(f'#transactionsTable tr[data-id="{tx["id"]}"] .selection-check')
+        # Entries stay selected after an action (and a refresh), so the next action can follow straight away.
+        expect(page.locator("#selectedCount")).to_have_text("Selected: 3")
         page.click("#bulkActions .split-arrow")
         page.locator("#bulkActions .split-dropdown button", has_text="People...").click()
         self.pick(page, "#chooseMode", "Remove from the selected entries")
         self.set_checks(page, "#chooseMulti", ["Riley"])
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
-        expect(page.locator("#confirmMessage")).to_have_text("People: 2 entries changed, 1 skipped. Skipped entries stay selected.")
+        expect(page.locator("#confirmMessage")).to_have_text("People: 2 entries changed, 1 skipped. The entries stay selected.")
         expect(page.locator("#confirmDetail")).to_contain_text(f"#{third['id']}: Riley has linked refunds or paybacks on this purchase")
         page.click("#confirmOkButton")
+        expect(page.locator("#selectedCount")).to_have_text("Selected: 3")
+        for tx in (first, second):
+            page.click(f'#transactionsTable tr[data-id="{tx["id"]}"] .selection-check')
         expect(page.locator("#selectedCount")).to_have_text("Selected: 1")
 
         # The bulk dialogs can add a new item ("Add New..."), which is then checked.
@@ -760,7 +775,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("errands")
-        page.click(f'#transactionsTable tr[data-id="{third["id"]}"] .selection-check')  # changed entries are deselected
+        expect(page.locator("#selectedCount")).to_have_text("Selected: 1")  # the changed entry is still selected
 
         # Merchant... chooses from a dropdown of merchants, like tags and people; the list fits without scrolling the dialog.
         page.click("#bulkActions .split-arrow")
@@ -773,7 +788,6 @@ class BrowserTests(unittest.TestCase):
         page.click("#chooseOkButton")
         page.click("#confirmOkButton")
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("Bakery")
-        page.click(f'#transactionsTable tr[data-id="{third["id"]}"] .selection-check')
 
         # Archiving hides an entry from the ledger but it still counts in Stats.
         page.click("#bulkActions .split-primary")
@@ -1068,6 +1082,13 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#statsMerchantsTable")).not_to_contain_text("Returned desk")
         # Merchant loyalty: Market's three visits fall on three days, 9 and 21 days apart (15 on average).
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("Market3")
+        # Charts over the breakdowns, and the top merchants month by month; a merchant's bar opens its list.
+        expect(page.locator("#statsMerchantsChart")).to_be_visible()
+        expect(page.locator("#merchantTrendKey")).to_contain_text("Market")
+        merchant_chart = page.locator("#statsMerchantsChart")
+        merchant_chart.click(position={"x": 70 + 8, "y": merchant_chart.bounding_box()["height"] - 40})
+        expect(page.locator("#scopeDialogTitle")).to_contain_text("Merchant: ")
+        page.locator("#scopeDialog button", has_text="Close").click()
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("1 of 1")
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("15 days")
 

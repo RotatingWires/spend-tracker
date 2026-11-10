@@ -412,9 +412,6 @@ function linkedTotal(purchase, personId, excludingId, kind = null) {
   return total;
 }
 
-export function purchaseRefundable(purchase, excludingId = null) {
-  return purchase.shares.reduce((sum, share) => sum + shareRefundable(purchase, share.personId, excludingId), 0);
-}
 
 export function transactionsInRange(start, end) {
   return state.model.transactions.filter(tx => tx.date >= start && tx.date <= end);
