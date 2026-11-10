@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.45
+# SpendTracker v1.2.46
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -576,7 +576,14 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.45**.
+Current release: **v1.2.46**.
+
+### v1.2.46
+
+- Phones: a dropdown in a dialog (Merchant, Paid with, Tags, ...) opens in place under its box instead of floating, so it no longer jumps around while the keyboard opens for its search box.
+- A dialog opens scrolled to its top: a New Transaction after scrolling down in the last one no longer starts halfway down.
+- **Paid with** has a search box, however few payment methods there are.
+- Phones: the ledger's **What** and **Linked To** columns are wide enough to read, and the ledger stops at its edges instead of bouncing and being dragged around inside its frame.
 
 ### v1.2.45
 
