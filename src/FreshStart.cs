@@ -18,10 +18,14 @@ sealed partial class Store
           AND NOT EXISTS (SELECT 1 FROM transactions d WHERE d.linked_id = t.id AND d.archived = 0)
         """;
 
-    // "Me" and every used label stay. Payment methods are chosen separately so at least one active one remains.
+    // "Me" and every used label stay, and so do merchants with aliases, which automated entries still use.
+    // Payment methods are chosen separately so at least one active one remains.
     static readonly (string Table, string Entity, string Scope, string Unused)[] UnusedLabels =
     [
-        ("merchants", "Merchant", "merchant", "NOT EXISTS (SELECT 1 FROM transactions t WHERE t.merchant_id = merchants.id)"),
+        ("merchants", "Merchant", "merchant", """
+            NOT EXISTS (SELECT 1 FROM transactions t WHERE t.merchant_id = merchants.id)
+            AND NOT EXISTS (SELECT 1 FROM merchant_aliases a WHERE a.merchant_id = merchants.id)
+            """),
         ("tags", "Tag", "tag", "NOT EXISTS (SELECT 1 FROM transaction_tags l WHERE l.tag_id = tags.id)"),
         ("collections", "Collection", "collection", "NOT EXISTS (SELECT 1 FROM transaction_collections l WHERE l.collection_id = collections.id)"),
         ("people", "Person", "person", """

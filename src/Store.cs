@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
 /// <summary>A request the server refuses. The message is shown to the user, so it must say how to fix the problem.</summary>
@@ -14,16 +15,38 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed partial class Store
 {
-    public const int SchemaVersion = 7;
+    public const int SchemaVersion = 8;
 
     /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
-    public static readonly string[] Tables = ["payment_methods", "people", "tags", "merchants", "collections", "transactions", "transaction_shares", "transaction_tags", "transaction_collections", "scope_counters", "scope_numbers", "history"];
+    public static readonly string[] Tables = ["payment_methods", "people", "tags", "merchants", "merchant_aliases", "collections", "transactions", "transaction_shares", "transaction_tags", "transaction_collections", "scope_counters", "scope_numbers", "shortcut_entries", "history"];
+
+    /// <summary>The tables a database of this schema version holds: schemas 6 and 7 had no merchant aliases or Shortcut entries.</summary>
+    public static string[] TablesInSchema(int schemaVersion) =>
+        schemaVersion >= 8 ? Tables : [.. Tables.Except(["merchant_aliases", "shortcut_entries"])];
+
+    // Schema 8's tables, created by the same SQL in a new database and an upgraded one so both have the same layout.
+    const string Schema8Tables = """
+        -- Text an automated entry's merchant starts with, such as BURGER KING for "BURGER KING #1234" (see ResolveMerchant).
+        CREATE TABLE merchant_aliases (
+            alias TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
+            merchant_id INTEGER NOT NULL REFERENCES merchants(id) ON DELETE CASCADE
+        );
+        CREATE INDEX idx_merchant_aliases_merchant ON merchant_aliases(merchant_id);
+        -- Every iPhone Shortcut entry ID received, so sending a queue again never adds an entry twice.
+        CREATE TABLE shortcut_entries (
+            entry_id TEXT NOT NULL PRIMARY KEY,
+            transaction_id INTEGER NULL REFERENCES transactions(id) ON DELETE SET NULL,
+            received_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_shortcut_entries_transaction ON shortcut_entries(transaction_id);
+        """;
 
     const long MaxAmountCents = 1_000_000_000; // $10,000,000.00 — far above any real purchase, small enough to stay exact in JavaScript.
     const int MaxNameLength = 60;
     const int MaxMerchantLength = 120;
     const int MaxDescriptionLength = 500;
     const int MaxNoteLength = 2000;
+    const int MaxAliases = 50;
 
     static readonly string[] Kinds = ["Purchase", "Refund", "Payback"];
     static readonly JsonSerializerOptions HistoryJson = new(JsonSerializerDefaults.Web);
@@ -52,17 +75,15 @@ sealed partial class Store
         var version = Convert.ToInt32(Scalar(connection, null, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
         if (version > SchemaVersion)
             throw new InvalidOperationException($"spendtracker.db uses schema version {version}, but this SpendTracker build only understands version {SchemaVersion}. Update SpendTracker before opening this database.");
+        if (version is 6 or 7)
+        {
+            if (version == 6) UpgradeFromSchema6(connection);
+            UpgradeFromSchema7(connection);
+            version = SchemaVersion;
+        }
         if (version == SchemaVersion)
         {
             // Gives existing entries their numbers in any scope added to NumberedScopes since they were saved.
-            using var renumber = connection.BeginTransaction();
-            Renumber(connection, renumber, null);
-            renumber.Commit();
-            return journalMode;
-        }
-        if (version == 6)
-        {
-            UpgradeFromSchema6(connection);
             using var renumber = connection.BeginTransaction();
             Renumber(connection, renumber, null);
             renumber.Commit();
@@ -176,6 +197,7 @@ sealed partial class Store
                 after_json TEXT NULL
             );
             """);
+        Execute(connection, transaction, Schema8Tables);
 
         // Starter rows a new user can rename. "Me" is the one person who never owes anyone.
         var now = Now();
@@ -328,11 +350,25 @@ sealed partial class Store
 
     static List<Merchant> ReadMerchants(SqliteConnection connection, SqliteTransaction? transaction)
     {
+        var aliases = new Dictionary<long, List<string>>();
+        using (var aliasCommand = Sql(connection, transaction, "SELECT merchant_id, alias FROM merchant_aliases ORDER BY alias COLLATE NOCASE;"))
+        using (var aliasReader = aliasCommand.ExecuteReader())
+        {
+            while (aliasReader.Read())
+            {
+                var merchantId = aliasReader.GetInt64(0);
+                if (!aliases.TryGetValue(merchantId, out var list)) aliases[merchantId] = list = [];
+                list.Add(aliasReader.GetString(1));
+            }
+        }
         var merchants = new List<Merchant>();
         using var command = Sql(connection, transaction, "SELECT id, name, archived, created_at FROM merchants ORDER BY name COLLATE NOCASE, id;");
         using var reader = command.ExecuteReader();
         while (reader.Read())
-            merchants.Add(new Merchant(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2) != 0, reader.GetString(3)));
+        {
+            var id = reader.GetInt64(0);
+            merchants.Add(new Merchant(id, reader.GetString(1), reader.GetInt64(2) != 0, reader.GetString(3), aliases.GetValueOrDefault(id) ?? []));
+        }
         return merchants;
     }
 
@@ -461,7 +497,14 @@ sealed partial class Store
     {
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
+        var saved = SaveTransaction(connection, transaction, id, request);
+        transaction.Commit();
+        return saved;
+    }
 
+    /// <summary>Validates and saves one transaction with its history inside the caller's database transaction, which the caller commits.</summary>
+    static SpendTransaction SaveTransaction(SqliteConnection connection, SqliteTransaction transaction, long? id, TransactionRequest request)
+    {
         SpendTransaction? before = null;
         if (id is not null)
             before = ReadTransactions(connection, transaction, id).SingleOrDefault() ?? throw RequestException.NotFound("Transaction not found.");
@@ -509,7 +552,6 @@ sealed partial class Store
 
         var after = ReadTransactions(connection, transaction, savedId).Single();
         RecordHistory(connection, transaction, before is null ? "Created" : "Edited", "Transaction", savedId, before, after);
-        transaction.Commit();
         return after;
     }
 
@@ -649,6 +691,15 @@ sealed partial class Store
         if (Scalar(connection, transaction, "PRAGMA foreign_key_check;") is not null)
             throw new InvalidOperationException("Upgrading spendtracker.db to schema 7 found shares linked to missing rows; nothing was changed.");
         Execute(connection, transaction, "PRAGMA user_version = 7;");
+        transaction.Commit();
+    }
+
+    /// <summary>Schema 8 adds merchant aliases and the record of Shortcut entries received; existing tables are unchanged.</summary>
+    static void UpgradeFromSchema7(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        Execute(connection, transaction, Schema8Tables);
+        Execute(connection, transaction, "PRAGMA user_version = 8;");
         transaction.Commit();
     }
 
@@ -949,6 +1000,45 @@ sealed partial class Store
         return after;
     }
 
+    /// <summary>
+    /// Replaces a merchant's aliases: text that automated entries' merchant names start with, such as BURGER KING for
+    /// "BURGER KING #1234". Each alias belongs to one merchant; spaces are trimmed and runs of spaces become one.
+    /// </summary>
+    public Merchant SetMerchantAliases(long id, AliasesRequest request)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        var before = ReadMerchants(connection, transaction).SingleOrDefault(m => m.Id == id) ?? throw RequestException.NotFound("Merchant not found.");
+        var aliases = new List<string>();
+        foreach (var requested in request.Aliases ?? throw RequestException.Invalid("Aliases are required; send [] for none."))
+        {
+            var alias = NormalizeMerchantText(RequireName(requested, "An alias", MaxMerchantLength));
+            if (aliases.Contains(alias, StringComparer.OrdinalIgnoreCase)) continue;
+            var owner = Scalar(connection, transaction,
+                "SELECT m.name FROM merchant_aliases a JOIN merchants m ON m.id = a.merchant_id WHERE a.alias = $alias AND a.merchant_id <> $id;",
+                ("$alias", alias), ("$id", id));
+            if (owner is not null) throw RequestException.Invalid($"{alias} is already an alias of {owner}.");
+            aliases.Add(alias);
+        }
+        if (aliases.Count > MaxAliases) throw RequestException.Invalid($"A merchant can have at most {MaxAliases} aliases.");
+        aliases.Sort(StringComparer.OrdinalIgnoreCase);
+        if (aliases.SequenceEqual(before.Aliases)) return before;
+
+        Execute(connection, transaction, "DELETE FROM merchant_aliases WHERE merchant_id = $id;", ("$id", id));
+        foreach (var alias in aliases)
+            Execute(connection, transaction, "INSERT INTO merchant_aliases (alias, merchant_id) VALUES ($alias, $id);", ("$alias", alias), ("$id", id));
+        var after = ReadMerchants(connection, transaction).Single(m => m.Id == id);
+        RecordHistory(connection, transaction, "Edited", "Merchant", id, before, after);
+        transaction.Commit();
+        return after;
+    }
+
+    /// <summary>Trimmed, with each run of spaces made one, so "BURGER  KING #12" matches the alias "BURGER KING".</summary>
+    static string NormalizeMerchantText(string value) => WhitespaceRun().Replace(value.Trim(), " ");
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRun();
+
     public void DeleteMerchant(long id)
     {
         using var connection = Open();
@@ -974,8 +1064,9 @@ sealed partial class Store
         Execute(destination, null, "PRAGMA journal_mode=DELETE;"); // One self-contained file with no -wal sidecar.
     }
 
-    public static Dictionary<string, long> CountRows(SqliteConnection connection) =>
-        Tables.ToDictionary(table => table, table => Convert.ToInt64(Scalar(connection, null, $"SELECT COUNT(*) FROM {table};"), CultureInfo.InvariantCulture));
+    /// <summary>Rows per table, for the tables of <paramref name="schemaVersion"/>; a backup's manifest records the same counts.</summary>
+    public static Dictionary<string, long> CountRows(SqliteConnection connection, int schemaVersion = SchemaVersion) =>
+        TablesInSchema(schemaVersion).ToDictionary(table => table, table => Convert.ToInt64(Scalar(connection, null, $"SELECT COUNT(*) FROM {table};"), CultureInfo.InvariantCulture));
 
     /// <summary>Column definitions of a table, used to require that a backup has exactly the live layout.</summary>
     public static List<string> TableLayout(SqliteConnection connection, string table)
@@ -994,9 +1085,10 @@ sealed partial class Store
     /// <summary>
     /// Replaces all data with the rows of an already verified backup database. Rows keep their IDs so links survive.
     /// Everything runs in one transaction and is checked before commit, so a backup that breaks any rule leaves the
-    /// current data untouched. Only rows are copied; the backup's own schema, triggers, and views are never used.
+    /// current data untouched. Only rows are copied; the backup's own schema, triggers, and views are never used. A backup
+    /// from an older schema leaves the tables it does not have empty.
     /// </summary>
-    public void ReplaceAllData(string importedPath, object restoreDetails)
+    public void ReplaceAllData(string importedPath, int schemaVersion, object restoreDetails)
     {
         using var imported = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = importedPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         imported.Open();
@@ -1010,7 +1102,7 @@ sealed partial class Store
 
         try
         {
-            foreach (var table in Tables)
+            foreach (var table in TablesInSchema(schemaVersion))
                 CopyRows(imported, connection, transaction, table);
         }
         catch (SqliteException error) when (error.SqliteErrorCode is 19 or 20) // SQLITE_CONSTRAINT or SQLITE_MISMATCH
@@ -1062,6 +1154,20 @@ sealed partial class Store
         var badMerchant = Scalar(connection, transaction,
             $"SELECT id FROM merchants WHERE typeof(name) <> 'text' OR length(trim(name)) = 0 OR length(name) > {MaxMerchantLength} OR name <> trim(name) LIMIT 1;");
         if (badMerchant is not null) throw RequestException.Invalid($"The backup has an invalid merchant name (#{badMerchant}).");
+        var badAlias = Scalar(connection, transaction, $"""
+            SELECT merchant_id FROM merchant_aliases
+            WHERE typeof(alias) <> 'text' OR length(alias) = 0 OR length(alias) > {MaxMerchantLength} OR alias <> trim(alias) OR alias LIKE '%  %'
+               OR typeof(merchant_id) <> 'integer'
+            LIMIT 1;
+            """);
+        if (badAlias is not null) throw RequestException.Invalid($"The backup has an invalid alias for merchant #{badAlias}.");
+        var badShortcutEntry = Scalar(connection, transaction, $"""
+            SELECT entry_id FROM shortcut_entries
+            WHERE typeof(entry_id) <> 'text' OR length(entry_id) NOT BETWEEN {MinShortcutIdLength} AND {MaxShortcutIdLength}
+               OR typeof(transaction_id) NOT IN ('integer', 'null') OR typeof(received_at) <> 'text'
+            LIMIT 1;
+            """);
+        if (badShortcutEntry is not null) throw RequestException.Invalid("The backup has an invalid record of a received Shortcut entry.");
 
         var badTransaction = Scalar(connection, transaction, $"""
             SELECT id FROM transactions
@@ -1291,7 +1397,7 @@ record Person(long Id, string Name, bool IsSelf, bool Archived, string CreatedAt
 record Label(long Id, string Name, bool Archived, string CreatedAt);
 /// <summary>Where a label kind is stored: its table, the link table to transactions, and the names used in messages and history.</summary>
 record LabelKind(string Table, string LinkTable, string LinkColumn, string Entity, string Scope, string Noun);
-record Merchant(long Id, string Name, bool Archived, string CreatedAt);
+record Merchant(long Id, string Name, bool Archived, string CreatedAt, List<string> Aliases);
 /// <summary>A transaction's number inside one scope, such as ("person", 3, 12): the 12th entry for person #3.</summary>
 record ScopeNumber(string Scope, long ScopeId, long Number);
 /// <summary>One person's part of a purchase. A gift share is not owed back and stays off their balance.</summary>
@@ -1313,3 +1419,4 @@ record FreshStartSummary(long ArchivedEntries, long AllArchivedEntries, long Ent
 record FreshStartResult(long RemovedEntries, long KeptArchivedEntries, long RemovedLabels, long RemovedHistory);
 record NameRequest(string? Name);
 record UpdateNameRequest(string? Name, bool? Archived);
+record AliasesRequest(List<string>? Aliases);

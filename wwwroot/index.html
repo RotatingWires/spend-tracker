@@ -33,6 +33,7 @@
             <button type="button" id="selectModeButton" role="menuitemcheckbox" aria-checked="false"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Select...</span></button>
             <div class="menu-separator" role="separator"></div>
             <button type="button" id="transferMenuItem" role="menuitem"><span></span><span class="menu-label">Import/Export...</span></button>
+            <button type="button" id="shortcutMenuItem" role="menuitem"><span></span><span class="menu-label">iPhone Shortcut...</span></button>
             <div class="menu-separator" role="separator"></div>
             <button type="button" id="highlightRowsButton" role="menuitemcheckbox" aria-checked="true"><span class="menu-check" aria-hidden="true"></span><span class="menu-label">Highlight rows on hover</span></button>
             <div class="menu-separator" role="separator"></div>
@@ -385,6 +386,35 @@
     </form>
   </dialog>
 
+  <dialog id="shortcutDialog" class="retro-dialog transfer-dialog" aria-labelledby="shortcutTitle">
+    <form method="dialog" class="dialog-window">
+      <div class="dialog-title" id="shortcutTitle">iPhone Shortcut</div>
+      <div class="dialog-body transfer-body">
+        <p>An iPhone Shortcut can add purchases for you: a Wallet automation each time you pay with Apple Pay, or a Shortcut you run to add one quickly. It saves each entry on the phone first and sends every one not yet saved here, so an entry made away from your network or VPN goes through on a later run. MANUAL.md, under <strong>iPhone Shortcut</strong>, shows how to build it.</p>
+        <p>The Shortcut sends to <code id="shortcutAddress"></code></p>
+        <p id="shortcutStatus"></p>
+        <label for="shortcutKey" class="shortcut-key" id="shortcutKeyBox" hidden>New key, shown only this once: paste it into the Shortcut
+          <span class="shortcut-key-row"><input id="shortcutKey" class="retro-input" type="text" readonly spellcheck="false" autocomplete="off"><button type="button" id="shortcutCopyButton">Copy</button></span>
+        </label>
+        <div class="shortcut-actions"><button type="button" id="shortcutCreateButton">Create Key</button><button type="button" id="shortcutOffButton">Turn Off</button></div>
+      </div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" data-close="shortcutDialog">OK</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="aliasesDialog" class="retro-dialog" aria-labelledby="aliasesTitle">
+    <form method="dialog" class="dialog-window" id="aliasesForm">
+      <div class="dialog-title" id="aliasesTitle">Aliases</div>
+      <div class="dialog-body aliases-body">
+        <p>Entries from the iPhone Shortcut get this merchant when their merchant name is this merchant's name, or starts with one of these aliases as whole words: <strong>BURGER KING</strong> matches "BURGER KING #1234" but not "BURGER KINGDOM". Case does not matter.</p>
+        <label for="aliasesInput">One alias per line</label>
+        <textarea id="aliasesInput" class="retro-input" rows="6" spellcheck="false" autocomplete="off"></textarea>
+        <div id="aliasesError" class="form-error" role="alert" aria-live="polite"></div>
+      </div>
+      <div class="dialog-buttons"><span class="spacer"></span><button type="button" value="cancel" data-close="aliasesDialog">Cancel</button><button type="submit" id="aliasesSaveButton">Save</button></div>
+    </form>
+  </dialog>
+
   <dialog id="freshStartDialog" class="fresh-start-dialog" aria-labelledby="freshStartTitle">
     <form method="dialog" class="fresh-start-layout">
       <div class="fresh-start-heading"><h2 id="freshStartTitle">Fresh Start</h2></div>
@@ -393,7 +423,7 @@
         <fieldset class="fresh-start-options"><legend>Choose what to clear</legend>
           <label><input type="checkbox" class="retro-check" data-fresh-start="archivedEntries"> <span><strong>Archived entries</strong> <span data-fresh-count="archivedEntries"></span><br>Archived entries still count in totals and balances, so those change. An archived purchase stays while an active refund or payback links to it.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="allEntries"> <span><strong>Every entry</strong> <span data-fresh-count="allEntries"></span><br>All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay unless you also clear unused labels.</span></label>
-          <label><input type="checkbox" class="retro-check" data-fresh-start="unusedLabels"> <span><strong>Unused labels</strong> <span data-fresh-count="unusedLabels"></span><br>Merchants, tags, collections, people, and payment methods no remaining entry uses. Me and one active payment method always stay.</span></label>
+          <label><input type="checkbox" class="retro-check" data-fresh-start="unusedLabels"> <span><strong>Unused labels</strong> <span data-fresh-count="unusedLabels"></span><br>Merchants, tags, collections, people, and payment methods no remaining entry uses. Me, one active payment method, and merchants with aliases always stay.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="allLabels"> <span><strong>Every label, used ones too</strong> <span data-fresh-count="allLabels"></span><br>All merchants, tags, collections, people but Me, and payment methods, so IDs and entry numbers start again at 1 and the payment methods are back to Cash, Credit Card, and Debit Card. Only together with every entry.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="history" checked> <span><strong>Change history</strong> <span data-fresh-count="history"></span><br>Every saved add, edit, delete, and restore on the History tab, with its before and after values.</span></label>
           <label><input type="checkbox" class="retro-check" data-fresh-start="recoveryBackups" checked> <span><strong>Pre-restore recovery backups</strong> <span data-fresh-count="recoveryBackups"></span><br>ZIPs the server saved in data/backups before each restore.</span></label>
@@ -412,7 +442,7 @@
       <div class="dialog-body">
         <p>A self-hosted spending tracker. Every number comes from entries you recorded; nothing is guessed or categorized for you.</p>
         <p>Record <strong>purchases</strong> (split between people, or as gifts), <strong>refunds</strong> linked to the purchase they return, and <strong>paybacks</strong> from people who owe you. Paybacks never change net spent. Tags, collections, and merchants are labels you add on their tabs; Stats breaks spending down by them.</p>
-        <p><strong>Tips:</strong> click a row to edit it, and use File > Select... to change several at once. File > Import/Export... backs up everything but your password. MANUAL.md has the full guide.</p>
+        <p><strong>Tips:</strong> click a row to edit it, and use File > Select... to change several at once. File > Import/Export... backs up everything but your password. File > iPhone Shortcut... lets an iPhone add purchases. MANUAL.md has the full guide.</p>
         <div>about.lehighradio.com<br><span id="aboutVersion">SpendTracker</span></div>
       </div>
       <div class="dialog-buttons"><button type="button" data-close="aboutDialog">OK</button></div>
@@ -431,6 +461,7 @@
   <script type="module" src="/bulk.js"></script>
   <script type="module" src="/scopes.js"></script>
   <script type="module" src="/fresh-start.js"></script>
+  <script type="module" src="/shortcut.js"></script>
   <script type="module" src="/ui.js"></script>
 </body>
 </html>

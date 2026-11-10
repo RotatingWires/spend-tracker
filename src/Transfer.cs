@@ -72,7 +72,7 @@ static class Transfer
             var transactions = manifest.Totals["transactions"];
             try
             {
-                store.ReplaceAllData(databasePath, new
+                store.ReplaceAllData(databasePath, manifest.SchemaVersion, new
                 {
                     AppVersion = manifest.ApplicationVersion,
                     manifest.ExportedAt,
@@ -122,8 +122,9 @@ static class Transfer
                     throw RequestException.Invalid("This is not a SpendTracker backup.");
                 if (!Version.TryParse(manifest.ApplicationVersion, out var backupVersion) || backupVersion > Version.Parse(version) || manifest.SchemaVersion > Store.SchemaVersion)
                     throw RequestException.Invalid("This backup was made by a newer SpendTracker version. Update SpendTracker first.");
-                // Schema 6 backups restore too: they hold the same tables and columns, without $0.00 shares.
-                if (manifest.SchemaVersion is not (6 or Store.SchemaVersion))
+                // Schema 6 and 7 backups restore too: the same tables and columns without merchant aliases and received
+                // Shortcut entries, and schema 6 without $0.00 shares.
+                if (manifest.SchemaVersion is not (6 or 7 or Store.SchemaVersion))
                     throw RequestException.Invalid($"This backup uses database schema {manifest.SchemaVersion}, which this version cannot restore.");
 
                 using var source = archive.GetEntry(databaseEntry)!.Open();
@@ -142,9 +143,9 @@ static class Transfer
                 throw RequestException.Invalid("The backup database has links to missing rows.");
             if (Convert.ToInt64(Scalar(imported, "PRAGMA user_version;"), CultureInfo.InvariantCulture) != manifest.SchemaVersion)
                 throw RequestException.Invalid("The backup database schema does not match its manifest.");
-            VerifySchema(store, imported);
+            VerifySchema(store, imported, manifest.SchemaVersion);
 
-            var totals = Store.CountRows(imported);
+            var totals = Store.CountRows(imported, manifest.SchemaVersion);
             if (manifest.Totals.Count != totals.Count || totals.Any(pair => !manifest.Totals.TryGetValue(pair.Key, out var count) || count != pair.Value))
                 throw RequestException.Invalid("The backup's row counts do not match its manifest.");
             return (databasePath, manifest);
@@ -155,8 +156,8 @@ static class Transfer
         }
     }
 
-    /// <summary>The backup must hold exactly the live tables and columns, and nothing that could run code.</summary>
-    static void VerifySchema(Store store, SqliteConnection imported)
+    /// <summary>The backup must hold exactly the live tables and columns of its schema version, and nothing that could run code.</summary>
+    static void VerifySchema(Store store, SqliteConnection imported, int schemaVersion)
     {
         var tables = new HashSet<string>();
         using (var command = imported.CreateCommand())
@@ -171,12 +172,13 @@ static class Transfer
                 if (type == "table") tables.Add(reader.GetString(1));
             }
         }
-        if (!tables.SetEquals(Store.Tables))
+        var expected = Store.TablesInSchema(schemaVersion);
+        if (!tables.SetEquals(expected))
             throw RequestException.Invalid("The backup's tables do not match this version of SpendTracker.");
 
         // The live database was created or upgraded by this build at startup, so its layout is the expected one.
         using var live = OpenReadOnly(store.DatabasePath);
-        foreach (var table in Store.Tables)
+        foreach (var table in expected)
         {
             if (!Store.TableLayout(live, table).SequenceEqual(Store.TableLayout(imported, table)))
                 throw RequestException.Invalid($"The backup's {table} table does not match this version of SpendTracker.");

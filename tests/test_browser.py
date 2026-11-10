@@ -205,6 +205,68 @@ class BrowserTests(unittest.TestCase):
         self.shot(page, "fresh-start-dialog-phone")
         page.keyboard.press("Escape")
 
+    def test_merchant_aliases_and_iphone_shortcut_dialogs(self):
+        # Its own merchants, deleted at the end, so the other tests' lists and totals are unchanged.
+        api = self.api_client()
+        merchant = api.post("/api/merchants", {"name": "Alias check"})["id"]
+        owner = api.post("/api/merchants", {"name": "Alias owner"})["id"]
+        api.put(f"/api/merchants/{owner}/aliases", {"aliases": ["TAKEN"]})
+        self.addCleanup(lambda: [api.delete(f"/api/merchants/{m}") for m in (merchant, owner)])
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+
+        # A merchant's dialog has Aliases...: one per line, Cancel then Save; a refused list keeps the dialog open.
+        page.click('.tabs [data-tab="merchants"]')
+        page.locator("#merchantsTable tbody tr", has_text="Alias check").click()
+        expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Aliases...", "Archive", "Delete"])
+        page.locator("#scopeActions button", has_text="Aliases...").click()
+        dialog = page.locator("#aliasesDialog")
+        expect(page.locator("#aliasesTitle")).to_have_text("Aliases of Alias check")
+        expect(dialog.locator(".dialog-buttons button")).to_have_text(["Cancel", "Save"])
+        page.fill("#aliasesInput", "taken")
+        page.click("#aliasesSaveButton")
+        expect(page.locator("#aliasesError")).to_have_text("taken is already an alias of Alias owner.")
+        expect(dialog).to_be_visible()
+        page.fill("#aliasesInput", "  BURGER   KING \n\nWhopper Bar")
+        self.shot(page, "merchant-aliases")
+        page.click("#aliasesSaveButton")
+        expect(dialog).not_to_be_visible()
+        expect(page.locator("#scopeSummary")).to_have_text("Aliases: BURGER KING, Whopper Bar. ")
+        expect(page.locator("#statusLeft")).to_have_text("Alias check has 2 aliases.")
+        page.locator("#scopeDialog button", has_text="Close").click()
+        page.click('.tabs [data-tab="history"]')
+        expect(page.locator("#historyTable tbody tr").first).to_contain_text("Aliases: — → BURGER KING, Whopper Bar")
+
+        # File > iPhone Shortcut... creates a key shown once, asks before replacing it, and turns the Shortcut off.
+        page.click("#fileMenuButton")
+        page.click("#shortcutMenuItem")
+        shortcut = page.locator("#shortcutDialog")
+        expect(page.locator("#shortcutAddress")).to_have_text(self.server.url + "/api/shortcut/entries")
+        expect(page.locator("#shortcutStatus")).to_have_text(re.compile("^Off"))
+        expect(page.locator("#shortcutOffButton")).to_be_hidden()
+        expect(page.locator("#shortcutKeyBox")).to_be_hidden()
+        page.click("#shortcutCreateButton")
+        expect(page.locator("#shortcutKey")).to_have_value(re.compile(r"^stk_[A-Za-z0-9_-]{43}$"))
+        expect(page.locator("#shortcutStatus")).to_have_text(re.compile("^On, with a key created"))
+        key = page.locator("#shortcutKey").input_value()
+        self.shot(page, "iphone-shortcut")
+        page.click("#shortcutCreateButton")
+        expect(page.locator("#confirmDialog .dialog-buttons button:visible")).to_have_text(["Cancel", "Replace Key"])
+        page.click("#confirmCancelButton")
+        expect(page.locator("#shortcutKey")).to_have_value(key)
+        page.click("#shortcutOffButton")
+        page.click("#confirmOkButton")
+        expect(page.locator("#shortcutStatus")).to_have_text(re.compile("^Off"))
+        expect(page.locator("#shortcutKeyBox")).to_be_hidden()
+        self.assertEqual(api.get("/api/shortcut"), {"keyCreatedAt": None})
+
+        page.set_viewport_size({"width": 390, "height": 760})
+        box = shortcut.bounding_box()
+        self.assertLessEqual(box["x"] + box["width"], 390)
+        self.assertEqual(page.evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling at phone width")
+        shortcut.locator("button", has_text="OK").click()
+        expect(shortcut).not_to_be_visible()
+
     def test_full_workflow_in_both_themes_and_phone_width(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
@@ -887,11 +949,11 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#peopleTable button")).to_have_count(0)
         page.locator("#personDialog button", has_text="Close").click()
         page.click('.tabs [data-tab="merchants"]')
-        # Merchant rows have no buttons; Rename, Archive, and Delete are in the dialog a row opens.
+        # Merchant rows have no buttons; Rename, Aliases, Archive, and Delete are in the dialog a row opens.
         expect(page.locator("#merchantsTable button", has_text="Rename")).to_have_count(0)
         page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
-        expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
+        expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Aliases...", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Rename").click()
         page.fill("#promptInput", "Bakery & Cafe")
         page.keyboard.press("Enter")

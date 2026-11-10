@@ -6,6 +6,8 @@ import json
 import sqlite3
 import tempfile
 import unittest
+import urllib.error
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -291,6 +293,176 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual(self.history()[0]["before"]["removedFromTransactions"], 1)
         self.assertRejected(lambda: self.api.delete(f"/api/collections/{trip}"), 404)
 
+    # ------------------------------------------------------------ merchant aliases and the iPhone Shortcut
+
+    def shortcut(self, lines, key):
+        """POSTs queue lines (dicts become JSON lines) as the Shortcut does; returns (status, reply)."""
+        body = "\n".join(json.dumps(line) if isinstance(line, dict) else line for line in lines).encode()
+        request = urllib.request.Request(self.server.url + "/api/shortcut/entries", data=body, method="POST")
+        if key:
+            request.add_header("Authorization", f"Bearer {key}")
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            with error:
+                return error.code, json.loads(error.read())
+
+    @staticmethod
+    def entry(entry_id, amount="$12.34", merchant="BURGER KING #1234", method="Credit Card", **extra):
+        return {"id": entry_id, "date": "2026-11-10", "amount": amount, "merchant": merchant, "paymentMethod": method, **extra}
+
+    def test_merchant_aliases(self):
+        bk = self.merchant_id("BK")
+        saved = self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["  burger   king ", "BURGER KING", "Whopper Bar"]})
+        self.assertEqual(saved["aliases"], ["burger king", "Whopper Bar"], "trimmed, spaces collapsed, duplicates ignoring case dropped")
+        self.assertEqual(next(m for m in self.api.get("/api/snapshot")["merchants"] if m["id"] == bk)["aliases"], ["burger king", "Whopper Bar"])
+        edit = self.history()[0]
+        self.assertEqual((edit["action"], edit["entity"], edit["before"]["aliases"], edit["after"]["aliases"]), ("Edited", "Merchant", [], ["burger king", "Whopper Bar"]))
+
+        other = self.merchant_id("Other")
+        self.assertRejected(lambda: self.api.put(f"/api/merchants/{other}/aliases", {"aliases": ["Burger King"]}), contains="already an alias of BK")
+        self.assertRejected(lambda: self.api.put(f"/api/merchants/{other}/aliases", {"aliases": [" "]}), contains="required")
+        self.assertRejected(lambda: self.api.put(f"/api/merchants/{other}/aliases", {"aliases": ["x" * 121]}), contains="120")
+        self.assertRejected(lambda: self.api.put(f"/api/merchants/{other}/aliases", {}), contains="Aliases are required")
+        self.assertRejected(lambda: self.api.put("/api/merchants/999/aliases", {"aliases": []}), 404)
+        history = len(self.history())
+        self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["Whopper Bar", "burger king"]})
+        self.assertEqual(len(self.history()), history, "an unchanged list records no history")
+
+        # A merchant with aliases is still in use, so Fresh start's unused labels keep it; deleting it removes its aliases.
+        self.fresh_start(unusedLabels=True)
+        self.assertEqual([m["name"] for m in self.api.get("/api/snapshot")["merchants"]], ["BK"])
+        self.api.delete(f"/api/merchants/{bk}")
+        self.api.put(f"/api/merchants/{self.merchant_id('New')}/aliases", {"aliases": ["Burger King"]})
+
+    def test_shortcut_key_is_needed_and_can_be_replaced_or_turned_off(self):
+        self.assertEqual(self.api.get("/api/shortcut"), {"keyCreatedAt": None})
+        status, reply = self.shortcut([self.entry("2026-11-10-a")], None)
+        self.assertEqual(status, 401)
+        self.assertIn("File > iPhone Shortcut", reply["error"])
+
+        first = self.api.post("/api/shortcut/key")
+        self.assertTrue(first["key"].startswith("stk_"))
+        self.assertEqual(self.api.get("/api/shortcut")["keyCreatedAt"], first["keyCreatedAt"])
+        self.assertNotIn(first["key"], (self.server.data_dir / "shortcut-key.json").read_text(), "only the key's hash is saved")
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-a")], first["key"] + "x")[0], 401)
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-a")], first["key"])[0], 200)
+
+        second = self.api.post("/api/shortcut/key")
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-b")], first["key"])[0], 401, "a replaced key stops working")
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-b")], second["key"])[0], 200)
+
+        # The key cannot be used for anything else, and the key's own endpoints need a session.
+        for path in ("/api/shortcut", "/api/snapshot"):
+            request = urllib.request.Request(self.server.url + path, headers={"Authorization": f"Bearer {second['key']}"})
+            with self.assertRaises(urllib.error.HTTPError) as context:
+                urllib.request.urlopen(request, timeout=10)
+            with context.exception as error:
+                self.assertEqual(error.code, 401)
+        self.assertRejected(lambda: self.server.client().post("/api/shortcut/key"), 401)
+
+        self.api.delete("/api/shortcut/key")
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-c")], second["key"])[0], 401)
+        self.assertEqual(self.api.get("/api/shortcut"), {"keyCreatedAt": None})
+
+    def test_shortcut_entries_use_aliases_and_are_saved_once(self):
+        key = self.api.post("/api/shortcut/key")["key"]
+        bk = self.merchant_id("BK")
+        self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["BURGER KING"]})
+        shop = self.merchant_id("Corner Shop")
+        lines = [
+            self.entry("2026-11-10-1"),                                                        # alias, Wallet's "$12.34"
+            self.entry("2026-11-10-2", amount=4.5, merchant="corner shop", method="cash"),     # exact name in any case; a number
+            self.entry("2026-11-10-3", amount="1,234.56", merchant="BURGER KINGDOM", description="Lunch"),  # whole words only
+            self.entry("2026-11-10-4", merchant=None, description="Parking", note="meter"),    # quick add without a merchant
+            "",                                                                                # blank lines are skipped
+            self.entry("2026-11-10-5", method="Apple Card"),                                   # unknown payment method
+            self.entry("2026-11-10-6", amount="12.345"),
+            self.entry("2026-11-10-7", amount="-3"),
+            self.entry("short"),
+            {"id": "2026-11-10-8", "date": "2026-02-30", "amount": 1, "paymentMethod": "Cash", "description": "x"},
+            {"id": "2026-11-10-9", "date": "2026-11-10", "amount": 1, "paymentMethod": "Cash", "description": "x", "color": "red"},
+            self.entry("2026-11-10-1"),                                                        # repeated in the same queue
+            json.dumps(self.entry("2026-11-10-11", amount="2.00", merchant="Corner Shop", method="Cash"), indent=2),  # spread over lines
+            "5",
+            "{not json",                                                                       # a damaged queue: reading stops here
+        ]
+        status, reply = self.shortcut(lines, key)
+        self.assertEqual(status, 200, reply)
+        self.assertEqual((reply["saved"], reply["duplicates"]), (5, 1))
+        rejected = {r["entry"]: r["error"] for r in reply["rejected"]}
+        self.assertEqual(sorted(rejected), [5, 6, 7, 8, 9, 10, 13, 14])
+        self.assertIn("BURGER KING #1234, $12.34, 2026-11-10: No active payment method is named Apple Card", rejected[5])
+        self.assertIn("not a dollar amount", rejected[6])
+        self.assertIn("not a dollar amount", rejected[7])
+        self.assertIn("id must be", rejected[8])
+        self.assertIn("real date", rejected[9])
+        self.assertIn("Entry 10 is not a valid entry", rejected[10])
+        self.assertIn("Entry 13 is not a valid entry", rejected[13])
+        self.assertIn("Entry 14 and anything after it could not be read", rejected[14])
+        self.assertTrue(reply["message"].startswith("Saved 5 entries. 1 was already saved. Not saved, add them by hand: BURGER KING #1234"), reply["message"])
+
+        saved = sorted(self.api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])
+        self.assertEqual([(tx["merchantId"], tx["description"], tx["amountCents"], tx["paymentMethodId"]) for tx in saved],
+                         [(bk, "", 1234, self.card), (shop, "", 450, self.cash), (None, "Lunch (BURGER KINGDOM)", 123456, self.card),
+                          (None, "Parking", 1234, self.card), (shop, "", 200, self.cash)])
+        for tx in saved:
+            self.assertEqual((tx["kind"], tx["date"], tx["shares"]), ("Purchase", "2026-11-10", [{"personId": self.me, "amountCents": tx["amountCents"], "gift": False}]))
+        self.assertEqual(saved[3]["note"], "meter")
+        self.assertEqual(sum(entry["action"] == "Created" and entry["entity"] == "Transaction" for entry in self.history()), 5)
+
+        # The phone sends its whole queue again when a reply is lost: nothing is added twice, even after a delete.
+        self.api.delete(f"/api/transactions/{saved[0]['id']}")
+        status, reply = self.shortcut(lines[:4], key)
+        self.assertEqual((status, reply["saved"], reply["duplicates"], reply["message"]), (200, 0, 4, "Saved 0 entries. 4 were already saved."))
+        self.assertEqual(len(self.api.get("/api/snapshot")["transactions"]), 4)
+
+        # An archived merchant is not matched, so its text goes in the description instead.
+        self.api.patch(f"/api/merchants/{bk}", {"archived": True})
+        self.shortcut([self.entry("2026-11-10-10")], key)
+        self.assertEqual(max(self.api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])["description"], "BURGER KING #1234")
+
+        for body, message in ((["", " "], "at least one entry"), ([self.entry(f"2026-11-10-n{i}") for i in range(501)], "at most 500")):
+            status, reply = self.shortcut(body, key)
+            self.assertEqual(status, 400)
+            self.assertIn(message, reply["error"])
+
+    def test_schema_7_database_and_backup_gain_aliases_and_shortcut_entries(self):
+        """Databases and backups from v1.3 (schema 7) have no alias or Shortcut tables; both still open and restore."""
+        self.purchase(description="Old lunch")
+        archive = self.api.download("/api/backup")
+        to_schema_7 = "DROP TABLE merchant_aliases; DROP TABLE shortcut_entries; PRAGMA user_version = 7;"
+        self.api.upload_zip("/api/restore", rebuild(archive, sql=to_schema_7, manifest={"schemaVersion": 7}))
+        self.assertEqual([tx["description"] for tx in self.api.get("/api/snapshot")["transactions"]], ["Old lunch"])
+        # Each schema has exactly its own tables, so a "schema 7" backup holding the new ones is refused.
+        self.assertRejected(lambda: self.api.upload_zip("/api/restore", rebuild(archive, sql="PRAGMA user_version = 7;", manifest={"schemaVersion": 7})), contains="tables")
+
+        copy = Path(tempfile.mkdtemp()) / "spendtracker.db"
+        with sqlite3.connect(self.server.data_dir / "spendtracker.db") as live, sqlite3.connect(copy) as target:
+            live.backup(target)
+        with sqlite3.connect(copy) as old:
+            old.executescript(to_schema_7)
+        upgraded = Server(prepare=lambda data: (data / "spendtracker.db").write_bytes(copy.read_bytes()))
+        self.addCleanup(upgraded.stop)
+        api = upgraded.logged_in_client()
+        self.assertEqual([tx["description"] for tx in api.get("/api/snapshot")["transactions"]], ["Old lunch"])
+        merchant = api.post("/api/merchants", {"name": "BK"})
+        self.assertEqual(api.put(f"/api/merchants/{merchant['id']}/aliases", {"aliases": ["BURGER KING"]})["aliases"], ["BURGER KING"])
+        with sqlite3.connect(upgraded.data_dir / "spendtracker.db") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 8)
+
+    def test_backup_keeps_aliases_and_received_shortcut_entries(self):
+        key = self.api.post("/api/shortcut/key")["key"]
+        bk = self.merchant_id("BK")
+        self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["BURGER KING"]})
+        self.shortcut([self.entry("2026-11-10-1")], key)
+        archive = self.api.download("/api/backup")
+        self.fresh_start(allEntries=True, allLabels=True)
+        self.api.upload_zip("/api/restore", archive)
+        self.assertEqual(next(m for m in self.api.get("/api/snapshot")["merchants"] if m["id"] == bk)["aliases"], ["BURGER KING"])
+        self.assertEqual(self.shortcut([self.entry("2026-11-10-1")], key)[1]["duplicates"], 1, "a restored backup remembers what was received")
+
     # ------------------------------------------------------------ backup and restore
 
     def test_schema_6_database_upgrades_and_keeps_its_data(self):
@@ -321,7 +493,7 @@ class SpendTrackerApiTests(unittest.TestCase):
         food = api.post("/api/transactions", {**self.editable(kept), "description": "Food", "shares": [{"personId": self.me, "amountCents": 1500}, {"personId": self.alex, "amountCents": 0}]})
         self.assertEqual([share["amountCents"] for share in food["shares"]], [1500, 0])
         with sqlite3.connect(upgraded.data_dir / "spendtracker.db") as db:
-            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 7)
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 8)
 
     def test_backup_restore_round_trip_keeps_ids_links_and_history(self):
         food = self.api.post("/api/tags", {"name": "food"})["id"]
@@ -469,6 +641,10 @@ class SpendTrackerApiTests(unittest.TestCase):
             "view": "CREATE VIEW extra AS SELECT 1",
             "extra table": "CREATE TABLE extra (id INTEGER)",
             "extra column": "ALTER TABLE tags ADD COLUMN color TEXT",
+            "blank alias": "INSERT INTO merchant_aliases VALUES (' ', 1)",
+            "alias with double spaces": "INSERT INTO merchant_aliases VALUES ('BURGER  KING', 1)",
+            "alias for a missing merchant": "PRAGMA foreign_keys=OFF; INSERT INTO merchant_aliases VALUES ('GONE', 99)",
+            "short Shortcut entry ID": "INSERT INTO shortcut_entries VALUES ('x', NULL, 'x')",
         }
         for name, sql in data_cases.items():
             with self.subTest(name):
@@ -480,7 +656,7 @@ class SpendTrackerApiTests(unittest.TestCase):
             "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
             "wrong format": rebuild(archive, manifest={"format": "something-else"}),
             "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
-            "newer schema": rebuild(archive, manifest={"schemaVersion": 8}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 9}),
             "schema 5 from v0.9": rebuild(archive, manifest={"schemaVersion": 5}),
             "schema 4 from v0.8": rebuild(archive, manifest={"schemaVersion": 4}),
             "schema 3 from v0.4": rebuild(archive, manifest={"schemaVersion": 3}),
@@ -669,7 +845,9 @@ def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True
         if resign:
             fields["sha256"] = hashlib.sha256(database).hexdigest()
             with sqlite3.connect(path) as connection:
-                fields["totals"] = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in fields["totals"]}
+                # Counted again for the tables still there, so a backup made to look like an older schema's matches its manifest.
+                tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+                fields["totals"] = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in fields["totals"] if table in tables}
             connection.close()
         fields.update(manifest or {})
         output = io.BytesIO()

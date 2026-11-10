@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.7
+# SpendTracker v1.4.0
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -25,6 +25,8 @@ A new database starts with you ("Me") and three payment methods: Cash, Credit Ca
 
 All data lives in the `data/` folder next to the project (`data/spendtracker.db`); logs go to `logs/console.log`. Use **File > Import/Export... > Download Backup** regularly. See [Data and backups](MANUAL.md#import-and-export).
 
+An iPhone can add purchases too: **File > iPhone Shortcut...** turns on an endpoint for an Apple Pay automation and a Quick Add Shortcut, which keep entries on the phone until SpendTracker can be reached and never add one twice. Merchant aliases turn names like `BURGER KING #1234` into your merchant. See [iPhone Shortcut](MANUAL.md#iphone-shortcut).
+
 To free disk space later, **File > Fresh Start...** clears only what you pick (archived entries, every entry, unused labels, change history, or pre-restore recovery backups) and compacts the database. Download a backup first if you might want that data back. See [Fresh Start](MANUAL.md#fresh-start).
 
 ## Security and privacy
@@ -41,7 +43,8 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 - **Passwords:** salted PBKDF2-HMAC-SHA256 with 600,000 iterations in `data/auth.json`; the plaintext password is never stored. The setup token is printed to the console only and is not written to the log file.
 - **Sessions:** HttpOnly, SameSite=Strict cookies lasting up to 30 days, marked Secure when the request uses HTTPS. Setup/login allow 5 attempts per source IP per minute.
 - **No third parties:** SpendTracker makes no outbound network requests. Nothing is cached for offline use, like NewsReview.
-- **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash.
+- **iPhone Shortcut:** its key is stored only as a SHA-256 hash, can only add entries, and can be replaced or turned off in File > iPhone Shortcut....
+- **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash or the Shortcut key.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).
 

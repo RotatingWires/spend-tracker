@@ -755,6 +755,15 @@ button.calendar-day:active {
 .transfer-dialog { width: min(560px, calc(100vw - 24px)); }
 .transfer-body { display: grid; gap: 7px; line-height: 1.5; }
 .transfer-body p { margin: 0; }
+.transfer-body code { overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.shortcut-key { display: grid; gap: 4px; }
+.shortcut-key[hidden] { display: none; }
+.shortcut-key-row { display: flex; gap: 6px; }
+.shortcut-key-row .retro-input { flex: 1; min-width: 0; font-family: monospace; }
+.shortcut-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.aliases-body { display: grid; gap: 6px; }
+.aliases-body p { margin: 0; line-height: 1.5; }
+.aliases-body textarea { width: 100%; resize: vertical; }
 .retro-dialog::backdrop { background: var(--backdrop); }
 .dialog-window {
   display: flex;

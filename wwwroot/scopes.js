@@ -53,9 +53,10 @@ export function renderScopeList() {
   const name = SCOPE_NAMES[scope](scopeId);
   $('#scopeDialogTitle').textContent = `${SCOPE_TITLES[scope]}: ${name}${month ? ` · ${formatMonth(month)}` : ''}`;
   const archived = entries.filter(entry => entry.tx.archived).length;
-  $('#scopeSummary').textContent = entries.length === 0
+  const aliases = scope === 'merchant' && item.aliases.length ? `Aliases: ${item.aliases.join(', ')}. ` : '';
+  $('#scopeSummary').textContent = aliases + (entries.length === 0
     ? ''
-    : `${plural(entries.length, 'entry', 'entries')}${archived ? `, ${archived} archived` : ''}. Numbers count up as entries join ${name} and are never reused, so gaps mean an entry was deleted or left.`;
+    : `${plural(entries.length, 'entry', 'entries')}${archived ? `, ${archived} archived` : ''}. Numbers count up as entries join ${name} and are never reused, so gaps mean an entry was deleted or left.`);
 
   const rows = entries.map(({ tx, number }) => {
     const direction = tx.kind === 'Purchase' ? 'out' : tx.kind === 'Refund' ? 'refund' : 'in';

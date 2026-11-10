@@ -8,6 +8,7 @@ using Microsoft.Data.Sqlite;
 using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -103,6 +104,18 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    // The iPhone Shortcut sends its whole queue at once, so a handful of runs a minute is plenty.
+    options.AddPolicy("shortcut", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 });
 
 // Brotli or gzip for text responses (data, scripts, styles), so they cross the network several times smaller.
@@ -119,6 +132,7 @@ app.UseResponseCompression();
 var appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
 var authPath = Path.Combine(dataDir, "auth.json");
+var shortcutKeyPath = ShortcutKey.PathIn(dataDir);
 
 var databasePath = DatabaseFiles.Locate(dataDir, "spendtracker.db", "spend-tracker.db", app.Logger);
 Onboarding.Initialize(dataDir, databasePath);
@@ -291,6 +305,18 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
+// The iPhone Shortcut uses its own key instead of a session, and can only add entries (src/ShortcutKey.cs).
+app.MapPost("/api/shortcut/entries", async (HttpRequest request) =>
+{
+    if (!ShortcutKey.Matches(shortcutKeyPath, request.Headers.Authorization))
+        return Results.Json(new { error = "The Shortcut key is missing or wrong. Create one in SpendTracker under File > iPhone Shortcut... and paste it into the Shortcut." },
+            statusCode: StatusCodes.Status401Unauthorized);
+    using var reader = new StreamReader(request.Body, Encoding.UTF8);
+    var result = store.ReceiveShortcutEntries(await reader.ReadToEndAsync(request.HttpContext.RequestAborted));
+    app.Logger.LogInformation("Shortcut entries: {Saved} saved, {Duplicates} already saved, {Rejected} not saved.", result.Saved, result.Duplicates, result.Rejected.Count);
+    return Results.Ok(result);
+}).RequireRateLimiting("shortcut").WithMetadata(new RequestSizeLimitAttribute(1024 * 1024));
+
 var api = app.MapGroup("/api").RequireAuthorization();
 
 // The first-start "Restore a Backup Before Starting" prompt, like TaskList's.
@@ -342,6 +368,7 @@ api.MapDelete("/tags/{id:long}", (long id) =>
 
 api.MapPost("/merchants", (NameRequest request) => Results.Ok(store.CreateMerchant(request)));
 api.MapPatch("/merchants/{id:long}", (long id, UpdateNameRequest request) => Results.Ok(store.UpdateMerchant(id, request)));
+api.MapPut("/merchants/{id:long}/aliases", (long id, AliasesRequest request) => Results.Ok(store.SetMerchantAliases(id, request)));
 api.MapDelete("/merchants/{id:long}", (long id) =>
 {
     store.DeleteMerchant(id);
@@ -353,6 +380,21 @@ api.MapPatch("/collections/{id:long}", (long id, UpdateNameRequest request) => R
 api.MapDelete("/collections/{id:long}", (long id) =>
 {
     store.DeleteLabel(Store.Collections, id);
+    return Results.NoContent();
+});
+
+// File > iPhone Shortcut...: the key is shown only in the reply that creates it.
+api.MapGet("/shortcut", () => Results.Ok(new { keyCreatedAt = ShortcutKey.CreatedAt(shortcutKeyPath) }));
+api.MapPost("/shortcut/key", () =>
+{
+    var key = ShortcutKey.Create(shortcutKeyPath);
+    app.Logger.LogInformation("Created a new iPhone Shortcut key; any earlier key stopped working.");
+    return Results.Ok(new { key, keyCreatedAt = ShortcutKey.CreatedAt(shortcutKeyPath) });
+});
+api.MapDelete("/shortcut/key", () =>
+{
+    ShortcutKey.Delete(shortcutKeyPath);
+    app.Logger.LogInformation("Turned off the iPhone Shortcut by deleting its key.");
     return Results.NoContent();
 });
 

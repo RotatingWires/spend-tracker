@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.7
+# SpendTracker v1.4.0
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -20,6 +20,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - [Using the app](#using-the-app)
 - [Statistics](#statistics)
 - [Import and export](#import-and-export)
+- [iPhone Shortcut](#iphone-shortcut)
 - [HTTP API](#http-api)
 - [Security and privacy](#security-and-privacy)
 - [Known limitations](#known-limitations)
@@ -35,6 +36,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 - **Calendar** with daily net spending for each month in the time frame, a per-day detail view, and the collections of each day's entries.
 - **Collections**: labels like tags (a trip, a move) that you put on purchases, with their own totals and stats.
 - **Stats** for any month, year, collection, or all time, on six sub-tabs: totals, daily averages, streaks, and records (**Overview**); TaskList Stats-style **Heatmaps** of days, months, tags or merchants by month, and weekdays by week of the month; the net spent chart, running total against the period before, average by month of year, and purchase sizes (**Trends**); how many entries, by time, weekday, size, merchant, and tag (**Counts**); two periods side by side (**Compare**); and people, balances over time, tags, collections, merchants, merchant loyalty, and recurring purchases (**People & Places**).
+- **iPhone Shortcut**: an Apple Pay automation and a Quick Add Shortcut add purchases from the phone, kept on the phone until SpendTracker can be reached, with merchant aliases you set once (`BURGER KING #1234` means BK).
 - **History** of every add, edit, delete, and restore with before/after values.
 - **Backup and restore** as a ZIP holding a copy of the database (the same format as TaskList and NewsReview), plus CSV export.
 - Light and dark themes, desktop and phone layouts, installable as a PWA.
@@ -58,6 +60,8 @@ src/
   Store.cs              SQLite schema, validation rules, history, and restoring rows
   FreshStart.cs         File > Fresh Start...: counts, clearing chosen data, and compaction (like TaskList's and NewsReview's)
   Transfer.cs           backup ZIP creation and restore verification
+  ShortcutEntries.cs    entries sent by the iPhone Shortcut, and matching their merchants by name or alias
+  ShortcutKey.cs        the iPhone Shortcut's key: created, replaced, turned off, and checked
   SingleFileLogger.cs   capped logs/console.log writer
   PasswordAuth.cs       setup token, password file, and sign-in cookie (the same file in all four apps)
   SignInKeys.cs         where the sign-in keys live and how they are encrypted (the same file in all four apps)
@@ -80,8 +84,9 @@ wwwroot/
   people.js             people balances and person detail
   summaries.js          Payment Methods, Tags, Collections, and Merchants tabs: totals and actions per item
   fresh-start.js        File > Fresh Start... dialog
+  shortcut.js           File > iPhone Shortcut... dialog
   history.js            history log rendering
-  manage.js             add, rename, archive, and delete payment methods, people, tags, collections, and merchants
+  manage.js             add, rename, archive, and delete payment methods, people, tags, collections, and merchants; merchant aliases
   bulk.js               selection mode and bulk actions in the ledger
   scopes.js             numbered list of one person, tag, merchant, or payment method
   ui.js                 startup, tabs, toolbar, menus, backup/restore, session
@@ -94,7 +99,7 @@ wwwroot/
 
 tests/
   server.py             starts a real server on a temporary data folder
-  test_api.py           API, validation, history, backup/restore, and Fresh start tests
+  test_api.py           API, validation, history, backup/restore, Fresh start, merchant alias, and iPhone Shortcut tests
   test_sign_in.py       setup, login, logout, and the password file (the same file in TaskList and TaskList Stats)
   test_browser.py       optional Playwright browser tests
 ```
@@ -169,7 +174,7 @@ Enter it on the **Create Password** screen with a password of at least 8 charact
 - Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes with 600,000 iterations. A hash saved with fewer iterations is upgraded at the next successful login.
 - Sessions use an HttpOnly, SameSite=Strict cookie named `SpendTracker.Auth`, valid up to 30 days and sliding while active. It is marked Secure when the request uses HTTPS.
 - `/api/auth/setup` and `/api/auth/login` allow 5 attempts per source IP per minute.
-- Every other `/api` endpoint and the app page require a session; unauthenticated API calls get HTTP 401.
+- Every other `/api` endpoint and the app page require a session; unauthenticated API calls get HTTP 401. The one exception is `POST /api/shortcut/entries`, which takes the iPhone Shortcut's own key instead and can only add entries; see [iPhone Shortcut](#iphone-shortcut).
 
 **Reset the password:** stop SpendTracker, delete `data/auth.json`, and start it again. A new setup token is printed. Your spending data is not affected.
 
@@ -230,6 +235,8 @@ Tags are optional labels you create and assign yourself. A purchase can have sev
 ### Merchants
 
 Merchants are managed like tags and people (the People, Payment Methods, Tags, Collections, and Merchants tabs each have a search box at the right of their Add row that narrows the list by name when you press **Search**): add them on the **Merchants** tab (names are unique ignoring case), then choose one from the **Merchant** dropdown in the editor, or **No merchant**. There you can also rename them (every entry follows, since entries store the merchant's ID), archive them, and delete unused ones. Stats groups merchants by ID, so a renamed merchant keeps its whole history.
+
+A merchant can also have **aliases**: text, such as `BURGER KING`, that a payment app's merchant name starts with. Entries from the [iPhone Shortcut](#iphone-shortcut) get that merchant when their merchant text matches. Aliases are rules you set; SpendTracker never invents one. See [Merchant aliases](#merchant-aliases).
 
 ### Collections
 
@@ -311,7 +318,7 @@ An **Add** form, then one row per person, you first (*(you)*, with no balance) a
 
 ### Payment Methods, Tags, Collections, and Merchants
 
-Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. **Rename**, **Archive** / **Restore**, and **Delete** sit in the dialog a row opens, not on the row. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Click a row (or focus it and press Enter), as in the ledger, for its numbered list of entries. On the Collections tab, that dialog's **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Its numbered list (a row's click) holds every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. **Rename**, **Archive** / **Restore**, and **Delete** sit in the dialog a row opens, not on the row. A merchant's dialog also has **Aliases...** (one per line, **Cancel** and **Save**; see [Merchant aliases](#merchant-aliases)) and lists its aliases above its entries. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Click a row (or focus it and press Enter), as in the ledger, for its numbered list of entries. On the Collections tab, that dialog's **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Its numbered list (a row's click) holds every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### History
 
@@ -319,7 +326,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 
 ### Menus
 
-- **File:** New Transaction..., Refresh (loads everything from the server again, for changes made on another device), Select..., Import/Export..., Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
+- **File:** New Transaction..., Refresh (loads everything from the server again, for changes made on another device, or for entries the iPhone Shortcut added), Select..., Import/Export..., iPhone Shortcut... (see [iPhone Shortcut](#iphone-shortcut)), Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
 - **View:** switch tabs, **Show Archived**, choose the Light or Dark theme, and **Use Retro Font**. These are saved in this browser.
 
 **View > Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
@@ -410,6 +417,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 data/
   spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
+  shortcut-key.json     SHA-256 hash of the iPhone Shortcut's key, while the Shortcut is turned on
   keys/                 sign-in cookie keys, encrypted (DPAPI on Windows, a systemd credential on Linux)
   backups/              recovery copies written automatically before each restore (File > Fresh Start can remove them)
 logs/
@@ -422,10 +430,10 @@ logs/
 
 **Download Backup** downloads `spendtracker-backup-YYYYMMDD-HHMMSS.zip` (local time), the same layout TaskList and NewsReview use. It contains exactly two files:
 
-- `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant, collection, transaction, per-scope number, and history entry), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
+- `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant and its aliases, collection, transaction, per-scope number, history entry, and the IDs of entries received from the iPhone Shortcut), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
 
-It never contains `auth.json` or the password hash. Treat it like your bank statements.
+It never contains `auth.json`, the password hash, or the iPhone Shortcut's key. Treat it like your bank statements.
 
 ### Restore Backup
 
@@ -436,11 +444,11 @@ The upload is verified before any live data changes. It is rejected when:
 - it is not a ZIP with exactly `manifest.json` and `spendtracker.db`, or a member is encrypted or too large;
 - the manifest is not a SpendTracker backup, or came from a newer SpendTracker version or schema;
 - the database does not match the manifest's checksum or row counts, fails SQLite's integrity check, or has links to missing rows (`PRAGMA foreign_key_check`);
-- the database has different tables or columns than this version, or contains triggers, views, or virtual tables.
+- the database has different tables or columns than this version has for the backup's schema, or contains triggers, views, or virtual tables.
 
 SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
 
-Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
+Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v1.2 and v1.3 (schemas 6 and 7) restore too: they have no merchant aliases or received Shortcut entries, so those are left empty. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
 
 ### Fresh Start
 
@@ -449,8 +457,8 @@ Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v0
 | Choice | What is cleared |
 | --- | --- |
 | Archived entries | Archived purchases, refunds, and paybacks. Archived entries still count in totals and balances, so those change. An archived purchase stays while an active (unarchived) refund or payback still links to it; the dialog says how many stay for that reason. |
-| Every entry | All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay. |
-| Unused labels | Merchants, tags, collections, people, and payment methods that no remaining entry uses. Me always stays, and so does one active payment method (the oldest one) when no active method is in use. |
+| Every entry | All purchases, refunds, and paybacks. People, payment methods, merchants, tags, and collections stay. SpendTracker still remembers which iPhone Shortcut entries it received, so a queue sent again does not bring them back. |
+| Unused labels | Merchants, tags, collections, people, and payment methods that no remaining entry uses. Me always stays, and so does one active payment method (the oldest one) when no active method is in use. Merchants with aliases stay, since iPhone Shortcut entries still use them. |
 | Every label, used ones too | Only together with **Every entry** (ticking it ticks that too). All merchants, tags, collections, people but Me, and payment methods. IDs and per-scope entry numbers then start again at 1, and the payment methods are back to a new database's Cash, Credit Card, and Debit Card. |
 | Change history | Every entry on the History tab. |
 | Pre-restore recovery backups | The `before-restore-*.zip` files in `data/backups/`. |
@@ -469,13 +477,98 @@ To back up the files instead, stop SpendTracker first, then copy the whole `data
 
 ### Schema and migrations
 
-The database records its schema version in `PRAGMA user_version` (currently 6). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spendtracker.db`.
+The database records its schema version in `PRAGMA user_version` (currently 8). SpendTracker refuses to open a database with a newer schema version, rather than risk damaging it. At startup it upgrades a schema 6 database (v1.2) to 7 by letting shares be $0.00, and a schema 7 database (v1.3) to 8 by adding the alias and Shortcut tables, each in one transaction. Databases and backups from SpendTracker 0.2 (schema 1), 0.3 (schema 2), 0.4 (schema 3), 0.5–0.8 (schema 4), and 0.9 (schema 5) cannot be upgraded by this version: start with a new `data/spendtracker.db`.
 
-Schema 6 tables: `payment_methods`, `people`, `tags`, `merchants`, `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares` (with `gift`), `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), and `history`.
+Schema 8 tables: `payment_methods`, `people`, `tags`, `merchants`, `merchant_aliases` (alias text and its merchant), `collections` (named like tags, no dates), `transactions` (with `merchant_id` and `archived`), `transaction_shares` (with `gift`), `transaction_tags`, `transaction_collections`, `scope_numbers` (scope, scope ID, transaction ID, number), `scope_counters` (the last number given out in each scope), `shortcut_entries` (every iPhone Shortcut entry ID received, with the transaction it became and when), and `history`.
+
+## iPhone Shortcut
+
+An iPhone Shortcut can add purchases without opening SpendTracker: a Wallet automation that runs each time you pay with Apple Pay, and a Quick Add Shortcut you run to type one in. Both hand their entry to a third Shortcut, **Send to SpendTracker**, which saves it to a queue file on the phone first and then sends the whole queue. When the phone cannot reach SpendTracker (off your network or VPN), the entry stays in the queue and goes with the next run that can, so nothing is lost. SpendTracker remembers every entry it has received, so a queue sent twice (say, the reply was lost on the way back) never adds anything twice.
+
+Each entry becomes a **purchase for you alone**, dated as sent, paid with the payment method of the name sent. Split it, tag it, or change anything else afterwards in the editor, like any entry. Shortcut entries are recorded on the History tab as Created, like entries you add.
+
+### Turning it on
+
+**File > iPhone Shortcut...** shows the address the Shortcut sends to (`http(s)://<server>/api/shortcut/entries`, as you reach SpendTracker from the phone) and whether a key exists.
+
+- **Create Key** makes a key (`stk_` and 43 letters, digits, `-`, `_`) and shows it this once, selected, with a **Copy** button; paste it into the Shortcut. Browsers only allow copying over HTTPS or on the server itself; elsewhere copy the selected key yourself.
+- **Replace Key** makes a new key after asking; the old one stops working at once, so paste the new one into the Shortcut.
+- **Turn Off** deletes the key after asking. The Shortcut's entries wait in its queue until you create a key and paste it in.
+
+Only a SHA-256 hash of the key is kept, in `data/shortcut-key.json`. Backups never include it. The key can only add entries: it cannot read, change, or delete anything, and it does not sign in to the app.
+
+### Merchant aliases
+
+A payment app shows merchants its own way, such as `BURGER KING #1234`. In a merchant's dialog on the **Merchants** tab, **Aliases...** lists text, one per line, that means that merchant. A Shortcut entry's merchant text is matched like this:
+
+1. A merchant whose name is exactly that text (ignoring case) is used.
+2. Otherwise the merchant with the longest alias the text **starts with, as whole words**: `BURGER KING` matches `BURGER KING #1234` and `Burger King 0042`, but not `BURGER KINGDOM`. An alias ending in a symbol, such as `SQ *`, matches whatever follows it.
+3. Otherwise the entry has no merchant, and the text goes in its description (after the Shortcut's own description, in brackets, if it sent one), so you can still recognize it. Give that merchant an alias and later entries match it.
+
+Spaces around an alias are trimmed and runs of spaces become one, in aliases and in the text sent. Each alias belongs to one merchant. Archived merchants are not matched. Aliases apply when an entry arrives; they never change entries already saved. A merchant with aliases counts as in use, so Fresh Start's **Unused labels** keeps it; deleting a merchant deletes its aliases. Alias changes are recorded on the History tab as merchant edits.
+
+### Building the Shortcuts
+
+In the Shortcuts app on the iPhone, make these three. Action names are as the Shortcuts app shows them; dictionary keys must be typed exactly, in lowercase as shown.
+
+**1. Send to SpendTracker.** The only one that talks to SpendTracker. It saves its input (if any) to the queue, then sends the queue.
+
+1. **If** *Shortcut Input* **has any value**:
+   - **Append to Text File**: append *Shortcut Input* to `SpendTracker/queue.txt` in the Shortcuts folder, with **Make New Line** on.
+2. **End If**.
+3. **Get File** `SpendTracker/queue.txt` from the Shortcuts folder, with **Error If Not Found** off.
+4. **If** *File* **has any value**:
+   - **Get Contents of URL**: the address from File > iPhone Shortcut..., **Method** POST, a **Header** `Authorization` with the value `Bearer ` followed by the key, and **Request Body** *File* set to *File*.
+   - **Get Dictionary Value**: *Value* for `message` in *Contents of URL*.
+   - **If** *Dictionary Value* **has any value**: **Delete Files** *File* with **Confirm Before Deleting** off, then **Show Notification** *Dictionary Value*.
+   - **Otherwise**: **Get Dictionary Value** for `error` in *Contents of URL*, then **Show Notification** "SpendTracker kept the entries on this phone:" followed by that value.
+   - **End If**.
+5. **End If**.
+
+**2. The Apple Pay automation.** In **Automation**, add a **Transaction** automation, choose the cards it is for, set it to **Run Immediately**, and give it these actions:
+
+1. **Format Date** *Current Date*, custom format `yyyy-MM-dd`.
+2. **Format Date** *Current Date*, custom format `yyyyMMdd-HHmmss`; **Random Number** between 100000 and 999999; **Text** with the second formatted date, `-`, and the random number. This is the entry's ID; every entry needs a different one.
+3. **Dictionary** with `id` set to that Text, `date` to the first formatted date, `amount` to *Shortcut Input*'s **Amount**, `merchant` to its **Merchant**, and `paymentMethod` to its **Card or Pass** (the card's name in Wallet), or type the name of a SpendTracker payment method instead.
+4. **Run Shortcut** *Send to SpendTracker* with the *Dictionary* as input.
+
+`paymentMethod` must be the name of an active payment method in SpendTracker (ignoring case). If your cards are called differently in Wallet, rename the payment method to match, or make one automation per card with that payment method's name typed in.
+
+**3. Quick Add.** For cash and anything else, run it from the home screen, a widget, or Siri:
+
+1. **Ask for Input** a Number, "Amount", and **Ask for Input** Text, "What".
+2. **Choose from List** with a List of your payment methods' names, as they are in SpendTracker.
+3. The same two **Format Date** actions, **Random Number**, and **Text** as the automation.
+4. **Dictionary** with `id`, `date`, `amount` (the number), `description` (what you typed), and `paymentMethod` (the chosen item). Add `merchant` too, from another Ask for Input, if you like.
+5. **Run Shortcut** *Send to SpendTracker* with the *Dictionary* as input.
+
+To send what is waiting without adding anything, run **Send to SpendTracker** by itself: put it on the home screen, or add an automation that runs it, say when the phone joins your home Wi-Fi or at a time each evening. Every Apple Pay purchase and Quick Add sends the waiting entries too.
+
+### What the Shortcut sends
+
+The queue file, as it is: JSON entries one after another (one per line, or spread over several lines; both are read). Each entry has:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id` | yes | 8–100 letters, digits, or `. _ : -`, different for every entry. An ID already received is skipped. |
+| `date` | yes | The purchase date, `YYYY-MM-DD`. |
+| `amount` | yes | Dollars, as a number (`12.34`) or text (`"$1,234.56"`), $0.01 to $10,000,000.00, at most two decimal places. |
+| `paymentMethod` | yes | The name of an active payment method, ignoring case. |
+| `merchant` | no | Merchant text, matched as in [Merchant aliases](#merchant-aliases); 120 characters at most. |
+| `description` | no | What it was; 500 characters at most. |
+| `note` | no | A note; 2000 characters at most. |
+
+Unknown fields are refused, like everywhere in the API. A queue holds at most 500 entries per send, and the request at most 1 MiB. The Shortcut endpoint allows 30 requests per source IP per minute.
+
+### What happens when something goes wrong
+
+- **The phone cannot reach SpendTracker** (no VPN, server down): **Get Contents of URL** fails, iOS shows its own error, and the Shortcut stops before deleting anything. The entries stay in the queue for the next run.
+- **SpendTracker refuses the whole request** (no key or the wrong one, too many requests, a database error): the reply has no `message`, so the Shortcut shows the reason and keeps the queue.
+- **SpendTracker answers**: every entry it could save is saved, the queue is deleted, and the notification says how many were saved, how many it already had, and for each entry it could not save, what was sent and why (such as "BURGER KING #1234, $12.34, 2026-11-10: No active payment method is named Apple Card."). Add those by hand; sending them again would fail the same way. If the queue file is damaged, the entries before the damage are saved and the notification says where reading stopped.
 
 ## HTTP API
 
-All endpoints are under `/api`, use JSON, and require a session except `auth/status`, `auth/setup`, and `auth/login`. Requests are strict: unknown fields, explicit `null` for non-nullable fields, and malformed JSON are rejected with HTTP 400. Refused requests return `{ "error": "message" }`.
+All endpoints are under `/api`, use JSON, and require a session except `auth/status`, `auth/setup`, `auth/login`, and `shortcut/entries` (which takes the Shortcut's key). Requests are strict: unknown fields, explicit `null` for non-nullable fields, and malformed JSON are rejected with HTTP 400. Refused requests return `{ "error": "message" }`.
 
 | Method and path | Purpose |
 |---|---|
@@ -490,6 +583,11 @@ All endpoints are under `/api`, use JSON, and require a session except `auth/sta
 | `POST /api/payment-methods`, `/api/people`, `/api/tags`, `/api/collections`, `/api/merchants` | `{ name }` |
 | `PATCH /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/collections/{id}`, `/api/merchants/{id}` | `{ name?, archived? }` |
 | `DELETE /api/payment-methods/{id}`, `/api/people/{id}`, `/api/tags/{id}`, `/api/collections/{id}`, `/api/merchants/{id}` | delete when allowed (deleting a tag or collection removes it from its purchases) |
+| `PUT /api/merchants/{id}/aliases` | `{ aliases: [...] }` replaces the merchant's aliases (`[]` for none); returns the merchant |
+| `GET /api/shortcut` | `keyCreatedAt`: when the iPhone Shortcut's key was created, or `null` when it is turned off |
+| `POST /api/shortcut/key` | make a new Shortcut key, replacing any earlier one; returns `key` (shown only here) and `keyCreatedAt` |
+| `DELETE /api/shortcut/key` | turn the Shortcut off by deleting its key |
+| `POST /api/shortcut/entries` | the Shortcut's queue (see [What the Shortcut sends](#what-the-shortcut-sends)) with `Authorization: Bearer <key>` and no session; returns `saved`, `duplicates`, `rejected` (`[{ entry, id, error }]`), and `message`, or 401 with `{ error }` for a missing or wrong key |
 | `GET /api/history?limit=&beforeId=` | newest-first history page (`limit` 1–500, default 200) and `hasMore` |
 | `GET /api/backup` | download a backup ZIP |
 | `POST /api/restore` | restore a backup ZIP (raw body with `Content-Type: application/zip`, up to 256 MiB) |
@@ -516,7 +614,7 @@ A transaction body is:
 }
 ```
 
-`merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, ...]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
+`merchantId` is a merchant from `/api/merchants`, or `null` for none, like `paymentMethodId`; merchant names are not accepted here. `archived` is optional; leaving it out keeps the current value (new entries start unarchived). Merchants in the snapshot include `aliases`, sorted. Saved transactions also include `id`, `merchant` (the merchant's current name, or `""`), `numbers` (`[{ "scope": "person", "scopeId": 2, "number": 3 }, ...]`), `createdAt`, and `updatedAt`. There is no bulk endpoint; the app's bulk actions call `PUT` or `DELETE` once per entry.
 
 Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zone. Purchases send `personId: null` and their `shares` (each share may set `"gift": true` for anyone but you; leaving it out means false); refunds and paybacks send `shares: []`, a `personId` (whose share is refunded, or who paid you back), and for refunds a `linkedId`. Only purchases may have `tagIds` and `collectionIds`; leaving either out means none. Limits: names 60 characters, merchant 120 (also for merchant names under Manage), description 500, note 2000, amount $0.01–$10,000,000.00.
 
@@ -526,14 +624,15 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 - **At rest:** the database and backups are not encrypted. Protect the `data/` folder, downloaded backups, and CSV exports with filesystem permissions.
 - **Least privilege:** the account running SpendTracker needs read access to the project files and write access to `data/` and `logs/` only.
 - **No outbound traffic:** SpendTracker does not contact any external service. It keeps no offline copy of its pages; without a connection the browser shows its own offline page, which makes a connection problem obvious instead of opening a stale app that cannot reach its data. It can still be added to a phone's home screen from the web manifest. `sw.js` only removes the service worker and cache that releases before v1.2.23 installed.
-- **Logs:** `logs/console.log` contains startup, restore, and error messages, never passwords, the setup token, or request bodies.
+- **iPhone Shortcut key:** only its SHA-256 hash is stored, and it can only add entries. Anyone with the key can add purchases, so replace it (File > iPhone Shortcut... > Replace Key) if the phone is lost. Over plain HTTP the key crosses the network unencrypted, so use it over your LAN or VPN, or HTTPS.
+- **Logs:** `logs/console.log` contains startup, restore, and error messages, and how many Shortcut entries were saved, never passwords, the setup token, the Shortcut key, or request bodies.
 
 ## Known limitations
 
 - One user per installation.
 - Amounts are shown in US dollars; there is no currency setting.
 - Transfers between your own accounts (paying off a card, withdrawing cash) are not tracked; record only real spending.
-- No automatic import yet. Entries are added by hand.
+- No bank or card import. Entries are added by hand or by the [iPhone Shortcut](#iphone-shortcut), and Shortcut entries are always purchases for you alone.
 - Stats are computed in the browser from the full snapshot, which is fine for years of personal data but not designed for very large datasets.
 - After a save, only the saved entries are updated in the browser; changes made on another device or in another tab show up after **File > Refresh** or reloading the page.
 
@@ -563,6 +662,13 @@ The message explains which rule was broken (for example a refund larger than wha
 
 Nothing was changed; the message names the problem. Only files saved with **File > Import/Export... > Download Backup** (or the automatic `data/backups/` copies) can be restored.
 
+### The iPhone Shortcut does not add entries
+
+- iOS says it could not connect: the phone cannot reach SpendTracker. The entries stay in the queue; run **Send to SpendTracker** again once you are on your network or VPN.
+- "The Shortcut key is missing or wrong": the key in the Shortcut is not the current one. Create or replace it in **File > iPhone Shortcut...** and paste it into the `Authorization` header as `Bearer stk_...`.
+- "No active payment method is named ...": name a payment method exactly as the Shortcut sends it (Wallet's card name), or type the payment method's name in the Shortcut.
+- The entries are there but the page does not show them: use **File > Refresh**.
+
 ### The page shows "Could not load data"
 
 The server is unreachable or the database could not be read. Check that SpendTracker is running and see `logs/console.log`.
@@ -574,7 +680,7 @@ dotnet build
 python3 -m unittest discover -s tests
 ```
 
-`tests/server.py` (the same file in TaskList, TaskList Stats, and SpendTracker) builds the app and starts the real server on a temporary data folder; `tests/test_sign_in.py` (also the same in all three) checks first-run setup, login, logout, and the saved password file. `test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, Fresh start (confirmation, archived entries kept while an active entry links to them, every entry and unused labels keeping Me and one payment method, history and recovery-backup removal, and compaction), and backup ZIP round trips plus 35 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in), each leaving data unchanged. It uses only the Python standard library.
+`tests/server.py` (the same file in TaskList, TaskList Stats, and SpendTracker) builds the app and starts the real server on a temporary data folder; `tests/test_sign_in.py` (also the same in all three) checks first-run setup, login, logout, and the saved password file. `test_api.py` builds the project and starts real servers on temporary data folders, covering authentication, strict request validation, refund/payback rules, split purchases and per-share refunds and paybacks, edits that would break links, tag archiving, archiving and deletion rules, tag deletion, merchants, per-person/tag/merchant numbering, archived transactions, restores that fill in missing numbers, collections as labels, history, Fresh start (confirmation, archived entries kept while an active entry links to them, every entry and unused labels keeping Me and one payment method, history and recovery-backup removal, and compaction), merchant aliases (normalizing, one merchant per alias, history, and Fresh start keeping aliased merchants), the iPhone Shortcut (its key needed, replaced, turned off, and good for nothing else; entries matched by name or alias as whole words, Wallet-style amounts, per-entry refusals with reasons, damaged queues, and nothing added twice when a queue is sent again, even after a delete or a restore), schema 7 databases and backups, and backup ZIP round trips plus 39 kinds of rejected restore (damaged ZIPs, the wrong content type, wrong manifests, older or newer schemas, checksum or count mismatches, triggers, views, extra tables or columns, and rows that break app rules, including numbers for scopes an entry is not in and invalid aliases), each leaving data unchanged. It uses only the Python standard library.
 
 Optional browser tests use Playwright with Firefox (`pip install playwright` and `playwright install firefox`):
 
@@ -582,13 +688,19 @@ Optional browser tests use Playwright with Firefox (`pip install playwright` and
 python3 -m unittest discover -s tests -p "test_browser.py"
 ```
 
-They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, check the Fresh Start dialog's choices, confirmation, and phone-width fit while clearing only history, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
+They run first-run setup, add purchases, refunds, and paybacks through the UI, download and restore a backup ZIP, visit every tab in both themes, check phone-width layout, choose several months and All time, total collections, select entries and run bulk actions (including a skipped entry and archiving), verify every Stats number for a known month, check the Fresh Start dialog's choices, confirmation, and phone-width fit while clearing only history, edit a merchant's aliases (including a refused one), create, replace, and turn off the iPhone Shortcut key, and fail on any browser error. Set `SPEND_TRACKER_SCREENSHOTS=<folder>` to save screenshots. Python and Playwright are development tools only and are not needed to run SpendTracker.
 
 GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs every test file on every push and pull request; the Playwright browser tests skip there (no Playwright), so they stay a local, optional tool.
 
 ## Release notes
 
-Current release: **v1.3.7**.
+Current release: **v1.4.0**.
+
+### v1.4.0
+
+- **iPhone Shortcut** (File > iPhone Shortcut...): an Apple Pay automation and a Quick Add Shortcut add purchases from the phone through `POST /api/shortcut/entries`, with a key of their own that can only add entries. Entries are saved on the phone first and sent until SpendTracker answers, so ones made off your network or VPN go through later, and an entry is never added twice. The manual shows how to build the Shortcuts.
+- **Merchant aliases** (a merchant's Aliases...): text a payment app's merchant name starts with, such as `BURGER KING` for `BURGER KING #1234`, so Shortcut entries get that merchant. Text no merchant matches goes in the description.
+- Database schema 8 adds the `merchant_aliases` and `shortcut_entries` tables; schema 7 databases are upgraded at startup, and v1.2 and v1.3 backups still restore.
 
 ### v1.3.7
 

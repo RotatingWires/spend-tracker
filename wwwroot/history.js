@@ -25,7 +25,8 @@ const TRANSACTION_FIELDS = [
 
 const SIMPLE_FIELDS = [
   ['name', 'Name', value => value],
-  ['archived', 'Archived', value => (value ? 'Yes' : 'No')]
+  ['archived', 'Archived', value => (value ? 'Yes' : 'No')],
+  ['aliases', 'Aliases', value => (value?.length ? value.join(', ') : '—')]
 ];
 
 export async function loadHistory({ older = false } = {}) {
