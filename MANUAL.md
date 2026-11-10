@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.4
+# SpendTracker v1.3.5
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -364,14 +364,14 @@ Breakdown tables:
 - **By Payment Method:** purchases, spent, refunds, and net per method, and each method's share of spent.
 - **Day of Week:** purchases and net per weekday, and the average per occurrence of that weekday in the counted days.
 
-**People**, **Tags**, **Collections**, and **Merchants** share one layout, highest net first: purchases (*visits* for merchants), spent, refunds, net, average purchase, and last purchase date. Select a row for that person's, tag's, collection's, or merchant's numbered list of entries.
+**People**, **Tags**, **Collections**, and **Merchants** are charted the same way: a bar of net spent in the period for each of the twelve with the most, highest first (any with purchases or refunds, so a fully refunded one is a $0 bar), then the *none* group (**Untagged**, **No collection**, *(no merchant)*). Hover over a bar for its figures in the period: purchases (*visits* for merchants), spent, refunds, average purchase, and last purchase date. Select a bar for that person's, tag's, collection's, or merchant's numbered list of entries. Each one's own tab (People, Tags, Collections, Merchants) lists them all, for all time; these charts replace the period tables Stats used to repeat.
 
-- **People:** each person's purchases and the total of their shares (a split purchase counts each person's own share), refunds on their shares, and **Paid Back** (paybacks from them).
+- **People:** each person's purchases and the total of their shares (a split purchase counts each person's own share), refunds on their shares, and **Paid back** (paybacks from them), in the bar's details.
 - **Tags:** plus **Untagged**. A purchase with two tags counts in both, so tag totals can add up to more than total spent.
 - **Collections:** plus **No collection**, the same way as tags.
 - **Merchants:** grouped by merchant ID, so a renamed merchant keeps its whole history under its current name, plus *(no merchant)*.
 
-Refunds count under the tags, collections, and merchant of their purchase. Each of the four has a bar chart over its table of the twelve with the most net spent; select a bar for that one's list of entries.
+Refunds count under the tags, collections, and merchant of their purchase.
 
 - **Tags Over Time** and **Merchants Over Time:** net spent each month of the period for the six tags (or merchants) with the most, one line each. Select a month to open it on the Transactions tab.
 
@@ -588,7 +588,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.3.4**.
+Current release: **v1.3.5**.
+
+### v1.3.5
+
+- Stats > People & Places no longer repeats the People, Tags, Collections, and Merchants tables, which their own tabs already list: each is a bar chart now (including Untagged, No collection, and no merchant), and hovering a bar shows its figures for the period (purchases or visits, spent, refunds, average purchase, last purchase, and paid back for people). Selecting a bar still opens its list.
 
 ### v1.3.4
 

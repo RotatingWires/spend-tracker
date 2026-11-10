@@ -79,9 +79,10 @@ export const Charts = (() => {
 
   /**
    * labels: one per bar. titles: tooltip heading per bar. series: [{ label, color (1-8), values, count, format }].
-   * Hovering a bar lists every series' value there, the hovered section in bold. onSelect(index) opens what a bar stands for.
+   * Hovering a bar lists every series' value there, the hovered section in bold, then any details lines given for that
+   * bar. onSelect(index) opens what a bar stands for.
    */
-  function bars(canvas, { labels, titles, series, onSelect = null }) {
+  function bars(canvas, { labels, titles, series, details = null, onSelect = null }) {
     const ratio = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -184,10 +185,14 @@ export const Charts = (() => {
         && pointerY >= section.top - 1 && pointerY <= section.bottom + 1)?.series;
       showTooltip([
         { text: titles[index], strong: true },
-        ...series.map(s => ({ text: `${s.label}: ${s.format(s.values[index])}`, series: s.color, strong: s === hovered }))
+        ...series.map(s => ({ text: `${s.label}: ${s.format(s.values[index])}`, series: s.color, strong: s === hovered })),
+        ...(details?.[index] ?? []).map(text => ({ text }))
       ], event.clientX, event.clientY);
     };
     canvas.onpointerleave = hideTooltip;
+    // What the bars show, for screen readers: "Market: $26.00; groceries: $15.00".
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', titles.map((title, index) => `${title}: ${series.map(s => s.format(s.values[index])).join(', ')}`).join('; '));
     selectable(canvas, onSelect, pointerX => Math.floor((pointerX - padding.left) / slot), labels.length);
   }
 

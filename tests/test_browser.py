@@ -88,6 +88,15 @@ class BrowserTests(unittest.TestCase):
 
     KIND_LABELS = {"Purchase": "Purchase", "Refund": "Refund / return", "Payback": "Payback to me"}
 
+    @staticmethod
+    def bar(page, chart, name):
+        """Where the bar for `name` is in a bar chart, found from the chart's label ("Market: $26.00; groceries: $15.00")."""
+        parts = page.locator(chart).get_attribute("aria-label").split("; ")
+        index = next(i for i, part in enumerate(parts) if part.startswith(name + ":"))
+        box = page.locator(chart).bounding_box()
+        slot = (box["width"] - 70 - 12) / len(parts)  # the chart's left and right padding
+        return {"x": 70 + slot * (index + 0.5), "y": box["height"] - 40}
+
     def set_checks(self, page, host, names):
         """Makes exactly these items checked in a multi-select dropdown, then closes it."""
         page.click(f"{host} .retro-select")
@@ -321,7 +330,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="stats"]')
         expect(page.locator("#statsTotals")).to_contain_text("$52.17")  # spent
         page.click('[data-stats-tab="places"]')
-        expect(page.locator("#statsTagsTable")).to_contain_text("Untagged")
+        expect(page.locator("#statsTagsChart")).to_have_attribute("aria-label", re.compile(r"\bUntagged: "))
         page.click('[data-stats-tab="overview"]')
 
         page.click('.tabs [data-tab="people"]')
@@ -649,10 +658,13 @@ class BrowserTests(unittest.TestCase):
         page.locator("#scopeActions button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
         expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
-        # Stats lists people, tags, collections, and merchants in the same table layout; a row opens its numbered list.
+        # Stats charts people, tags, collections, and merchants the same way; hovering a bar shows its figures for the
+        # period, and selecting it opens its numbered list.
         page.click('[data-stats-tab="places"]')
-        expect(page.locator("#statsCollectionsTable tbody tr").first).to_contain_text("Beach trip1$600.00$100.00$500.00$600.00")
-        expect(page.locator("#statsPeopleTable tbody tr").first).to_contain_text("Me1$600.00$100.00$500.00$600.00")
+        expect(page.locator("#statsCollectionsChart")).to_have_attribute("aria-label", "Beach trip: $500.00")
+        expect(page.locator("#statsPeopleChart")).to_have_attribute("aria-label", "Me: $500.00")
+        page.locator("#statsCollectionsChart").hover(position=self.bar(page, "#statsCollectionsChart", "Beach trip"))
+        expect(page.locator(".chart-tooltip")).to_contain_text("Beach tripNet spent: $500.00Purchases: 1Spent: $600.00Refunds: $100.00Avg purchase: $600.00")
         self.shot(page, "stats-collection")
         page.click('[data-stats-tab="trends"]')
         # The chart can show other measures than net spent, per day here because the collection spans 17 days.
@@ -676,7 +688,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#tagsTable")).to_be_visible()
         page.click('.tabs [data-tab="stats"]')
         page.click('[data-stats-tab="places"]')
-        page.locator("#statsMerchantsTable tbody tr", has_text="Hotel").click()
+        page.locator("#statsMerchantsChart").click(position=self.bar(page, "#statsMerchantsChart", "Hotel"))
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Hotel")
         page.locator("#scopeDialog button", has_text="Close").click()
 
@@ -1086,18 +1098,23 @@ class BrowserTests(unittest.TestCase):
 
         # Refunds count under their purchase's tag and merchant, regardless of the refund's own merchant.
         page.click('[data-stats-tab="places"]')
-        expect(page.locator("#statsTagsTable tbody tr", has_text="groceries")).to_contain_text("$20.00$5.00$15.00")
-        expect(page.locator("#statsTagsTable tbody tr", has_text="Untagged")).to_contain_text("3$16.00$0.00$16.00")
-        expect(page.locator("#statsMerchantsTable tbody tr").first).to_contain_text("Market3$31.00$5.00$26.00$10.33")
-        expect(page.locator("#statsMerchantsTable")).not_to_contain_text("Returned desk")
+        tags = page.locator("#statsTagsChart")
+        tags.hover(position=self.bar(page, "#statsTagsChart", "groceries"))
+        expect(page.locator(".chart-tooltip")).to_contain_text("Net spent: $15.00Purchases: 1Spent: $20.00Refunds: $5.00")
+        tags.hover(position=self.bar(page, "#statsTagsChart", "Untagged"))
+        expect(page.locator(".chart-tooltip")).to_contain_text("Net spent: $16.00Purchases: 3Spent: $16.00Refunds: $0.00")
+        merchants = page.locator("#statsMerchantsChart")
+        expect(merchants).to_have_attribute("aria-label", re.compile(r"^Market: \$26\.00"))
+        expect(merchants).not_to_have_attribute("aria-label", re.compile("Returned desk"))
+        merchants.hover(position=self.bar(page, "#statsMerchantsChart", "Market"))
+        expect(page.locator(".chart-tooltip")).to_contain_text("Visits: 3Spent: $31.00Refunds: $5.00Avg purchase: $10.33")
         # Merchant loyalty: Market's three visits fall on three days, 9 and 21 days apart (15 on average).
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("Market3")
         # Charts over the breakdowns, and the top merchants month by month; a merchant's bar opens its list.
         expect(page.locator("#statsMerchantsChart")).to_be_visible()
         expect(page.locator("#merchantTrendKey")).to_contain_text("Market")
-        merchant_chart = page.locator("#statsMerchantsChart")
-        merchant_chart.click(position={"x": 70 + 8, "y": merchant_chart.bounding_box()["height"] - 40})
-        expect(page.locator("#scopeDialogTitle")).to_contain_text("Merchant: ")
+        merchants.click(position=self.bar(page, "#statsMerchantsChart", "Market"))
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Market")
         page.locator("#scopeDialog button", has_text="Close").click()
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("1 of 1")
         expect(page.locator("#loyaltyTable tbody tr").first).to_contain_text("15 days")

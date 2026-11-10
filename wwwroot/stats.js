@@ -463,10 +463,10 @@ function renderStatsTables(stats) {
 
 /** People, tags, collections, and merchants on the People & Places sub-tab. */
 export function renderBreakdowns(stats) {
-  renderBreakdown($('#statsPeopleTable'), 'Person', 'person', stats.byPerson, { paidBack: true, chart: $('#statsPeopleChart'), color: 4 });
-  renderBreakdown($('#statsTagsTable'), 'Tag', 'tag', stats.byTag, { none: 'Untagged', chart: $('#statsTagsChart'), color: 2 });
-  renderBreakdown($('#statsCollectionsTable'), 'Collection', 'collection', stats.byCollection, { none: 'No collection', chart: $('#statsCollectionsChart'), color: 6 });
-  renderBreakdown($('#statsMerchantsTable'), 'Merchant', 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits', chart: $('#statsMerchantsChart'), color: 5 });
+  renderBreakdown($('#statsPeopleChart'), 'person', stats.byPerson, { paidBack: true, color: 4 });
+  renderBreakdown($('#statsTagsChart'), 'tag', stats.byTag, { none: 'Untagged', color: 2 });
+  renderBreakdown($('#statsCollectionsChart'), 'collection', stats.byCollection, { none: 'No collection', color: 6 });
+  renderBreakdown($('#statsMerchantsChart'), 'merchant', stats.byMerchant, { none: '(no merchant)', countLabel: 'Visits', color: 5 });
 }
 
 export function renderMonthsTable(stats) {
@@ -487,42 +487,33 @@ export function renderMonthsTable(stats) {
 }
 
 /**
- * People, tags, collections, and merchants share one table layout, highest net first, under a bar chart of the twelve
- * with the most net spent. Selecting a row or a bar lists that scope's entries; the "none" row (untagged, no
- * collection, no merchant) is listed last, is not selectable, and is left out of the chart.
+ * People, tags, collections, and merchants in the period: a bar of net spent for each of the twelve with the most (of
+ * those with purchases or refunds), plus the "none" group (untagged, no collection, no merchant) when it has any. Each one's own tab lists them for all time;
+ * here hovering a bar shows its figures for the period, and selecting one (other than "none") lists its entries.
  */
-function renderBreakdown(table, label, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false, chart = null, color = 1 } = {}) {
+function renderBreakdown(chart, scope, groups, { none = null, countLabel = 'Purchases', paidBack = false, color = 1 } = {}) {
   const net = group => group.spent - group.refunded;
-  if (chart) {
-    const top = [...groups].filter(([id, group]) => id != null && net(group) > 0).sort((a, b) => net(b[1]) - net(a[1])).slice(0, 12);
-    chart.closest('.chart-frame').hidden = top.length === 0;
-    if (top.length) {
-      const names = top.map(([id]) => SCOPE_NAMES[scope](id));
-      Charts.bars(chart, {
-        labels: names.map(name => (name.length > 10 ? `${name.slice(0, 9)}…` : name)),
-        titles: names,
-        series: [{ label: scope === 'person' ? 'Net share' : 'Net spent', color, format: formatMoney, values: top.map(([, group]) => net(group)) }],
-        onSelect: index => openScopeList(scope, top[index][0])
-      });
-    }
-  }
-  const rows = [...groups]
-    .filter(([id, group]) => (id != null || none) && (group.purchases || group.refunded || group.paidBack))
-    .sort((a, b) => (a[0] == null) - (b[0] == null) || net(b[1]) - net(a[1]))
-    .map(([id, group]) => ({
-      onClick: id == null ? undefined : () => openScopeList(scope, id),
-      cells: [
-        id == null ? none : SCOPE_NAMES[scope](id),
-        numberFormat.format(group.purchases), formatMoney(group.spent), formatMoney(group.refunded), formatMoney(net(group)),
-        averageMoney(group.spent, group.purchases), group.last ? formatDate(group.last) : '—',
-        ...(paidBack ? [formatMoney(group.paidBack)] : [])
-      ]
-    }));
-  renderTable(table, [
-    { label }, { label: countLabel, num: true, title: 'Number of purchases.' }, { label: 'Spent', num: true }, { label: 'Refunds', num: true },
-    { label: 'Net', num: true }, { label: 'Avg Purchase', num: true }, { label: 'Last Purchase' },
-    ...(paidBack ? [{ label: 'Paid Back', num: true, title: 'Paybacks this person made to you in the period.' }] : [])
-  ], rows, { empty: 'No purchases or refunds.' });
+  // Anything with purchases or refunds in the period, as the tables listed; a fully refunded one is a $0 bar to hover.
+  const active = group => group.purchases || group.refunded;
+  const named = [...groups].filter(([id, group]) => id != null && active(group)).sort((a, b) => net(b[1]) - net(a[1])).slice(0, 12);
+  const other = none ? [...groups].find(([id, group]) => id == null && active(group)) : null;
+  const shown = other ? [...named, other] : named;
+  const empty = chart.closest('.chart-frame').nextElementSibling;
+  chart.closest('.chart-frame').hidden = shown.length === 0;
+  empty.hidden = shown.length > 0;
+  if (!shown.length) return;
+  const names = shown.map(([id]) => (id == null ? none : SCOPE_NAMES[scope](id)));
+  Charts.bars(chart, {
+    labels: names.map(name => (name.length > 10 ? `${name.slice(0, 9)}…` : name)),
+    titles: names,
+    series: [{ label: scope === 'person' ? 'Net share' : 'Net spent', color, format: formatMoney, values: shown.map(([, group]) => net(group)) }],
+    details: shown.map(([, group]) => [
+      `${countLabel}: ${numberFormat.format(group.purchases)}`, `Spent: ${formatMoney(group.spent)}`, `Refunds: ${formatMoney(group.refunded)}`,
+      `Avg purchase: ${averageMoney(group.spent, group.purchases)}`, `Last purchase: ${group.last ? formatDate(group.last) : '—'}`,
+      ...(paidBack ? [`Paid back: ${formatMoney(group.paidBack)}`] : [])
+    ]),
+    onSelect: index => { if (shown[index][0] != null) openScopeList(scope, shown[index][0]); }
+  });
 }
 
 export function initializeStats() {
