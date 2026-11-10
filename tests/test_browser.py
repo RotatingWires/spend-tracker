@@ -478,6 +478,22 @@ class BrowserTests(unittest.TestCase):
         widths = page.evaluate("[...document.querySelectorAll('#transactionsTable th.wide-text')].map(th => th.getBoundingClientRect().width)")
         self.assertTrue(all(width >= 190 for width in widths), widths)
 
+    def test_click_outside_a_dialog_closes_it(self):
+        page = self.new_page(viewport={"width": 1280, "height": 900})
+        self.log_in(page)
+        page.click("#newTransactionButton")
+        dialog = page.locator("#transactionDialog")
+        box = dialog.bounding_box()
+        # A drag that starts inside (selecting text) and ends outside does not close it.
+        page.mouse.move(box["x"] + 20, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(5, 5, steps=4)
+        page.mouse.up()
+        expect(dialog).to_be_visible()
+        # A click outside closes it, as Escape does (shared dropdown.js, the same in every app).
+        page.mouse.click(5, 5)
+        expect(dialog).not_to_be_visible()
+
     def test_split_purchase_in_editor(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.merchant_id("Pizza")

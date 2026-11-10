@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.6
+# SpendTracker v1.3.7
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -179,7 +179,7 @@ When SpendTracker creates a fresh database, it records a pending reminder outsid
 
 > If you have a SpendTracker backup ZIP, restore it before adding entries. Use File > Import/Export... to restore it. Restoring a backup replaces all current data, so anything you add first would be replaced by a later restore. If you don't have a backup, choose Start Fresh.
 
-**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
+**Import/Export...** acknowledges the reminder and opens the Import/Export dialog. **Start Fresh** acknowledges it and continues; it does not reset or delete data. Escape, or a click outside the box, follows Start Fresh. Acknowledgement is saved for the server, so the reminder stays dismissed across browsers and restarts. Existing installations do not acquire the reminder just by updating. A successful restore also acknowledges it, including restores made directly through the API. The reminder marker (`data/import-reminder.pending`) is outside the database and is not part of backups.
 
 ## Concepts
 
@@ -588,7 +588,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.3.6**.
+Current release: **v1.3.7**.
+
+### v1.3.7
+
+- Clicking outside a dialog closes it, as Escape does (shared `dropdown.js`, the same in every app). A dialog that refuses Escape while it is busy stays open, and a drag that starts inside a dialog (selecting text) and ends outside does not close it.
 
 ### v1.3.6
 
