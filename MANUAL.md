@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.52
+# SpendTracker v1.3.0
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -60,6 +60,7 @@ src/
   Transfer.cs           backup ZIP creation and restore verification
   SingleFileLogger.cs   capped logs/console.log writer
   PasswordAuth.cs       setup token, password file, and sign-in cookie (the same file in all four apps)
+  SignInKeys.cs         where the sign-in keys live and how they are encrypted (the same file in all four apps)
 appsettings.json        listen address and log level
 deploy/spendtracker.service
                         example systemd unit
@@ -132,6 +133,15 @@ There are no other settings. To keep SpendTracker running in the background, sta
 ### Run as a Linux service
 
 `deploy/spendtracker.service` is a systemd template, not an installer, like NewsReview's: build with `dotnet publish -c Release -o /opt/spendtracker`, create the service account, `/var/lib/spendtracker` (the data folder) and `/opt/spendtracker/logs`, adjust `User`, `WorkingDirectory`, `ExecStart`, and `ReadWritePaths` to match, then install and enable it. It listens on loopback at port 8715; change its `--urls` for LAN access, and find the first-run setup token in the journal.
+
+**Encrypted sign-in keys on Linux.** On Windows the sign-in keys in `data/keys/` are encrypted with machine-scope DPAPI. On Linux the template's `ImportCredential=spendtracker-sign-in-keys` hands SpendTracker a secret that systemd encrypts with the machine's credential key (or its TPM), and the keys are encrypted with it (AES-256-GCM, `src/SignInKeys.cs`, the same in all four apps), so a copied data folder or backup holds no readable key. Create the secret once (systemd 254 or later), then restart the service:
+
+```sh
+sudo mkdir -p /etc/credstore.encrypted
+head -c 32 /dev/urandom | sudo systemd-creds encrypt --name=spendtracker-sign-in-keys - /etc/credstore.encrypted/spendtracker-sign-in-keys
+```
+
+Keys already in `data/keys/` are encrypted in place on that start, so nobody is signed out. The startup log says how the keys are kept (`Sign-in keys: ..., encrypted with the spendtracker-sign-in-keys systemd credential`). Without the credential (or when started from a terminal) the service still runs and the key files stay unencrypted but readable only by the service account, in an owner-only folder. Once keys are encrypted, starting the app without the credential cannot read them: everyone signs in again, or start it through the service.
 
 `appsettings.json` holds the default listen address (`Urls`) and log level, the same keys in every app. `--urls` and `ASPNETCORE_URLS` override it.
 
@@ -398,7 +408,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 data/
   spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
-  keys/                 sign-in cookie keys (machine-scope DPAPI on Windows)
+  keys/                 sign-in cookie keys, encrypted (DPAPI on Windows, a systemd credential on Linux)
   backups/              recovery copies written automatically before each restore (File > Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
@@ -576,7 +586,12 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.52**.
+Current release: **v1.3.0**.
+
+### v1.3.0
+
+- Sign-in keys are encrypted on Linux too, as on Windows: with the `spendtracker-sign-in-keys` systemd credential (AES-256-GCM, shared `src/SignInKeys.cs`), so a copied data folder or backup holds no readable key. The systemd template imports it; create it once with the command in the manual. Existing keys are encrypted in place, so nobody is signed out. Without the credential the keys stay unencrypted, as before, in a folder only the app's account can open.
+- Windows is unchanged: machine-scope DPAPI. The startup log now says how the keys are kept.
 
 ### v1.2.52
 
