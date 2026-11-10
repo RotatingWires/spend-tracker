@@ -391,17 +391,29 @@ export function describeTransaction(tx) {
   return [tx.merchant, tx.description].filter(Boolean).join(' — ');
 }
 
-/** A person's share of a purchase not yet covered by refunds or paybacks linked to that share. */
+/**
+ * A person's share of a purchase not yet covered by refunds or paybacks linked to that share. Below zero when they
+ * paid back more than their share, which is allowed.
+ */
 export function shareRemaining(purchase, personId, excludingId = null) {
-  let covered = 0;
-  for (const tx of state.model.linked.get(purchase.id) ?? []) {
-    if (tx.id !== excludingId && tx.personId === personId) covered += tx.amountCents;
-  }
-  return shareOf(purchase, personId) - covered;
+  return shareOf(purchase, personId) - linkedTotal(purchase, personId, excludingId);
 }
 
-export function purchaseRemaining(purchase, excludingId = null) {
-  return purchase.shares.reduce((sum, share) => sum + shareRemaining(purchase, share.personId, excludingId), 0);
+/** How much of a person's share can still be refunded: only refunds count, since paybacks can go past the share. */
+export function shareRefundable(purchase, personId, excludingId = null) {
+  return shareOf(purchase, personId) - linkedTotal(purchase, personId, excludingId, 'Refund');
+}
+
+function linkedTotal(purchase, personId, excludingId, kind = null) {
+  let total = 0;
+  for (const tx of state.model.linked.get(purchase.id) ?? []) {
+    if (tx.id !== excludingId && tx.personId === personId && (!kind || tx.kind === kind)) total += tx.amountCents;
+  }
+  return total;
+}
+
+export function purchaseRefundable(purchase, excludingId = null) {
+  return purchase.shares.reduce((sum, share) => sum + shareRefundable(purchase, share.personId, excludingId), 0);
 }
 
 export function transactionsInRange(start, end) {

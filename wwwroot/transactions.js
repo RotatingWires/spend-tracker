@@ -1,5 +1,5 @@
 /* Transactions tab (the monthly ledger) and the shared transaction editor dialog. */
-import { $, TAG_SEPARATOR, api, applyTransactionChanges, centsToInput, collectionIdsOf, collectionName, describeTransaction, el, evenShares, fileStamp, formatAmount, formatDate, formatMoney, formatMonth, matchesSearch, methodName, monthOf, numberFormat, othersShare, parseMoney, parseTypedDate, peopleOf, personName, plural, purchaseRemaining, scopeNumbers, shareOf, shareRemaining, state, tagIdsOf, tagName, timeFrameLabel, timeFrameTransactions, todayKey, typedDate, whoLabel, writeSetting } from './app.js';
+import { $, TAG_SEPARATOR, api, applyTransactionChanges, centsToInput, collectionIdsOf, collectionName, describeTransaction, el, evenShares, fileStamp, formatAmount, formatDate, formatMoney, formatMonth, matchesSearch, methodName, monthOf, numberFormat, othersShare, parseMoney, parseTypedDate, peopleOf, personName, plural, purchaseRefundable, scopeNumbers, shareOf, shareRefundable, shareRemaining, state, tagIdsOf, tagName, timeFrameLabel, timeFrameTransactions, todayKey, typedDate, whoLabel, writeSetting } from './app.js';
 import { bindSearchForm, confirmAction, createMultiSelect, createSingleSelect, moneyCell, renderTable, setStatus, sortByValue, tableSorts } from './widgets.js';
 import { calendarCollectionId, setCalendarCollectionId } from './calendar.js';
 import { merchantIdsOf } from './summaries.js';
@@ -808,7 +808,7 @@ function refreshLinkedOptions(preferredId = null, preferredPersonId = null) {
   const candidates = state.model.transactions
     .filter(tx => tx.kind === 'Purchase')
     .filter(tx => kind === 'Refund'
-      ? purchaseRemaining(tx, selfId) > 0 || tx.id === wanted
+      ? purchaseRefundable(tx, selfId) > 0 || tx.id === wanted
       : payers.length > 0 && payers.every(payer => shareOf(tx, payer) > 0 && (shareRemaining(tx, payer, selfId) > 0 || tx.id === wanted)))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
     .map(tx => ({ value: tx.id, label: purchaseLabel(tx) }));
@@ -827,7 +827,7 @@ function refreshRefundPerson(preferredPersonId = null) {
   const selfId = editor.transaction?.id ?? null;
   const wanted = preferredPersonId ?? (editor.person.value ? Number(editor.person.value) : null);
   const options = (purchase?.shares ?? [])
-    .filter(share => shareRemaining(purchase, share.personId, selfId) > 0 || share.personId === wanted)
+    .filter(share => shareRefundable(purchase, share.personId, selfId) > 0 || share.personId === wanted)
     .map(share => ({ value: share.personId, label: `${personName(share.personId)} (${formatMoney(share.amountCents)})` }));
   editor.person.setOptions(options, wanted);
   $('#txPersonLabel').textContent = 'Whose share';
@@ -855,15 +855,21 @@ function updateLinkedHint() {
   }
   const payers = kind === 'Payback' ? selectedPayers() : [];
   if (payers.length > 1) {
-    const unpaid = payers.map(id => `${formatMoney(shareRemaining(purchase, id, editor.transaction?.id ?? null))} of ${personName(id)}'s share`);
-    hint.textContent = `${unpaid.join(', ')} still unpaid.`;
+    const unpaid = payers.map(id => `${formatMoney(Math.max(0, shareRemaining(purchase, id, editor.transaction?.id ?? null)))} of ${personName(id)}'s share`);
+    hint.textContent = `${unpaid.join(', ')} still unpaid. Paying back more is fine; the extra shows on their balance.`;
     return;
   }
-  const remaining = shareRemaining(purchase, personId, editor.transaction?.id ?? null);
+  const selfId = editor.transaction?.id ?? null;
   const whose = purchase.shares.length > 1 ? `${personName(personId)}'s share` : 'this purchase';
-  hint.textContent = kind === 'Refund'
-    ? `Up to ${formatMoney(remaining)} of ${whose} can still be refunded. Refunds use the purchase's tags and collections.`
-    : `${formatMoney(remaining)} of ${whose} is still unpaid.`;
+  if (kind === 'Refund') {
+    hint.textContent = `Up to ${formatMoney(shareRefundable(purchase, personId, selfId))} of ${whose} can still be refunded. Refunds use the purchase's tags and collections.`;
+    return;
+  }
+  // A payback can go past the share (someone who rounds up); the extra shows as overpaid on their balance.
+  const remaining = shareRemaining(purchase, personId, selfId);
+  hint.textContent = remaining > 0
+    ? `${formatMoney(remaining)} of ${whose} is still unpaid. Paying back more is fine; the extra shows on their balance.`
+    : `${whose[0].toUpperCase()}${whose.slice(1)} is paid${remaining < 0 ? `, with ${formatMoney(-remaining)} extra` : ''}. More is fine; it shows on their balance.`;
 }
 
 function onLinkedPurchaseChange() {
@@ -884,13 +890,17 @@ function prefillFromLinkedPurchase() {
   if (payers.length > 1) {
     // Several payers: each pays back what is left of their own share, and the amount is the total.
     if (!$('#txAmount').value.trim()) {
-      const remaining = payers.map(id => shareRemaining(purchase, id));
+      const remaining = payers.map(id => Math.max(0, shareRemaining(purchase, id)));
       $('#txAmount').value = centsToInput(remaining.reduce((sum, cents) => sum + cents, 0));
       editor.autoShare = null;
       shareInputs().forEach((input, index) => { input.value = formatAmount(remaining[index]); });
       updateShareTotal();
     }
-  } else if (!$('#txAmount').value.trim() && personId != null) $('#txAmount').value = centsToInput(shareRemaining(purchase, personId));
+  } else if (!$('#txAmount').value.trim() && personId != null) {
+    // A refund starts at what can still be refunded, a payback at what is still unpaid.
+    const left = editorKind() === 'Refund' ? shareRefundable(purchase, personId) : Math.max(0, shareRemaining(purchase, personId));
+    if (left > 0) $('#txAmount').value = centsToInput(left);
+  }
   if (editorKind() === 'Refund') {
     if (!editor.merchant.value && !$('#txDescription').value.trim()) {
       editor.merchant.value = purchase.merchantId ?? '';

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.1
+# SpendTracker v1.3.2
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -211,7 +211,7 @@ The server enforces these rules on every save:
 
 - a refund or payback can only link to a purchase, and cannot be dated before it;
 - a purchase's shares add up exactly to its amount, each person appears once, and each share is at least $0.01;
-- a refund or linked payback is for someone with a share of that purchase, and refunds plus linked paybacks for one person's share can never exceed that share;
+- a refund or linked payback is for someone with a share of that purchase, and refunds for one person's share can never exceed that share. Paybacks can: someone who pays you back more than their share (rounding $25 up to $30) is shown as overpaid on their balance, and the purchase in their dialog reads *Covered, $5.00 extra*;
 - a purchase with linked refunds/paybacks must stay a purchase, cannot move to a date after them, must keep everyone who has linked entries, and cannot give anyone a share smaller than what is linked to it;
 - a purchase with linked entries cannot be deleted until those entries are deleted.
 
@@ -586,7 +586,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.3.1**.
+Current release: **v1.3.2**.
+
+### v1.3.2
+
+- People can pay you back more than their share: a $30 payback on a $25 share is saved, their balance shows $5.00 overpaid, and the purchase reads *Covered, $5.00 extra* in their dialog. Only refunds are still capped at a person's share, and paybacks no longer use up what can be refunded.
 
 ### v1.3.1
 

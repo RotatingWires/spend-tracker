@@ -580,8 +580,9 @@ sealed partial class Store
                 if (string.CompareOrdinal(date, refunded.Date) < 0)
                     throw RequestException.Invalid("A refund cannot be dated before its purchase.");
                 var refundShare = RequireShare(connection, transaction, refunded.Id, personId, "Choose whose share of the purchase this refund is for.");
-                if (LinkedShareTotal(connection, transaction, refunded.Id, personId!.Value, id) + amount > refundShare)
-                    throw RequestException.Invalid($"Refunds and paybacks for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(refundShare)}.");
+                // Refunds lower what the share cost, so they cannot add up to more than it; paybacks do not count here.
+                if (RefundedShareTotal(connection, transaction, refunded.Id, personId!.Value, id) + amount > refundShare)
+                    throw RequestException.Invalid($"Refunds for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(refundShare)}.");
                 break;
 
             case "Payback":
@@ -592,12 +593,10 @@ sealed partial class Store
                     var repaid = RequireLinkedPurchase(connection, transaction, id, linkedId, "Choose the purchase this payback is for.");
                     if (string.CompareOrdinal(date, repaid.Date) < 0)
                         throw RequestException.Invalid("A payback cannot be dated before its purchase.");
-                    var paybackShare = RequireShare(connection, transaction, repaid.Id, personId,
-                        "A payback can only be linked to a purchase that person had a share of.");
+                    RequireShare(connection, transaction, repaid.Id, personId, "A payback can only be linked to a purchase that person had a share of.");
                     if (IsGiftShare(connection, transaction, repaid.Id, personId!.Value))
                         throw RequestException.Invalid($"{PersonName(connection, transaction, personId.Value)}'s share of that purchase was a gift, so there is nothing to pay back.");
-                    if (LinkedShareTotal(connection, transaction, repaid.Id, personId!.Value, id) + amount > paybackShare)
-                        throw RequestException.Invalid($"Refunds and paybacks for {PersonName(connection, transaction, personId.Value)}'s share would total more than their {FormatCents(paybackShare)}.");
+                    // Paying back more than the share is allowed (a friend who rounds up); their balance then shows overpaid.
                 }
                 break;
         }
@@ -692,9 +691,10 @@ sealed partial class Store
                 ?? throw RequestException.Invalid($"{name} has linked refunds or paybacks on this purchase, so they must stay on it.");
             if (share.Gift && group.Any(d => d.Kind == "Payback"))
                 throw RequestException.Invalid($"{name} has paid back part of this purchase, so their share cannot be a gift.");
-            var linked = group.Sum(d => d.AmountCents);
-            if (linked > share.AmountCents)
-                throw RequestException.Invalid($"Refunds and paybacks for {name}'s share already total {FormatCents(linked)}; their share cannot be less than that.");
+            // Only refunds hold a share up; paybacks may be more than it.
+            var refunded = group.Where(d => d.Kind == "Refund").Sum(d => d.AmountCents);
+            if (refunded > share.AmountCents)
+                throw RequestException.Invalid($"Refunds for {name}'s share already total {FormatCents(refunded)}; their share cannot be less than that.");
         }
     }
 
@@ -745,9 +745,9 @@ sealed partial class Store
         Convert.ToInt64(Scalar(connection, transaction, "SELECT gift FROM transaction_shares WHERE transaction_id = $purchase AND person_id = $person;",
             ("$purchase", purchaseId), ("$person", personId)) ?? 0L, CultureInfo.InvariantCulture) != 0;
 
-    static long LinkedShareTotal(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long personId, long? excludingId) =>
+    static long RefundedShareTotal(SqliteConnection connection, SqliteTransaction transaction, long purchaseId, long personId, long? excludingId) =>
         Convert.ToInt64(Scalar(connection, transaction,
-            "SELECT COALESCE(SUM(amount_cents), 0) FROM transactions WHERE linked_id = $purchase AND person_id = $person AND ($exclude IS NULL OR id <> $exclude);",
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM transactions WHERE linked_id = $purchase AND person_id = $person AND kind = 'Refund' AND ($exclude IS NULL OR id <> $exclude);",
             ("$purchase", purchaseId), ("$person", personId), ("$exclude", excludingId)), CultureInfo.InvariantCulture);
 
     static string PersonName(SqliteConnection connection, SqliteTransaction transaction, long personId) =>

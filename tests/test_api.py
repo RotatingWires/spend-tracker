@@ -125,10 +125,9 @@ class SpendTrackerApiTests(unittest.TestCase):
         for_me = self.purchase(amount=3000)
         self.assertRejected(lambda: self.payback(100, person=self.me), contains="someone other than you")
         self.assertRejected(lambda: self.payback(100, linked=for_me["id"]), contains="had a share")
-        self.assertRejected(lambda: self.payback(3001, linked=for_alex["id"]), contains="more than")
+        # A payback can be more than what is left of the share (a friend who rounds up).
         self.refund(for_alex["id"], 1000, person=self.alex)
-        self.assertRejected(lambda: self.payback(2001, linked=for_alex["id"]), contains="more than")
-        self.payback(2000, linked=for_alex["id"])
+        self.payback(2500, linked=for_alex["id"])
         unlinked = self.payback(5000)
         self.assertIsNone(unlinked["linkedId"])
 
@@ -146,10 +145,13 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertRejected(lambda: self.purchase(shares=[]), contains="Choose who")
         self.assertRejected(lambda: self.purchase(personId=self.me), contains="not in personId")
 
-        # Refunds and paybacks apply to one person's share and are capped by it.
-        self.assertRejected(lambda: self.payback(1201, linked=dinner["id"]), contains="Alex's share")
+        # Refunds apply to one person's share and are capped by it; paybacks are not, since a friend can pay back extra.
+        extra = self.payback(1500, linked=dinner["id"])
+        self.assertEqual(extra["amountCents"], 1500)
+        self.api.delete(f"/api/transactions/{extra['id']}")
         self.payback(1200, linked=dinner["id"])
-        self.assertRejected(lambda: self.refund(dinner["id"], 1, person=self.alex), contains="Alex's share")
+        self.refund(dinner["id"], 1200, person=self.alex)  # paybacks do not use up what can be refunded
+        self.assertRejected(lambda: self.refund(dinner["id"], 1, person=self.alex), contains="Refunds for Alex's share")
         self.refund(dinner["id"], 800, person=jordan)
 
         # The split can change, but never drop someone below what is linked to their share.
@@ -168,7 +170,9 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.payback(1000, linked=bought["id"])
         base = self.editable(bought)
         put = lambda body: self.api.put(f"/api/transactions/{bought['id']}", body)
-        self.assertRejected(lambda: put({**base, "shares": [{"personId": self.alex, "amountCents": 1499}, {"personId": self.me, "amountCents": 501}]}), contains="cannot be less")
+        # Refunds hold the share up ($5.00 here); paybacks do not, so it can drop below refunds plus paybacks.
+        self.assertRejected(lambda: put({**base, "shares": [{"personId": self.alex, "amountCents": 499}, {"personId": self.me, "amountCents": 1501}]}), contains="cannot be less")
+        self.assertEqual(put({**base, "shares": [{"personId": self.alex, "amountCents": 1000}, {"personId": self.me, "amountCents": 1000}]})["shares"][0]["amountCents"], 1000)
         self.assertRejected(lambda: put({**base, "shares": [{"personId": self.me, "amountCents": 2000}]}), contains="must stay on it")
         self.assertRejected(lambda: put({**base, "date": "2026-10-07"}), contains="dated before")
         self.assertRejected(lambda: put({**base, "kind": "Payback", "personId": self.alex, "shares": []}), contains="must stay a purchase")

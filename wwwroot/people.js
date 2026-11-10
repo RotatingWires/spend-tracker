@@ -109,7 +109,7 @@ export function renderPersonDialog() {
     if (tx.kind === 'Purchase') {
       amount = shareOf(tx, personId);
       const remaining = shareRemaining(tx, personId);
-      status = isGiftShare(tx, personId) ? 'Gift' : remaining > 0 ? `${formatMoney(remaining)} unpaid` : 'Covered';
+      status = isGiftShare(tx, personId) ? 'Gift' : remaining > 0 ? `${formatMoney(remaining)} unpaid` : remaining < 0 ? `Covered, ${formatMoney(-remaining)} extra` : 'Covered';
       if (tx.shares.length > 1) status += ` · share of ${formatMoney(tx.amountCents)}`;
     } else if (tx.kind === 'Payback') {
       status = tx.linkedId == null ? 'Not linked' : `For #${tx.linkedId}`;
