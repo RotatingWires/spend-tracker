@@ -139,7 +139,10 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertIsNone(dinner["personId"])
         self.assertRejected(lambda: self.purchase(amount=3000, shares=[(self.me, 1000), (self.alex, 1000)]), contains="add up to $20.00")
         self.assertRejected(lambda: self.purchase(amount=2000, shares=[(self.me, 1000), (self.me, 1000)]), contains="only be on a purchase once")
-        self.assertRejected(lambda: self.purchase(amount=2000, shares=[(self.me, 2000), (self.alex, 0)]), contains="at least $0.01")
+        # $0.00 keeps someone on a purchase who had no part of the cost; a negative share is never valid.
+        food = self.purchase(amount=2000, shares=[(self.me, 2000), (self.alex, 0)])
+        self.assertEqual([(share["personId"], share["amountCents"]) for share in food["shares"]], [(self.me, 2000), (self.alex, 0)])
+        self.assertRejected(lambda: self.purchase(amount=2000, shares=[(self.me, 2100), (self.alex, -100)]), contains="cannot be negative")
         self.assertRejected(lambda: self.purchase(shares=[]), contains="Choose who")
         self.assertRejected(lambda: self.purchase(personId=self.me), contains="not in personId")
 
@@ -285,6 +288,36 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertRejected(lambda: self.api.delete(f"/api/collections/{trip}"), 404)
 
     # ------------------------------------------------------------ backup and restore
+
+    def test_schema_6_database_upgrades_and_keeps_its_data(self):
+        """A database from before $0.00 shares (schema 6) opens, keeps everything, and then accepts $0.00 shares."""
+        purchase = self.purchase(amount=1500, shares=[(self.me, 500), (self.alex, 1000)], description="Old dinner")
+        copy = Path(tempfile.mkdtemp()) / "spendtracker.db"
+        with sqlite3.connect(self.server.data_dir / "spendtracker.db") as live, sqlite3.connect(copy) as target:
+            live.backup(target)
+        with sqlite3.connect(copy) as old:  # make it a schema 6 database again
+            old.executescript("""
+                PRAGMA foreign_keys = OFF;
+                CREATE TABLE shares_v6 (
+                    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                    person_id INTEGER NOT NULL REFERENCES people(id),
+                    amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+                    gift INTEGER NOT NULL DEFAULT 0 CHECK(gift IN (0, 1)),
+                    PRIMARY KEY (transaction_id, person_id));
+                INSERT INTO shares_v6 SELECT transaction_id, person_id, amount_cents, gift FROM transaction_shares;
+                DROP TABLE transaction_shares;
+                ALTER TABLE shares_v6 RENAME TO transaction_shares;
+                PRAGMA user_version = 6;""")
+        upgraded = Server(prepare=lambda data: (data / "spendtracker.db").write_bytes(copy.read_bytes()))
+        self.addCleanup(upgraded.stop)
+        api = upgraded.logged_in_client()
+        snapshot = api.get("/api/snapshot")
+        kept = next(tx for tx in snapshot["transactions"] if tx["id"] == purchase["id"])
+        self.assertEqual([share["amountCents"] for share in kept["shares"]], [500, 1000])
+        food = api.post("/api/transactions", {**self.editable(kept), "description": "Food", "shares": [{"personId": self.me, "amountCents": 1500}, {"personId": self.alex, "amountCents": 0}]})
+        self.assertEqual([share["amountCents"] for share in food["shares"]], [1500, 0])
+        with sqlite3.connect(upgraded.data_dir / "spendtracker.db") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 7)
 
     def test_backup_restore_round_trip_keeps_ids_links_and_history(self):
         food = self.api.post("/api/tags", {"name": "food"})["id"]
@@ -443,7 +476,7 @@ class SpendTrackerApiTests(unittest.TestCase):
             "wrong totals": rebuild(archive, manifest={"totals": {"transactions": 99}}),
             "wrong format": rebuild(archive, manifest={"format": "something-else"}),
             "newer app": rebuild(archive, manifest={"applicationVersion": "99.0.0"}),
-            "newer schema": rebuild(archive, manifest={"schemaVersion": 7}),
+            "newer schema": rebuild(archive, manifest={"schemaVersion": 8}),
             "schema 5 from v0.9": rebuild(archive, manifest={"schemaVersion": 5}),
             "schema 4 from v0.8": rebuild(archive, manifest={"schemaVersion": 4}),
             "schema 3 from v0.4": rebuild(archive, manifest={"schemaVersion": 3}),

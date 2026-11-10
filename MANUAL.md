@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.44
+# SpendTracker v1.2.45
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -189,7 +189,7 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View > Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
-**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. When you add a second person, you start with the whole amount and everyone else with 0.00; your box follows the amount until you change any box. A blank box counts as $0.00, and anyone left at $0.00 is not saved on the purchase. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
+**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. When you add a second person, you start with the whole amount and everyone else with 0.00; your box follows the amount until you change any box. A blank box counts as $0.00, and someone at $0.00 stays on the purchase, like a friend you bought food for who owes nothing. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
 **Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts in their shares (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
 
@@ -576,7 +576,12 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.44**.
+Current release: **v1.2.45**.
+
+### v1.2.45
+
+- Someone at $0.00 stays on a purchase (like a friend you bought food for who owes nothing); v1.2.44 left them off. A blank share still counts as $0.00. Paybacks still skip anyone at $0.00, since they paid nothing.
+- The database moves to schema 7, which allows $0.00 shares. An existing database is upgraded once on startup, keeping all its data, and backups from earlier versions (schema 6) still restore.
 
 ### v1.2.44
 

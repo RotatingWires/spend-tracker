@@ -739,8 +739,8 @@ function splitEvenly() {
 }
 
 /**
- * Who a purchase was for, or how much each payer paid back. People left at $0.00 are not saved on it: a share is a
- * part of the amount, so someone with no part is simply not on the purchase.
+ * Who a purchase was for, or how much each payer paid back. On a purchase, someone at $0.00 stays on it (a friend you
+ * bought food for); on a payback, someone at $0.00 paid nothing, so no payback is saved for them.
  */
 function collectShares(amountCents) {
   const payback = editorKind() === 'Payback';
@@ -758,7 +758,7 @@ function collectShares(amountCents) {
   if (assigned !== amountCents) {
     throw new Error(`The amounts add up to ${formatMoney(assigned)}, but the ${payback ? 'payback' : 'purchase'} is ${formatMoney(amountCents)}. Use Split Evenly, or change an amount.`);
   }
-  return shares.filter(share => share.amountCents > 0);
+  return payback ? shares.filter(share => share.amountCents > 0) : shares;
 }
 
 /** A payback's payers changed: the purchases it can be for, and the hint, follow them. */

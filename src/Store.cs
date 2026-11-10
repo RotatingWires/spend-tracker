@@ -14,7 +14,7 @@ sealed class RequestException(int statusCode, string message) : Exception(messag
 /// <summary>SQLite storage for SpendTracker. Every change is validated here and recorded in the history table in the same transaction.</summary>
 sealed partial class Store
 {
-    public const int SchemaVersion = 6;
+    public const int SchemaVersion = 7;
 
     /// <summary>Every data table, in an order where referenced rows are inserted before the rows that point at them.</summary>
     public static readonly string[] Tables = ["payment_methods", "people", "tags", "merchants", "collections", "transactions", "transaction_shares", "transaction_tags", "transaction_collections", "scope_counters", "scope_numbers", "history"];
@@ -55,6 +55,14 @@ sealed partial class Store
         if (version == SchemaVersion)
         {
             // Gives existing entries their numbers in any scope added to NumberedScopes since they were saved.
+            using var renumber = connection.BeginTransaction();
+            Renumber(connection, renumber, null);
+            renumber.Commit();
+            return journalMode;
+        }
+        if (version == 6)
+        {
+            UpgradeFromSchema6(connection);
             using var renumber = connection.BeginTransaction();
             Renumber(connection, renumber, null);
             renumber.Commit();
@@ -125,7 +133,8 @@ sealed partial class Store
             CREATE TABLE transaction_shares (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 person_id INTEGER NOT NULL REFERENCES people(id),
-                amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+                -- $0.00 keeps someone on a purchase who had no part of the cost, like a friend you bought food for.
+                amount_cents INTEGER NOT NULL CHECK(amount_cents >= 0),
                 -- A gift share is bought for that person but not owed back, so it stays off their balance.
                 gift INTEGER NOT NULL DEFAULT 0 CHECK(gift IN (0, 1)),
                 PRIMARY KEY (transaction_id, person_id)
@@ -616,7 +625,35 @@ sealed partial class Store
         return ids;
     }
 
-    /// <summary>Who a purchase was for: each person once, each share at least a cent, adding up exactly to the amount.</summary>
+    /// <summary>
+    /// Schema 7 lets a share be $0.00, so someone with no part of the cost can stay on a purchase. SQLite changes a CHECK
+    /// rule only by rebuilding the table: the shares are copied into a new table with the new rule, in one transaction.
+    /// </summary>
+    static void UpgradeFromSchema6(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        Execute(connection, transaction, """
+            CREATE TABLE transaction_shares_new (
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                person_id INTEGER NOT NULL REFERENCES people(id),
+                -- $0.00 keeps someone on a purchase who had no part of the cost, like a friend you bought food for.
+                amount_cents INTEGER NOT NULL CHECK(amount_cents >= 0),
+                -- A gift share is bought for that person but not owed back, so it stays off their balance.
+                gift INTEGER NOT NULL DEFAULT 0 CHECK(gift IN (0, 1)),
+                PRIMARY KEY (transaction_id, person_id)
+            );
+            INSERT INTO transaction_shares_new (transaction_id, person_id, amount_cents, gift)
+                SELECT transaction_id, person_id, amount_cents, gift FROM transaction_shares;
+            DROP TABLE transaction_shares;
+            ALTER TABLE transaction_shares_new RENAME TO transaction_shares;
+            """);
+        if (Scalar(connection, transaction, "PRAGMA foreign_key_check;") is not null)
+            throw new InvalidOperationException("Upgrading spendtracker.db to schema 7 found shares linked to missing rows; nothing was changed.");
+        Execute(connection, transaction, "PRAGMA user_version = 7;");
+        transaction.Commit();
+    }
+
+    /// <summary>Who a purchase was for: each person once, each share $0.00 or more, adding up exactly to the amount.</summary>
     static List<Share> ValidateShares(SqliteConnection connection, SqliteTransaction transaction, List<ShareRequest>? requested, long amount, SpendTransaction? before)
     {
         if (requested is null || requested.Count == 0) throw RequestException.Invalid("Choose who this purchase was for.");
@@ -625,7 +662,7 @@ sealed partial class Store
         {
             var personId = share.PersonId ?? throw RequestException.Invalid("Every share needs a person.");
             var cents = share.AmountCents ?? throw RequestException.Invalid("Every share needs an amount.");
-            if (cents < 1) throw RequestException.Invalid("Each person's share must be at least $0.01.");
+            if (cents < 0) throw RequestException.Invalid("A person's share cannot be negative.");
             if (shares.Any(s => s.PersonId == personId)) throw RequestException.Invalid("Each person can only be on a purchase once.");
             var wasOnPurchase = before?.Shares.Any(s => s.PersonId == personId) == true;
             var person = RequireUsablePerson(connection, transaction, personId, wasOnPurchase ? personId : null, "Choose who this purchase was for.");

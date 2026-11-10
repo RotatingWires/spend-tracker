@@ -122,7 +122,8 @@ static class Transfer
                     throw RequestException.Invalid("This is not a SpendTracker backup.");
                 if (!Version.TryParse(manifest.ApplicationVersion, out var backupVersion) || backupVersion > Version.Parse(version) || manifest.SchemaVersion > Store.SchemaVersion)
                     throw RequestException.Invalid("This backup was made by a newer SpendTracker version. Update SpendTracker first.");
-                if (manifest.SchemaVersion != Store.SchemaVersion)
+                // Schema 6 backups restore too: they hold the same tables and columns, without $0.00 shares.
+                if (manifest.SchemaVersion is not (6 or Store.SchemaVersion))
                     throw RequestException.Invalid($"This backup uses database schema {manifest.SchemaVersion}, which this version cannot restore.");
 
                 using var source = archive.GetEntry(databaseEntry)!.Open();

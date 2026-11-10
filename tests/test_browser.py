@@ -402,7 +402,7 @@ class BrowserTests(unittest.TestCase):
         page.click("#txSaveButton")
         expect(page.locator("#statusLeft")).to_contain_text("Added purchase")
         purchase = max(api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])
-        self.assertEqual([share["amountCents"] for share in purchase["shares"]], [4000])  # Dana at $0.00 is not on it
+        self.assertEqual([share["amountCents"] for share in purchase["shares"]], [4000, 0])  # Dana stays on it at $0.00
 
         # A payback from two people saves one payback each.
         page.click("#newTransactionButton")
