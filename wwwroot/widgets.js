@@ -373,8 +373,8 @@ function cycleTableSort(key, index) {
 
 /**
  * Renders a table. columns: [{ label, num, className, title, sortValue, unsortable }].
- * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), onDoubleClick(event), className, id, selected }].
- * onDoubleClick opens on a double click (or Enter) instead, for rows a stray click should not open.
+ * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), className, id, selected }].
+ * A click (or Enter) on a row runs onClick, except on a button in it, or at the end of a drag.
  */
 export function renderTable(table, columns, rows, options = {}) {
   const { empty = 'Nothing here yet.', footer = null, onSort = null } = options;
@@ -451,25 +451,22 @@ function tableRow(columns, row) {
     else td.textContent = String(content);
     tr.append(td);
   });
-  if (row.onClick || row.onDoubleClick) {
+  if (row.onClick) {
     tr.classList.add('clickable');
     tr.tabIndex = 0;
-    if (row.onClick) {
-      tr.addEventListener('click', event => {
-        if (!event.target.closest('button')) row.onClick(event);
-      });
-    }
-    if (row.onDoubleClick) {
-      tr.addEventListener('dblclick', event => {
-        if (event.target.closest('button, input')) return;
-        window.getSelection()?.removeAllRanges(); // a double click selects a word; opening the editor should not
-        row.onDoubleClick(event);
-      });
-    }
+    // A drag (to select text and copy it) is not a click on the row.
+    let pressedAt = null;
+    tr.addEventListener('pointerdown', event => { pressedAt = [event.clientX, event.clientY]; });
+    tr.addEventListener('click', event => {
+      const dragged = pressedAt && Math.hypot(event.clientX - pressedAt[0], event.clientY - pressedAt[1]) > 5;
+      // A row's own check box (selection mode) toggles through this click; buttons in it do their own thing.
+      if (event.target.closest('button') || dragged) return;
+      row.onClick(event);
+    });
     tr.addEventListener('keydown', event => {
       if ((event.key === 'Enter' || event.key === ' ') && event.target === tr && !event.repeat) {
         event.preventDefault();
-        (row.onClick ?? row.onDoubleClick)(event);
+        row.onClick(event);
       }
     });
   }

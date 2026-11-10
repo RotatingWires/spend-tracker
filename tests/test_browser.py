@@ -224,7 +224,7 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(box["height"], button["height"], "the Add box is as tall as its Add button")
         # A tag's row opens its dialog, which holds Rename, Archive, and Delete. Rename asks with Cancel, then Save; Enter saves.
         expect(page.locator("#tagsTable button")).to_have_count(0)
-        page.locator("#tagsTable tbody tr", has_text="food").dblclick()
+        page.locator("#tagsTable tbody tr", has_text="food").click()
         expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Rename").click()
         expect(page.locator("#promptDialog .dialog-buttons button")).to_have_text(["Cancel", "Save"])
@@ -266,18 +266,18 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionsTable thead th").last).to_have_text("Net Spent")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$12.17")
         expect(page.locator("#transactionsTable tbody tr", has_text="Venmo").locator("td").last).to_have_text("—")
-        # Linked To: a refund shows the purchase it is for, and the purchase shows its refund. Double-clicking one opens
+        # Linked To: a refund shows the purchase it is for, and the purchase shows its refund. Selecting one opens
         # that entry, not the row's own.
         refund_row = page.locator("#transactionsTable tbody tr", has_text="Refund:")
         diner_row = page.locator("#transactionsTable tbody tr", has_text="Diner — dinner").filter(has_not_text="Refund:")
         refund_id = refund_row.locator("td").first.inner_text().strip("#")
         expect(diner_row.locator(".linked-entry")).to_have_text(f"Refund #{refund_id}")
-        diner_row.locator(".linked-entry").dblclick()
+        diner_row.locator(".linked-entry").click()
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Refund #{refund_id}")
         page.click("#txCancelButton")
         linked = refund_row.locator(".linked-entry")
         expect(linked).to_contain_text("Diner — dinner")
-        linked.dblclick()
+        linked.click()
         expect(page.locator("#transactionDialogTitle")).to_contain_text("Edit Purchase")
         # View Entry in Time shows the entry in the ledger, highlighted like TaskList's visited task.
         page.click("#txViewButton")
@@ -335,7 +335,7 @@ class BrowserTests(unittest.TestCase):
 
         page.click('.tabs [data-tab="people"]')
         expect(page.locator("#peopleTable")).to_contain_text("overpaid")  # refunded in full, then paid $10 back
-        page.locator("#peopleTable tbody tr", has_text="Alex").dblclick()
+        page.locator("#peopleTable tbody tr", has_text="Alex").click()
         expect(page.locator("#personDialog")).to_be_visible()
         self.shot(page, "person-dialog-dark")
         page.keyboard.press("Escape")
@@ -513,7 +513,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionDialog")).not_to_be_visible()
         expect(page.locator("#transactionsTable tbody tr", has_text="Pizza")).to_contain_text("Me, Alex")
         page.click('.tabs [data-tab="people"]')
-        page.locator("#peopleTable tbody tr", has_text="Alex").dblclick()
+        page.locator("#peopleTable tbody tr", has_text="Alex").click()
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("$10.00")
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
@@ -564,7 +564,7 @@ class BrowserTests(unittest.TestCase):
         expect(row).to_contain_text("$25.00 owed to you")
         page.uncheck("#includeGifts")
         expect(row).to_contain_text("Settled")
-        row.dblclick()
+        row.click()
         expect(page.locator("#personTable tbody tr", has_text="Florist")).to_contain_text("Gift")
         page.locator("#personDialog button", has_text="Close").click()
 
@@ -653,7 +653,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="collections"]')
         row = page.locator("#collectionsTable tbody tr", has_text="Beach trip")
         expect(row).to_contain_text("1$600.00$100.00$500.00")
-        row.dblclick()
+        row.click()
         expect(page.locator("#scopeActions button")).to_have_text(["Stats", "Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
@@ -700,7 +700,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#txCollections .retro-select")).to_have_text("Beach trip▼")
         page.click("#txCancelButton")
         page.click('.tabs [data-tab="collections"]')
-        page.locator("#collectionsTable tbody tr", has_text="Beach trip").dblclick()
+        page.locator("#collectionsTable tbody tr", has_text="Beach trip").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Collection: Beach trip")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -842,7 +842,7 @@ class BrowserTests(unittest.TestCase):
         page.fill("#ledgerSearch", f"#{first['id']}")
         page.locator("#statusLeft").click()
         expect(page.locator("#transactionsTable tbody tr")).to_have_count(1)
-        page.locator("#transactionsTable tbody tr").first.dblclick()
+        page.locator("#transactionsTable tbody tr").first.click()
         expect(page.locator("#txNumbers")).to_contain_text("Hardware #1")
         # Dropdowns in the editor float over the page rather than being cut off by the dialog.
         page.click("#txTags .retro-select")
@@ -860,7 +860,7 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Enter")
         # A person's row opens their dialog, which numbers their entries the same way.
         page.click('.tabs [data-tab="people"]')
-        page.locator("#peopleTable tbody tr", has_text="Riley").dblclick()
+        page.locator("#peopleTable tbody tr", has_text="Riley").click()
         # Riley left #1 and #2 (numbers 1 and 2), so the archived purchase (#3) and the payback (#4) remain.
         rows = page.locator("#personTable tbody tr")
         expect(rows).to_have_count(2)
@@ -873,7 +873,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="merchants"]')
         # Merchant rows have no buttons; Rename, Archive, and Delete are in the dialog a row opens.
         expect(page.locator("#merchantsTable button", has_text="Rename")).to_have_count(0)
-        page.locator("#merchantsTable tbody tr", has_text="Bakery").dblclick()
+        page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
         expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Rename").click()
@@ -885,7 +885,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")
         page.click('.tabs [data-tab="methods"]')
-        page.locator("#methodsTable tbody tr", has_text="Cash").dblclick()
+        page.locator("#methodsTable tbody tr", has_text="Cash").click()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Payment method: Cash")
         expect(page.locator("#scopeTable tbody tr", has_text="Hardware")).to_contain_text(f"#{first['id']}")  # other tests also pay cash
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -971,11 +971,15 @@ class BrowserTests(unittest.TestCase):
         page.click("#txSaveButton")
         expect(rows.first).to_contain_text("local update")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$212.00")
-        # A single click does not open an entry; a double click does.
-        rows.first.click()
+        # A click opens an entry, but a drag across it (to select text and copy it) does not.
+        box = rows.first.locator("td").nth(3).bounding_box()
+        page.mouse.move(box["x"] + 4, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(box["x"] + box["width"] - 4, box["y"] + box["height"] / 2, steps=5)
+        page.mouse.up()
         page.wait_for_timeout(300)
         expect(page.locator("#transactionDialog")).not_to_be_visible()
-        rows.first.dblclick()
+        rows.first.click()
         expect(page.locator("#transactionDialog")).to_be_visible()
         page.click("#txDeleteButton")
         page.click("#confirmOkButton")

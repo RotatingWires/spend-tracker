@@ -54,7 +54,7 @@ export function renderTransactions() {
     { label: 'When', sortValue: tx => Number(tx.date.replace(/-/g, '')) },
     { label: 'For Who', sortValue: tx => whoLabel(tx).toLowerCase() || null },
     { label: 'What', className: 'wide-text', sortValue: tx => describeTransaction(tx).toLowerCase() || null },
-    ...(showLinked ? [{ label: 'Linked To', className: 'wide-text', title: 'For a refund or payback, the purchase it is for; for a purchase, its refunds and paybacks. Double-click one to open it.', sortValue: tx => tx.linkedId ?? (linkedEntries(tx)[0]?.id ?? null) }] : []),
+    ...(showLinked ? [{ label: 'Linked To', className: 'wide-text', title: 'For a refund or payback, the purchase it is for; for a purchase, its refunds and paybacks. Select one to open it.', sortValue: tx => tx.linkedId ?? (linkedEntries(tx)[0]?.id ?? null) }] : []),
     { label: 'Tags', sortValue: tx => tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR).toLowerCase() || null },
     ...(showCollections ? [{ label: 'Collections', sortValue: tx => collectionIdsOf(tx).map(collectionName).join(', ').toLowerCase() || null }] : []),
     ...methods.map(method => ({ label: method.name, num: true, sortValue: tx => (tx.paymentMethodId === method.id ? netEffect(tx) ?? tx.amountCents : null) })),
@@ -90,9 +90,8 @@ export function renderTransactions() {
       id: tx.id,
       className: [tx.archived ? 'archived-row' : '', selected ? 'tx-selected' : ''].filter(Boolean).join(' '),
       selected: selectionMode ? selected : undefined,
-      // A double click opens the editor, so a stray click does not; in selection mode a single click selects.
-      onClick: selectionMode ? event => toggleSelection(tx.id, event.shiftKey) : null,
-      onDoubleClick: selectionMode ? null : () => openTransactionEditor(tx),
+      // A click opens the editor; in selection mode it selects instead.
+      onClick: selectionMode ? event => toggleSelection(tx.id, event.shiftKey) : () => openTransactionEditor(tx),
       cells: [
         selectionMode ? selectionCell(tx) : idLink(tx),
         formatDate(tx.date),
@@ -230,7 +229,7 @@ function idLink(tx) {
 
 /**
  * The Linked To cell: "Purchase #12 · Amazon — cable" on a refund or payback, "Refund #14, Payback #15" on a purchase.
- * Double-clicking one opens that entry, not the row's own.
+ * Selecting one opens that entry, not the row's own.
  */
 function linkedCell(tx) {
   const entries = linkedEntries(tx);
@@ -241,11 +240,10 @@ function linkedCell(tx) {
     const link = el('span', 'linked-entry');
     const what = tx.linkedId != null ? ` · ${describeTransaction(entry) || formatMoney(entry.amountCents)}` : '';
     link.textContent = `${KIND_LABELS[entry.kind]} #${entry.id}${what}`;
-    link.title = `Double-click to open ${KIND_LABELS[entry.kind].toLowerCase()} #${entry.id} (${formatDate(entry.date)}, ${formatMoney(entry.amountCents)})`;
-    link.addEventListener('dblclick', event => {
+    link.title = `Open ${KIND_LABELS[entry.kind].toLowerCase()} #${entry.id} (${formatDate(entry.date)}, ${formatMoney(entry.amountCents)})`;
+    link.addEventListener('click', event => {
       if (selectionMode) return;
       event.stopPropagation();
-      window.getSelection()?.removeAllRanges();
       openTransactionEditor(entry);
     });
     cell.append(link);

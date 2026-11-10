@@ -1,6 +1,6 @@
 /*
  * Payment Methods, Tags, Collections, and Merchants tabs: totals per item from the purchases that have it and the refunds
- * on those purchases, with an Add form. Double-clicking a row lists that scope's entries in a dialog that also holds the
+ * on those purchases, with an Add form. Selecting a row lists that scope's entries in a dialog that also holds the
  * item's Rename/Archive/Delete buttons (scopes.js); a collection's has Stats too, to open it as a Stats period.
  */
 import { $, collectionIdsOf, formatDateRange, formatMoney, numberFormat, state, tagIdsOf } from './app.js';
@@ -19,8 +19,7 @@ function renderLabelSummary(table, scope, items, idsOf, { label, empty }) {
     const entries = state.model.transactions.filter(tx => tx.kind !== 'Payback' && idsOf(tx).includes(item.id));
     const totals = monthTotals(entries);
     return {
-      // Double-click (or Enter) opens it, like the ledger, so a stray click does not.
-      onDoubleClick: () => openScopeList(scope, item.id),
+      onClick: () => openScopeList(scope, item.id),
       cells: [
         `#${item.id}`,
         archivedLabel(item),
