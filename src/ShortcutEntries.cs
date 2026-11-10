@@ -116,12 +116,7 @@ sealed partial class Store
     {
         var date = RequireDate(entry.Date, "date");
         var amount = ParseShortcutAmount(entry.Amount);
-
-        var methodName = entry.PaymentMethod?.Trim() ?? "";
-        if (methodName.Length == 0)
-            throw RequestException.Invalid("paymentMethod is required: the name of a payment method in SpendTracker.");
-        var methodId = Scalar(connection, transaction, "SELECT id FROM payment_methods WHERE name = $name AND archived = 0;", ("$name", methodName))
-            ?? throw RequestException.Invalid($"No active payment method is named {methodName}. Add or rename one on the Payment Methods tab to match, or change the Shortcut.");
+        var methodId = ResolvePaymentMethod(connection, transaction, entry.PaymentMethod);
 
         // Merchant text no merchant or alias matches goes in the description, so the entry is still recognizable.
         var merchantText = NormalizeMerchantText(OptionalText(entry.Merchant, MaxMerchantLength, "merchant"));
@@ -131,8 +126,29 @@ sealed partial class Store
             description = description.Length == 0 ? merchantText : $"{description} ({merchantText})";
 
         var self = Convert.ToInt64(Scalar(connection, transaction, "SELECT id FROM people WHERE is_self = 1;"), CultureInfo.InvariantCulture);
-        return new TransactionRequest("Purchase", date, amount, Convert.ToInt64(methodId, CultureInfo.InvariantCulture), null, null,
+        return new TransactionRequest("Purchase", date, amount, methodId, null, null,
             merchantId, description, entry.Note, [], [new ShareRequest(self, amount)]);
+    }
+
+    /// <summary>
+    /// The payment method of that name (ignoring case). A name SpendTracker does not have yet, such as a new card's name in
+    /// Wallet, is added as a payment method, so the purchase is never lost; it is undone with the entry if the entry is
+    /// refused. A name you archived is refused instead of being brought back unasked.
+    /// </summary>
+    static long ResolvePaymentMethod(SqliteConnection connection, SqliteTransaction transaction, string? requested)
+    {
+        var name = RequireName(requested, "paymentMethod");
+        using (var lookup = Sql(connection, transaction, "SELECT id, name, archived FROM payment_methods WHERE name = $name;", ("$name", name)))
+        using (var found = lookup.ExecuteReader())
+        {
+            if (found.Read())
+            {
+                if (found.GetInt64(2) != 0)
+                    throw RequestException.Invalid($"{found.GetString(1)} is an archived payment method. Restore it on the Payment Methods tab, or change the Shortcut.");
+                return found.GetInt64(0);
+            }
+        }
+        return InsertPaymentMethod(connection, transaction, name).Id;
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.4.0
+# SpendTracker v1.4.1
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -485,7 +485,7 @@ Schema 8 tables: `payment_methods`, `people`, `tags`, `merchants`, `merchant_ali
 
 An iPhone Shortcut can add purchases without opening SpendTracker: a Wallet automation that runs each time you pay with Apple Pay, and a Quick Add Shortcut you run to type one in. Both hand their entry to a third Shortcut, **Send to SpendTracker**, which saves it to a queue file on the phone first and then sends the whole queue. When the phone cannot reach SpendTracker (off your network or VPN), the entry stays in the queue and goes with the next run that can, so nothing is lost. SpendTracker remembers every entry it has received, so a queue sent twice (say, the reply was lost on the way back) never adds anything twice.
 
-Each entry becomes a **purchase for you alone**, dated as sent, paid with the payment method of the name sent. Split it, tag it, or change anything else afterwards in the editor, like any entry. Shortcut entries are recorded on the History tab as Created, like entries you add.
+Each entry becomes a **purchase for you alone**, dated as sent, paid with the payment method of the name sent (ignoring case). A name SpendTracker does not have yet, such as a new card's name in Wallet, is added as a payment method, recorded on the History tab like one you add, so the purchase is never lost; rename it on the Payment Methods tab if you like, and later entries with Wallet's name then need that name typed in the Shortcut instead. A name you archived is refused rather than brought back. Split it, tag it, or change anything else afterwards in the editor, like any entry. Shortcut entries are recorded on the History tab as Created, like entries you add.
 
 ### Turning it on
 
@@ -607,7 +607,7 @@ In the **Automation** tab, tap **+**, choose **Transaction**, choose the cards i
    - Input: *Dictionary* (step 5)
    - **Show While Running**: off
 
-`paymentMethod` must be the name of an active payment method in SpendTracker (ignoring case). If your cards are called differently in Wallet, rename the payment method to match, or make one automation per card with that payment method's name typed in.
+`paymentMethod` is matched to a payment method by name, ignoring case, and a name SpendTracker does not have yet is added as a new payment method. To keep your own names (such as "Credit Card" for Wallet's "Apple Card"), rename the payment method to Wallet's card name, or make one automation per card with your payment method's name typed in.
 
 To check it the first time, add **Show Result** with *Dictionary* (step 5) just before step 6 and pay once. It should show something like `{"id":"20261110-180412-483920","date":"2026-11-10","amount":"$4.50","merchant":"BURGER KING #1234","paymentMethod":"Apple Card"}`. Remove Show Result afterwards.
 
@@ -665,7 +665,7 @@ The queue file, as it is: JSON entries one after another (one per line, or sprea
 | `id` | yes | 8–100 letters, digits, or `. _ : -`, different for every entry. An ID already received is skipped. |
 | `date` | yes | The purchase date, `YYYY-MM-DD`. |
 | `amount` | yes | Dollars, as a number (`12.34`) or text (`"$1,234.56"`), $0.01 to $10,000,000.00, at most two decimal places. |
-| `paymentMethod` | yes | The name of an active payment method, ignoring case. |
+| `paymentMethod` | yes | A payment method's name, ignoring case, 60 characters at most. A new name is added as a payment method; an archived one is refused. |
 | `merchant` | no | Merchant text, matched as in [Merchant aliases](#merchant-aliases); 120 characters at most. |
 | `description` | no | What it was; 500 characters at most. |
 | `note` | no | A note; 2000 characters at most. |
@@ -676,7 +676,7 @@ Unknown fields are refused, like everywhere in the API. A queue holds at most 50
 
 - **The phone cannot reach SpendTracker** (no VPN, server down): **Get Contents of URL** fails, iOS shows its own error, and the Shortcut stops before deleting anything. The entries stay in the queue for the next run.
 - **SpendTracker refuses the whole request** (no key or the wrong one, too many requests, a database error): the reply has no `message`, so the Shortcut shows the reason and keeps the queue.
-- **SpendTracker answers**: every entry it could save is saved, the queue is deleted, and the notification says how many were saved, how many it already had, and for each entry it could not save, what was sent and why (such as "BURGER KING #1234, $12.34, 2026-11-10: No active payment method is named Apple Card."). Add those by hand; sending them again would fail the same way. If the queue file is damaged, the entries before the damage are saved and the notification says where reading stopped.
+- **SpendTracker answers**: every entry it could save is saved, the queue is deleted, and the notification says how many were saved, how many it already had, and for each entry it could not save, what was sent and why (such as "BURGER KING #1234, 12.345, 2026-11-10: amount 12.345 is not a dollar amount like 12.34."). Add those by hand; sending them again would fail the same way. If the queue file is damaged, the entries before the damage are saved and the notification says where reading stopped.
 
 ## HTTP API
 
@@ -778,7 +778,8 @@ Nothing was changed; the message names the problem. Only files saved with **File
 
 - iOS says it could not connect: the phone cannot reach SpendTracker. The entries stay in the queue; run **Send to SpendTracker** again once you are on your network or VPN.
 - "The Shortcut key is missing or wrong": the key in the Shortcut is not the current one. Create or replace it in **File > iPhone Shortcut...** and paste it into the `Authorization` header as `Bearer stk_...`.
-- "No active payment method is named ...": name a payment method exactly as the Shortcut sends it (Wallet's card name), or type the payment method's name in the Shortcut.
+- "... is an archived payment method": restore it on the Payment Methods tab, or type another payment method's name in the Shortcut.
+- A new payment method appeared, named like a Wallet card: the Shortcut sent a name SpendTracker did not have, so it was added. Rename it, or type your payment method's name in the automation.
 - The entries are there but the page does not show them: use **File > Refresh**.
 
 ### The page shows "Could not load data"
@@ -806,7 +807,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.4.0**.
+Current release: **v1.4.1**.
+
+### v1.4.1
+
+- An iPhone Shortcut entry whose payment method SpendTracker does not have yet, such as a new card's name in Wallet, adds that payment method instead of being refused, so the purchase is kept. An archived payment method's name is still refused.
 
 ### v1.4.0
 

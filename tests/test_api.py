@@ -371,20 +371,21 @@ class SpendTrackerApiTests(unittest.TestCase):
         bk = self.merchant_id("BK")
         self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["BURGER KING"]})
         shop = self.merchant_id("Corner Shop")
+        self.api.patch(f"/api/payment-methods/{self.debit}", {"archived": True})
         lines = [
             self.entry("2026-11-10-1"),                                                        # alias, Wallet's "$12.34"
             self.entry("2026-11-10-2", amount=4.5, merchant="corner shop", method="cash"),     # exact name in any case; a number
             self.entry("2026-11-10-3", amount="1,234.56", merchant="BURGER KINGDOM", description="Lunch"),  # whole words only
             self.entry("2026-11-10-4", merchant=None, description="Parking", note="meter"),    # quick add without a merchant
             "",                                                                                # blank lines are skipped
-            self.entry("2026-11-10-5", method="Apple Card"),                                   # unknown payment method
+            self.entry("2026-11-10-5", method="debit card"),                                   # an archived payment method
             self.entry("2026-11-10-6", amount="12.345"),
             self.entry("2026-11-10-7", amount="-3"),
             self.entry("short"),
             {"id": "2026-11-10-8", "date": "2026-02-30", "amount": 1, "paymentMethod": "Cash", "description": "x"},
             {"id": "2026-11-10-9", "date": "2026-11-10", "amount": 1, "paymentMethod": "Cash", "description": "x", "color": "red"},
             self.entry("2026-11-10-1"),                                                        # repeated in the same queue
-            json.dumps(self.entry("2026-11-10-11", amount="2.00", merchant="Corner Shop", method="Cash"), indent=2),  # spread over lines
+            json.dumps(self.entry("2026-11-10-11", amount="2.00", merchant="Corner Shop", method="Apple Card"), indent=2),  # a new card; spread over lines
             "5",
             "{not json",                                                                       # a damaged queue: reading stops here
         ]
@@ -393,7 +394,7 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual((reply["saved"], reply["duplicates"]), (5, 1))
         rejected = {r["entry"]: r["error"] for r in reply["rejected"]}
         self.assertEqual(sorted(rejected), [5, 6, 7, 8, 9, 10, 13, 14])
-        self.assertIn("BURGER KING #1234, $12.34, 2026-11-10: No active payment method is named Apple Card", rejected[5])
+        self.assertIn("BURGER KING #1234, $12.34, 2026-11-10: Debit Card is an archived payment method", rejected[5])
         self.assertIn("not a dollar amount", rejected[6])
         self.assertIn("not a dollar amount", rejected[7])
         self.assertIn("id must be", rejected[8])
@@ -403,10 +404,15 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertIn("Entry 14 and anything after it could not be read", rejected[14])
         self.assertTrue(reply["message"].startswith("Saved 5 entries. 1 was already saved. Not saved, add them by hand: BURGER KING #1234"), reply["message"])
 
-        saved = sorted(self.api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])
+        snapshot = self.api.get("/api/snapshot")
+        # A payment method SpendTracker does not have yet is added, so the purchase is kept.
+        apple = next(m for m in snapshot["paymentMethods"] if m["name"] == "Apple Card")
+        self.assertFalse(apple["archived"])
+        self.assertTrue(any(e["action"] == "Created" and e["entity"] == "PaymentMethod" and e["entityId"] == apple["id"] for e in self.history()))
+        saved = sorted(snapshot["transactions"], key=lambda tx: tx["id"])
         self.assertEqual([(tx["merchantId"], tx["description"], tx["amountCents"], tx["paymentMethodId"]) for tx in saved],
                          [(bk, "", 1234, self.card), (shop, "", 450, self.cash), (None, "Lunch (BURGER KINGDOM)", 123456, self.card),
-                          (None, "Parking", 1234, self.card), (shop, "", 200, self.cash)])
+                          (None, "Parking", 1234, self.card), (shop, "", 200, apple["id"])])
         for tx in saved:
             self.assertEqual((tx["kind"], tx["date"], tx["shares"]), ("Purchase", "2026-11-10", [{"personId": self.me, "amountCents": tx["amountCents"], "gift": False}]))
         self.assertEqual(saved[3]["note"], "meter")
@@ -417,6 +423,12 @@ class SpendTrackerApiTests(unittest.TestCase):
         status, reply = self.shortcut(lines[:4], key)
         self.assertEqual((status, reply["saved"], reply["duplicates"], reply["message"]), (200, 0, 4, "Saved 0 entries. 4 were already saved."))
         self.assertEqual(len(self.api.get("/api/snapshot")["transactions"]), 4)
+
+        # A new payment method goes away again with an entry that is refused.
+        status, reply = self.shortcut([self.entry("2026-11-10-12", method="Gift Card", description="x" * 501)], key)
+        self.assertIn("500 characters", reply["rejected"][0]["error"])
+        self.assertNotIn("Gift Card", [m["name"] for m in self.api.get("/api/snapshot")["paymentMethods"]])
+        self.assertIn("paymentMethod is required", self.shortcut([self.entry("2026-11-10-13", method=" ")], key)[1]["rejected"][0]["error"])
 
         # An archived merchant is not matched, so its text goes in the description instead.
         self.api.patch(f"/api/merchants/{bk}", {"archived": True})

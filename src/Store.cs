@@ -823,12 +823,19 @@ sealed partial class Store
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         EnsureNameFree(connection, transaction, "payment_methods", name, null, "A payment method with that name already exists.");
+        var created = InsertPaymentMethod(connection, transaction, name);
+        transaction.Commit();
+        return created;
+    }
+
+    /// <summary>Adds a payment method whose name is already validated and free, with its history, in the caller's transaction.</summary>
+    static PaymentMethod InsertPaymentMethod(SqliteConnection connection, SqliteTransaction transaction, string name)
+    {
         var id = Convert.ToInt64(Scalar(connection, transaction,
             "INSERT INTO payment_methods (name, created_at) VALUES ($name, $now); SELECT last_insert_rowid();",
             ("$name", name), ("$now", Now())), CultureInfo.InvariantCulture);
         var created = ReadPaymentMethods(connection, transaction).Single(m => m.Id == id);
         RecordHistory(connection, transaction, "Created", "PaymentMethod", id, null, created);
-        transaction.Commit();
         return created;
     }
 
