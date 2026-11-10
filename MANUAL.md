@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.3.3
+# SpendTracker v1.3.4
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -259,7 +259,7 @@ Double-click a row (or focus it and press Enter) to edit it; a single click does
 
 In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 95-style dropdowns like the ones in TaskList and TaskList Stats. Escape closes an open dropdown without closing the editor. A dropdown with more than ten choices (merchants, tags, people, months, filters) starts with a search box that narrows the list as you type, and so does **Paid with**, however few payment methods there are; Enter picks the first match in a one-choice list. A dropdown in a dialog floats over the page, below its box or above it when there is more room there, so a long list is not squeezed into the dialog; scrolling the dialog closes it. On a touch screen it opens in place under its box instead, pushing the fields below it down, so it stays put while the phone's keyboard opens and the dialog scrolls. A dialog always opens scrolled to its top.
 
-- **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Its list holds every purchase, with a search box: type a merchant, description, date, amount, or ID such as `#12`. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
+- **Refund / return** asks which purchase it refunds and shows how much can still be refunded. Its list holds every purchase, with a search box: type a merchant, description, date, amount, or ID such as `#12`. It draws only the newest 50 purchases (and the chosen one), with a note saying how many more there are; the search looks through all of them and draws the first 50 matches. Choosing the purchase on a new refund selects its payment method, fills an empty amount with what is left to refund, and copies its merchant and description when both are empty.
 - **For who** is a dropdown of check items. With one person checked, the whole amount is theirs. With several, an amount box appears for each person under **Share of the cost**, with a note on what it means: how much of the purchase was for that person (you paid it all; their shares are what they owe you unless **Gift** is checked, and what they pay you is recorded as a Payback), not how much they paid. **Split Evenly** and a running total sit under the boxes; Save refuses shares that do not add up to the amount.
 - **Refund / return** on a split purchase also asks **Whose share** it refunds.
 - **Payback to me** asks who paid you and, optionally, which purchase they had a share of, showing how much of their share is still unpaid. The list holds every purchase they are on (not as a gift), paid off or not, and has the same search box.
@@ -588,7 +588,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.3.3**.
+Current release: **v1.3.4**.
+
+### v1.3.4
+
+- A refund's or payback's purchase list draws only the newest 50 purchases, so it stays quick with a long history; its search box still looks through every purchase, and a note says how many more there are.
 
 ### v1.3.3
 

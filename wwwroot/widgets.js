@@ -102,7 +102,11 @@ function menuSearch(menu, render, searchOver = MENU_SEARCH_OVER) {
   };
 }
 
-export function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true, searchOver = MENU_SEARCH_OVER } = {}) {
+/**
+ * With showFirst, only that many options are drawn (the first ones, so a list ordered newest first shows the newest),
+ * plus the chosen one; the search box still looks through all of them, and a note says how many more there are.
+ */
+export function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true, searchOver = MENU_SEARCH_OVER, showFirst = Infinity } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
@@ -134,7 +138,10 @@ export function createSingleSelect(host, { onChange = () => {}, onAdd = null, ca
     label.textContent = selected?.label ?? '—';
     button.disabled = options.length === 0 && !(onAdd && canAdd());
     search.show(options.length);
-    search.list.replaceChildren(...options.filter(option => search.matches(option.label)).map(option => menuButton(option.label, {
+    const matches = options.filter(option => search.matches(option.label));
+    const drawn = matches.slice(0, showFirst);
+    if (selected && matches.includes(selected) && !drawn.includes(selected)) drawn.push(selected);
+    search.list.replaceChildren(...drawn.map(option => menuButton(option.label, {
       role: 'menuitemradio',
       checked: option.value === current,
       onClick: event => {
@@ -147,6 +154,12 @@ export function createSingleSelect(host, { onChange = () => {}, onAdd = null, ca
         onChange(current);
       }
     })));
+    if (matches.length > drawn.length) {
+      const more = matches.length - drawn.length;
+      search.list.append(el('div', 'menu-note', search.query()
+        ? `${more} more ${more === 1 ? 'match' : 'matches'}. Keep typing to narrow the list.`
+        : `Showing the newest ${showFirst} of ${options.length}. Search to find older ones.`));
+    }
     if (canAdd()) addNewItem(search.list, onAdd);
   }
 

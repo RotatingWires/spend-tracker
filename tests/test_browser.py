@@ -906,6 +906,16 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#ledgerMoreText")).to_have_text("Showing 200 of 205 entries.")
         expect(page.locator("#ledgerMoreButton")).to_have_text("Show 5 More")
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$205.00")
+        # The refund's purchase list draws only the newest 50 purchases; its search finds any of them.
+        page.click("#newTransactionButton")
+        self.pick(page, "#txKind", "Refund / return")
+        page.click("#txLinked .retro-select")
+        expect(page.locator("#txLinked .menu-list [role=menuitemradio]")).to_have_count(50)
+        expect(page.locator("#txLinked .menu-note")).to_contain_text("Showing the newest 50 of")
+        page.fill("#txLinked .menu-search input", "bulk 0")  # the very first of the 205, long before the newest 50
+        expect(page.locator("#txLinked .menu-list [role=menuitemradio]")).to_have_count(1)
+        page.keyboard.press("Escape")
+        page.click("#txCancelButton")
         # Headings sort: ascending, descending, then back to newest first. The ledger sorts every entry, not just the
         # 200 drawn, so the earliest dates come first even though they are not among the newest IDs.
         ids = [tx["id"] for tx in api.get("/api/snapshot")["transactions"] if tx["date"].startswith("2023-01")]

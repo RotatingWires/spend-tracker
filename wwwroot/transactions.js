@@ -371,7 +371,8 @@ export function initializeTransactionEditor() {
       onPayersChange();
     })
   });
-  editor.linked = createSingleSelect($('#txLinked'), { searchOver: 0, onChange: () => onLinkedPurchaseChange() });
+  // Only the newest 50 purchases are drawn; the search box finds any of them.
+  editor.linked = createSingleSelect($('#txLinked'), { searchOver: 0, showFirst: 50, onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), {
     empty: 'No tags',
     selectAll: true,

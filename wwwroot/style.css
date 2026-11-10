@@ -291,6 +291,8 @@ button:disabled { color: var(--shadow); cursor: default; }
 .single-select-dropdown:has(> .menu-list) { display: flex; flex-direction: column; overflow: hidden; }
 .single-select-dropdown > .menu-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .menu-search { flex: none; padding: 2px 2px 4px; background: var(--face); }
+/* Under a list that shows only its first items: how many more there are. */
+.menu-note { padding: 4px 6px 2px; font-size: 12px; color: var(--muted); white-space: normal; }
 .menu-search .retro-input { width: 100%; min-height: 26px; padding: 2px 5px; }
 .floating-menu { overflow-y: auto; }
 /* A menu that opens in place inside a dialog (touch screens; see dropdown.js) takes the dialog's width under its button. */
