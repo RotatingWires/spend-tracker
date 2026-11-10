@@ -50,7 +50,8 @@ export function renderPeople() {
     // Me first, then A–Z, like the dropdowns; the Balance heading sorts by balance.
     .sort((a, b) => b.person.isSelf - a.person.isSelf || compareNames(a.person.name, b.person.name))
     .map(({ person, ledger }) => ({
-      onClick: () => openPersonDialog(person.id),
+      // Double-click (or Enter) opens it, like the ledger, so a stray click does not.
+      onDoubleClick: () => openPersonDialog(person.id),
       cells: [
         `#${person.id}`,
         person.isSelf ? `${person.name} (you)` : archivedLabel(person),

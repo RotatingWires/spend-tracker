@@ -384,10 +384,9 @@ function longestRun(stats, test) {
   return { ...best, current: stats.countedEnd === todayKey() ? run : null };
 }
 
-/** Shows the chosen Stats sub-tab and remembers it in this browser. */
+/** Shows the chosen Stats sub-tab. Each visit to the app starts on Overview; the choice is not saved. */
 function showStatsTab(name) {
   state.statsTab = name;
-  writeSetting('spend-tracker-stats-tab', name);
   renderStats();
 }
 
@@ -515,6 +514,7 @@ function renderBreakdown(table, label, scope, groups, { none = null, countLabel 
 export function initializeStats() {
   // Check any number of measures; unchecking the last one is ignored so the chart always shows something.
   statsChartSelect = createMultiSelect($('#statsChartMetric'), {
+    selectAll: true,
     onChange: values => {
       if (values.length) {
         state.statsChart = values;

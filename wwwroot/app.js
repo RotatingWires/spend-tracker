@@ -38,7 +38,7 @@ export const state = {
   statsPeriod: ['all'],
   statsChart: savedChartMeasures(),
   // The Stats sub-tab, and the choices on the Heatmaps and Compare sub-tabs.
-  statsTab: readSetting('spend-tracker-stats-tab') || 'overview',
+  statsTab: 'overview',
   // Bars or lines for charts over time, remembered in this browser.
   chartStyle: readSetting('spend-tracker-chart-style') === 'lines' ? 'lines' : 'bars',
   heat: { measures: ['net'], years: [], rows: 'tags' },

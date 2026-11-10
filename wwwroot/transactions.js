@@ -345,6 +345,7 @@ export function initializeTransactionEditor() {
   });
   editor.people = createMultiSelect($('#txPeople'), {
     empty: 'Choose people',
+    selectAll: true,
     deferChange: true,
     onChange: () => renderShareRows(),
     onAdd: () => addFromEditor('people', id => {
@@ -362,6 +363,7 @@ export function initializeTransactionEditor() {
   // Several people can pay back at once; each gets their own payback entry when saved.
   editor.payers = createMultiSelect($('#txPayers'), {
     empty: 'Choose people',
+    selectAll: true,
     deferChange: true,
     onChange: () => onPayersChange(),
     onAdd: () => addFromEditor('people', id => {
@@ -372,6 +374,7 @@ export function initializeTransactionEditor() {
   editor.linked = createSingleSelect($('#txLinked'), { onChange: () => onLinkedPurchaseChange() });
   editor.tags = createMultiSelect($('#txTags'), {
     empty: 'No tags',
+    selectAll: true,
     summary: names => names.join(TAG_SEPARATOR),
     onAdd: () => addFromEditor('tags', id => {
       const chosen = [...editor.tags.values.map(Number), id];
@@ -380,6 +383,7 @@ export function initializeTransactionEditor() {
   });
   editor.collections = createMultiSelect($('#txCollections'), {
     empty: 'No collections',
+    selectAll: true,
     onAdd: () => addFromEditor('collections', id => {
       const chosen = [...editor.collections.values.map(Number), id];
       editor.collections.setOptions(labelOptions(state.snapshot.collections, chosen), chosen);

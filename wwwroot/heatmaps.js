@@ -313,6 +313,7 @@ function weekGrid(stats, measure) {
 export function initializeHeatmaps() {
   // Check boxes like Years, applied when the dropdown closes; closing it with none checked goes back to Net spent.
   heatMeasureSelect = createMultiSelect($('#heatMeasure'), {
+    selectAll: true,
     deferChange: true,
     summary: names => (names.length > 2 ? `${names.length} measures` : names.join(', ')),
     onChange: values => {
@@ -322,6 +323,7 @@ export function initializeHeatmaps() {
   });
   // Check boxes, applied when the dropdown closes; closing it with none checked goes back to the usual year.
   heatYearSelect = createMultiSelect($('#heatYear'), {
+    selectAll: true,
     deferChange: true,
     summary: names => names.length > 2 ? `${names.length} years` : names.join(', '),
     onChange: values => {

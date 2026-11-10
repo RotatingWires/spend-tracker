@@ -176,7 +176,7 @@ export function createSingleSelect(host, { onChange = () => {}, onAdd = null, ca
  * ungrouped option), options are nested under group headings that expand and collapse in place, like the years of the
  * Time frame dropdown; a group holding a checked option starts expanded and shows how many are checked.
  */
-export function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true } = {}) {
+export function createMultiSelect(host, { empty = 'None', onChange = () => {}, summary = names => names.join(', '), onAdd = null, deferChange = false, groupOf = null, canAdd = () => true, selectAll = false } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
@@ -255,6 +255,21 @@ export function createMultiSelect(host, { empty = 'None', onChange = () => {}, s
       item.dataset.value = option.value;
       if (group != null) item.classList.add('menu-grouped');
       items.push(item);
+    }
+    // With selectAll, "Select All" checks every item the search shows (all of them, with no search).
+    if (selectAll && shown.length > 1) {
+      const all = menuButton('Select All', {
+        onClick: event => {
+          event.stopPropagation();
+          for (const option of shown) selected.add(option.value);
+          render();
+          menu.querySelector('.select-all')?.focus();
+          if (deferChange) changed = true;
+          else onChange(values());
+        }
+      });
+      all.classList.add('select-all');
+      items.unshift(all, menuSeparator());
     }
     search.list.replaceChildren(...items);
     if (canAdd()) addNewItem(search.list, onAdd);
@@ -578,7 +593,7 @@ export function chooseOption(title, label, options, okLabel = 'OK', { modes = nu
   const dialog = $('#chooseDialog');
   const addOptions = { onAdd: () => choiceAdd?.(), canAdd: () => Boolean(choiceAdd) };
   choiceSelect ??= createSingleSelect($('#chooseSelect'), addOptions);
-  choiceChecks ??= createMultiSelect($('#chooseMulti'), { empty: 'Choose one or more', ...addOptions });
+  choiceChecks ??= createMultiSelect($('#chooseMulti'), { empty: 'Choose one or more', selectAll: true, ...addOptions });
   choiceAdd = addPath ? async () => {
     const created = await addListItem(addPath);
     if (!created) return;

@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.50
+# SpendTracker v1.2.51
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -284,7 +284,7 @@ One month grid for each month in the toolbar's time frame, newest first (All tim
 
 **Period** is a dropdown of check items: all time, or any mix of years, months, and collections. All time and the others exclude each other, and the last choice cannot be unchecked. With several periods checked, an entry counts when it falls in any of them, and day-based numbers (counted days, averages, streaks, day of week, months, and the chart's days) use only the days inside the checked periods; a no-spend streak does not carry across the gap between two of them. A collection's period runs from its first to its last entry and counts only its own purchases and the refunds on them (paybacks are not part of collections). See [Statistics](#statistics) for every definition. Selecting a row in the **Months** table opens that month in the ledger.
 
-Stats has six sub-tabs, like TaskList Stats' tabs; the one you were last on is remembered in this browser:
+Stats has six sub-tabs, like TaskList Stats' tabs; it always opens on **Overview** when the app starts. In every dropdown of check boxes where taking them all makes sense (**For who**, **Paid back by**, **Tags**, **Collections**, the Stats chart's and heatmaps' **Show**, the heatmaps' **Years**, and bulk tagging), **Select All** at the top checks every item, or every one the list's search shows:
 
 - **Overview:** ten totals (including **Average per day** and **Entries**, which counts purchases, refunds, and paybacks) in two rows of five, then Daily, Records, Streaks, By Payment Method, and Day of Week.
 - **Heatmaps:** a year of days, months by year, tags or merchants by month, and weekdays by week of the month. See [Heatmaps](#heatmaps).
@@ -297,11 +297,11 @@ Stats has six sub-tabs, like TaskList Stats' tabs; the one you were last on is r
 
 ### People
 
-An **Add** form, then one row per person, you first (*(you)*, with no balance) and then everyone by name, as in every list of people: purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. That dialog also has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself), so the rows have no buttons; people on transactions cannot be deleted, so archive them instead.
+An **Add** form, then one row per person, you first (*(you)*, with no balance) and then everyone by name, as in every list of people: purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Double-click a person (or focus the row and press Enter), as in the ledger, for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. That dialog also has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself), so the rows have no buttons; people on transactions cannot be deleted, so archive them instead.
 
 ### Payment Methods, Tags, Collections, and Merchants
 
-Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. **Rename**, **Archive** / **Restore**, and **Delete** sit in the dialog a row opens, not on the row. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, that dialog's **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. **Rename**, **Archive** / **Restore**, and **Delete** sit in the dialog a row opens, not on the row. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Double-click a row (or focus it and press Enter), as in the ledger, for its numbered list of entries. On the Collections tab, that dialog's **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Its numbered list (a row's double-click) holds every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### History
 
@@ -576,7 +576,13 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.50**.
+Current release: **v1.2.51**.
+
+### v1.2.51
+
+- **Select All** at the top of the dropdowns of check boxes where it makes sense: For who, Paid back by, Tags, Collections, the Stats chart's and heatmaps' Show, the heatmaps' Years, and bulk tagging. With a search typed, it checks the matches.
+- Stats always opens on **Overview** when the app starts; the last sub-tab is no longer remembered.
+- People, Payment Methods, Tags, Collections, and Merchants: double-click a row (or press Enter on it) to open it, like the ledger; a single click no longer does.
 
 ### v1.2.50
 

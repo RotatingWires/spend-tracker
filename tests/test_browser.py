@@ -215,7 +215,7 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(box["height"], button["height"], "the Add box is as tall as its Add button")
         # A tag's row opens its dialog, which holds Rename, Archive, and Delete. Rename asks with Cancel, then Save; Enter saves.
         expect(page.locator("#tagsTable button")).to_have_count(0)
-        page.locator("#tagsTable tbody tr", has_text="food").click()
+        page.locator("#tagsTable tbody tr", has_text="food").dblclick()
         expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Rename").click()
         expect(page.locator("#promptDialog .dialog-buttons button")).to_have_text(["Cancel", "Save"])
@@ -326,7 +326,7 @@ class BrowserTests(unittest.TestCase):
 
         page.click('.tabs [data-tab="people"]')
         expect(page.locator("#peopleTable")).to_contain_text("overpaid")  # refunded in full, then paid $10 back
-        page.locator("#peopleTable tbody tr", has_text="Alex").click()
+        page.locator("#peopleTable tbody tr", has_text="Alex").dblclick()
         expect(page.locator("#personDialog")).to_be_visible()
         self.shot(page, "person-dialog-dark")
         page.keyboard.press("Escape")
@@ -489,7 +489,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionDialog")).not_to_be_visible()
         expect(page.locator("#transactionsTable tbody tr", has_text="Pizza")).to_contain_text("Me, Alex")
         page.click('.tabs [data-tab="people"]')
-        page.locator("#peopleTable tbody tr", has_text="Alex").click()
+        page.locator("#peopleTable tbody tr", has_text="Alex").dblclick()
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("$10.00")
         expect(page.locator("#personTable tbody tr", has_text="Pizza")).to_contain_text("share of $30.01")
         self.shot(page, "split-people")
@@ -540,7 +540,7 @@ class BrowserTests(unittest.TestCase):
         expect(row).to_contain_text("$25.00 owed to you")
         page.uncheck("#includeGifts")
         expect(row).to_contain_text("Settled")
-        row.click()
+        row.dblclick()
         expect(page.locator("#personTable tbody tr", has_text="Florist")).to_contain_text("Gift")
         page.locator("#personDialog button", has_text="Close").click()
 
@@ -629,7 +629,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="collections"]')
         row = page.locator("#collectionsTable tbody tr", has_text="Beach trip")
         expect(row).to_contain_text("1$600.00$100.00$500.00")
-        row.click()
+        row.dblclick()
         expect(page.locator("#scopeActions button")).to_have_text(["Stats", "Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
@@ -673,7 +673,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#txCollections .retro-select")).to_have_text("Beach trip▼")
         page.click("#txCancelButton")
         page.click('.tabs [data-tab="collections"]')
-        page.locator("#collectionsTable tbody tr", has_text="Beach trip").click()
+        page.locator("#collectionsTable tbody tr", has_text="Beach trip").dblclick()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Collection: Beach trip")
         expect(page.locator("#scopeTable tbody tr")).to_have_count(1)
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -831,7 +831,7 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Enter")
         # A person's row opens their dialog, which numbers their entries the same way.
         page.click('.tabs [data-tab="people"]')
-        page.locator("#peopleTable tbody tr", has_text="Riley").click()
+        page.locator("#peopleTable tbody tr", has_text="Riley").dblclick()
         # Riley left #1 and #2 (numbers 1 and 2), so the archived purchase (#3) and the payback (#4) remain.
         rows = page.locator("#personTable tbody tr")
         expect(rows).to_have_count(2)
@@ -844,7 +844,7 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="merchants"]')
         # Merchant rows have no buttons; Rename, Archive, and Delete are in the dialog a row opens.
         expect(page.locator("#merchantsTable button", has_text="Rename")).to_have_count(0)
-        page.locator("#merchantsTable tbody tr", has_text="Bakery").click()
+        page.locator("#merchantsTable tbody tr", has_text="Bakery").dblclick()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Merchant: Bakery")
         expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
         page.locator("#scopeActions button", has_text="Rename").click()
@@ -856,7 +856,7 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#transactionDialogTitle")).to_have_text(f"Edit Purchase #{second['id']}")
         page.click("#txCancelButton")
         page.click('.tabs [data-tab="methods"]')
-        page.locator("#methodsTable tbody tr", has_text="Cash").click()
+        page.locator("#methodsTable tbody tr", has_text="Cash").dblclick()
         expect(page.locator("#scopeDialogTitle")).to_have_text("Payment method: Cash")
         expect(page.locator("#scopeTable tbody tr", has_text="Hardware")).to_contain_text(f"#{first['id']}")  # other tests also pay cash
         page.locator("#scopeDialog button", has_text="Close").click()
@@ -1095,6 +1095,11 @@ class BrowserTests(unittest.TestCase):
         self.set_checks(page, "#heatMeasure", ["Net spent", "Purchases"])
         expect(page.locator("#weekHeatmap .heatmap-title")).to_have_text(["Net spent", "Purchases"])
         expect(page.locator("#yearHeatmap .heatmap-title")).to_have_text([f"{this_year} · Net spent", f"{this_year} · Purchases", "2025 · Net spent", "2025 · Purchases"])
+        # Select All checks every measure.
+        page.click("#heatMeasure .retro-select")
+        page.locator("#heatMeasure .select-all").click()
+        page.keyboard.press("Escape")
+        expect(page.locator("#weekHeatmap .heatmap-title")).to_have_text(["Net spent", "Spent", "Refunds", "Purchases"])
         self.set_checks(page, "#heatMeasure", ["Net spent"])
         self.set_checks(page, "#heatYear", ["2025"])
         expect(page.locator('#yearHeatmap span[data-date="2025-03-11"]')).to_have_count(1)
@@ -1135,7 +1140,9 @@ class BrowserTests(unittest.TestCase):
         page.reload()
         page.click('.tabs [data-tab="stats"]')
         expect(page.locator("#chartStyleSelect .retro-select")).to_have_text("Lines▼")
-        expect(page.locator('[data-stats-tab="counts"]')).to_have_attribute("aria-selected", "true")
+        # Stats always opens on Overview after a reload, whichever sub-tab was open before.
+        expect(page.locator('[data-stats-tab="overview"]')).to_have_attribute("aria-selected", "true")
+        page.click('[data-stats-tab="counts"]')
         self.shot(page, "stats-counts-lines")
         self.pick(page, "#chartStyleSelect", "Bars")
         page.click('[data-stats-tab="overview"]')
