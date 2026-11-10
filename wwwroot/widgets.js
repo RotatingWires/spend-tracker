@@ -63,13 +63,14 @@ function addNewItem(menu, onAdd) {
 }
 
 /*
- * A dropdown with more than ten choices (merchants, tags, people, months, ...) starts with a filter box: typing
+ * A dropdown with more than ten choices (merchants, tags, people, months, ...) starts with a filter box, as does one
+ * created with searchOver: 0 (Paid with, which people search by card name however few there are): typing
  * narrows the list as you go, ignoring case. It clears each time the dropdown opens and takes focus there, except on
  * touch screens, where focusing would open the keyboard over the list.
  */
 const MENU_SEARCH_OVER = 10;
 
-function menuSearch(menu, render) {
+function menuSearch(menu, render, searchOver = MENU_SEARCH_OVER) {
   const box = el('div', 'menu-search');
   const input = el('input');
   input.type = 'search';
@@ -89,7 +90,7 @@ function menuSearch(menu, render) {
     query,
     matches: text => !query() || text.toLowerCase().includes(query()),
     show(count) {
-      box.hidden = count <= MENU_SEARCH_OVER;
+      box.hidden = count <= searchOver;
       if (box.hidden) input.value = '';
     },
     opened() {
@@ -101,7 +102,7 @@ function menuSearch(menu, render) {
   };
 }
 
-export function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true } = {}) {
+export function createSingleSelect(host, { onChange = () => {}, onAdd = null, canAdd = () => true, searchOver = MENU_SEARCH_OVER } = {}) {
   host.classList.add('menu-wrap', 'inline-select-menu');
   const button = el('button', 'retro-select');
   button.setAttribute('aria-haspopup', 'menu');
@@ -120,7 +121,7 @@ export function createSingleSelect(host, { onChange = () => {}, onAdd = null, ca
 
   let options = [];
   let current = '';
-  const search = menuSearch(menu, () => render());
+  const search = menuSearch(menu, () => render(), searchOver);
   // Enter in the filter box picks the first match.
   search.input.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
@@ -343,7 +344,7 @@ function cycleTableSort(key, index) {
 }
 
 /**
- * Renders a table. columns: [{ label, num, title, sortValue, unsortable }].
+ * Renders a table. columns: [{ label, num, className, title, sortValue, unsortable }].
  * rows: [{ cells: [string | Node | { text, num, className, title }], onClick(event), onDoubleClick(event), className, id, selected }].
  * onDoubleClick opens on a double click (or Enter) instead, for rows a stray click should not open.
  */
@@ -361,6 +362,7 @@ export function renderTable(table, columns, rows, options = {}) {
     th.scope = 'col';
     th.textContent = column.label;
     if (column.num) th.className = 'num';
+    if (column.className) th.classList.add(column.className);
     if (column.title) th.title = column.title;
     if (column.label && !column.unsortable && rows.length > 1) {
       th.classList.add('sortable');

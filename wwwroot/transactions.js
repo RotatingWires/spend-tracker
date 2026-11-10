@@ -53,8 +53,8 @@ export function renderTransactions() {
     { label: 'ID', title: 'The permanent ID of each entry. Search #12 to find entry #12.', sortValue: tx => tx.id },
     { label: 'When', sortValue: tx => Number(tx.date.replace(/-/g, '')) },
     { label: 'For Who', sortValue: tx => whoLabel(tx).toLowerCase() || null },
-    { label: 'What', sortValue: tx => describeTransaction(tx).toLowerCase() || null },
-    ...(showLinked ? [{ label: 'Linked To', title: 'For a refund or payback, the purchase it is for; for a purchase, its refunds and paybacks. Double-click one to open it.', sortValue: tx => tx.linkedId ?? (linkedEntries(tx)[0]?.id ?? null) }] : []),
+    { label: 'What', className: 'wide-text', sortValue: tx => describeTransaction(tx).toLowerCase() || null },
+    ...(showLinked ? [{ label: 'Linked To', className: 'wide-text', title: 'For a refund or payback, the purchase it is for; for a purchase, its refunds and paybacks. Double-click one to open it.', sortValue: tx => tx.linkedId ?? (linkedEntries(tx)[0]?.id ?? null) }] : []),
     { label: 'Tags', sortValue: tx => tagIdsOf(tx).map(tagName).join(TAG_SEPARATOR).toLowerCase() || null },
     ...(showCollections ? [{ label: 'Collections', sortValue: tx => collectionIdsOf(tx).map(collectionName).join(', ').toLowerCase() || null }] : []),
     ...methods.map(method => ({ label: method.name, num: true, sortValue: tx => (tx.paymentMethodId === method.id ? netEffect(tx) ?? tx.amountCents : null) })),
@@ -337,6 +337,7 @@ export function initializeTransactionEditor() {
   editor.kind.setOptions(KIND_OPTIONS, 'Purchase');
   // Each list's "Add New..." adds an item as its tab's Add form would, then chooses it here.
   editor.method = createSingleSelect($('#txMethod'), {
+    searchOver: 0,
     onAdd: () => addFromEditor('payment-methods', id => editor.method.setOptions(methodOptions(id), id))
   });
   editor.merchant = createSingleSelect($('#txMerchant'), {

@@ -420,6 +420,33 @@ class BrowserTests(unittest.TestCase):
         paybacks = [tx for tx in api.get("/api/snapshot")["transactions"] if tx["kind"] == "Payback" and tx["personId"] in new_people]
         self.assertEqual(sorted(tx["amountCents"] for tx in paybacks), [1250, 1250])
 
+    def test_phone_menus_open_in_place_and_dialogs_open_at_the_top(self):
+        page = self.new_page(viewport={"width": 390, "height": 700}, has_touch=True)
+        self.log_in(page)
+        page.click("#newTransactionButton")
+        body = page.locator("#transactionDialog .dialog-body")
+        # On a touch screen a menu in a dialog opens under its button, not floating, so a phone's keyboard cannot move it.
+        if page.evaluate("matchMedia('(pointer: coarse)').matches"):
+            page.click("#txMethod > button")
+            expect(page.locator("#txMethod .menu-dropdown")).to_have_class(re.compile("in-place-menu"))
+            page.click("#txMethod > button")
+        # Paid with always has a search box, however few cards there are.
+        page.click("#txMethod > button")
+        expect(page.locator("#txMethod .menu-search")).to_be_visible()
+        page.fill("#txMethod .menu-search input", "deb")
+        expect(page.locator("#txMethod .menu-list [role=menuitemradio]")).to_have_text(["Debit Card"])
+        page.locator("#txMethod .menu-list [role=menuitemradio]").click()
+        # A dialog that was scrolled down opens at its top the next time.
+        body.evaluate("box => box.scrollTop = 200")
+        self.assertGreater(body.evaluate("box => box.scrollTop"), 0)
+        page.locator("#transactionDialog button", has_text="Cancel").click()
+        page.click("#newTransactionButton")
+        self.assertEqual(body.evaluate("box => box.scrollTop"), 0)
+        page.locator("#transactionDialog button", has_text="Cancel").click()
+        # What and Linked To keep room to read on a phone; the ledger scrolls sideways instead.
+        widths = page.evaluate("[...document.querySelectorAll('#transactionsTable th.wide-text')].map(th => th.getBoundingClientRect().width)")
+        self.assertTrue(all(width >= 190 for width in widths), widths)
+
     def test_split_purchase_in_editor(self):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.merchant_id("Pizza")
