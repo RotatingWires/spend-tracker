@@ -380,8 +380,7 @@ class BrowserTests(unittest.TestCase):
         page = self.new_page(viewport={"width": 1280, "height": 900})
         self.log_in(page)
         api = self.api_client()
-        for name in ("Dana", "Eli"):
-            api.post("/api/people", {"name": name})
+        new_people = {api.post("/api/people", {"name": name})["id"] for name in ("Dana", "Eli")}
         page.reload()
         expect(page.locator("#statusLeft")).to_have_text("Ready")
 
@@ -417,7 +416,8 @@ class BrowserTests(unittest.TestCase):
         page.fill("#txDescription", "Venmo")
         page.click("#txSaveButton")
         expect(page.locator("#statusLeft")).to_contain_text("Saved 2 paybacks")
-        paybacks = [tx for tx in api.get("/api/snapshot")["transactions"] if tx["kind"] == "Payback"]
+        # Other tests share this server, so only Dana's and Eli's paybacks count here.
+        paybacks = [tx for tx in api.get("/api/snapshot")["transactions"] if tx["kind"] == "Payback" and tx["personId"] in new_people]
         self.assertEqual(sorted(tx["amountCents"] for tx in paybacks), [1250, 1250])
 
     def test_split_purchase_in_editor(self):
