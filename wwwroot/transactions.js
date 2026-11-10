@@ -661,6 +661,15 @@ function renderShareRows() {
   if (editor.autoShare != null && !people.map(String).includes(editor.autoShare)) editor.autoShare = null;
   const amountCents = parseMoney($('#txAmount').value);
 
+  // What the boxes mean: on a purchase, how much of it was for each person (you paid it all), not what they paid.
+  if (split) {
+    const heading = el('div', 'share-heading');
+    heading.append(el('strong', '', payback ? 'Amount paid back' : 'Share of the cost'), el('span', 'form-hint', payback
+      ? 'How much each person paid you back; each gets their own payback entry.'
+      : 'How much of the purchase was for each person. You paid it; their shares are what they owe you, unless Gift is checked. Record what they pay you as a Payback.'));
+    container.append(heading);
+  }
+
   for (const personId of people) {
     const name = el('label', 'share-name');
     name.htmlFor = split ? `txShare${personId}` : `txGift${personId}`;

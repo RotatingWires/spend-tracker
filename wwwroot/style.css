@@ -802,7 +802,9 @@ button.calendar-day:active {
   border-bottom: 1px solid var(--shadow);
   box-shadow: 0 1px 0 var(--light-edge);
 }
-.share-row:first-child { border-top: 1px solid var(--shadow); }
+.share-row:first-child, .share-heading + .share-row { border-top: 1px solid var(--shadow); }
+/* "Share of the cost" and what it means, over a split's amount boxes. */
+.share-heading { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
 /* A "$" inside the left edge of an amount box. */
 .money-input { position: relative; display: block; min-width: 0; }
 .money-input::before {

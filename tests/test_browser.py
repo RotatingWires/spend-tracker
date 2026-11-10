@@ -395,6 +395,8 @@ class BrowserTests(unittest.TestCase):
         page.fill("#txAmount", "30")
         self.set_checks(page, "#txPeople", ["Me (you)", "Dana"] if page.locator("#txPeople .menu-dropdown button", has_text="(you)").count() else ["Me", "Dana"])
         shares = page.locator("#txShares input[data-person]")
+        # A heading says what the boxes are: each person's share of the cost, not what they paid.
+        expect(page.locator("#txShares .share-heading")).to_contain_text("Share of the cost")
         expect(shares.nth(0)).to_have_value("30.00")
         expect(shares.nth(1)).to_have_value("")
         expect(shares.nth(1)).to_have_attribute("placeholder", "0.00")
@@ -417,6 +419,7 @@ class BrowserTests(unittest.TestCase):
         page.fill("#txAmount", "25")
         self.set_checks(page, "#txPayers", ["Dana", "Eli"])
         payers = page.locator("#txPayerShares input[data-person]")
+        expect(page.locator("#txPayerShares .share-heading")).to_contain_text("Amount paid back")
         expect(payers.nth(0)).to_have_value("25.00")
         expect(payers.nth(1)).to_have_value("")
         page.click("#txPayerShares button:has-text('Split Evenly')")
