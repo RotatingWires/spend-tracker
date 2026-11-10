@@ -534,8 +534,11 @@ html.row-hover-enabled tbody tr.row-hover > td { background: var(--row-hover); }
 #transactionsTable { border-collapse: separate; border-spacing: 0; }
 /* Phones squeezed What and Linked To into a word or two a line; they keep room to read, and the ledger scrolls sideways. */
 @media (max-width: 650px) { #transactionsTable th.wide-text { min-width: 190px; } }
-/* A frame that scrolls stops at its edges instead of bouncing, so a phone cannot drag the ledger around inside it. */
-.table-wrap, .workspace, .dialog-body, .menu-list, .menu-dropdown { overscroll-behavior: none; }
+/* A frame that scrolls stops at its edges instead of bouncing, so a phone cannot drag the ledger around inside it.
+   Only the ledger, which fills the window, stops up and down too: anywhere else that would also keep the wheel from
+   scrolling the page while the pointer is over a table (or a dropdown) that has nothing to scroll that way. */
+.workspace, .dialog-body, .tab-panel[data-panel="transactions"] > .table-wrap { overscroll-behavior: none; }
+.table-wrap { overscroll-behavior-x: none; }
 #transactionsTable tfoot td { position: sticky; bottom: 0; z-index: 1; border-bottom: 0; box-shadow: 0 8px 0 var(--surface-alt); }
 .scope-actions .row-actions { justify-content: flex-start; }
 /* Phones zoom into a text box whose text is under 16px, so touch screens get 16px boxes. */
