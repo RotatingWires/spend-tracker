@@ -257,6 +257,9 @@
           <label for="txDate">Date</label>
           <div><input id="txDate" class="retro-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="m/d/yy" required></div>
 
+          <label for="txDescription">What</label>
+          <div><input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was"></div>
+
           <label for="txAmount">Amount</label>
           <div><span class="money-input"><input id="txAmount" class="retro-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" required></span></div>
 
@@ -283,9 +286,6 @@
 
           <span class="form-label" id="txMerchantLabel">Merchant</span>
           <div id="txMerchant" aria-labelledby="txMerchantLabel"></div>
-
-          <label for="txDescription">What</label>
-          <div><input id="txDescription" class="retro-input" type="text" maxlength="500" autocomplete="off" placeholder="What it was"></div>
 
           <span class="form-label" id="txTagsLabel">Tags</span>
           <div id="txTags" aria-labelledby="txTagsLabel"></div>

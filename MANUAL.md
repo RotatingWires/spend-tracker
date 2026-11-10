@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.46
+# SpendTracker v1.2.47
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -189,7 +189,7 @@ Each transaction also has a date, an amount, a payment method, a merchant and/or
 
 **Archived transactions.** Archiving a transaction (the editor's **Archive** button, or a bulk action) hides it from the ledger and calendar unless **View > Show Archived** is on. It still counts everywhere else: Stats, People balances, refund and payback limits, collections, CSV exports, and backups. **Restore** lists it again.
 
-**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. When you add a second person, you start with the whole amount and everyone else with 0.00; your box follows the amount until you change any box. A blank box counts as $0.00, and someone at $0.00 stays on the purchase, like a friend you bought food for who owes nothing. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
+**Shares.** A purchase for one person is entirely theirs. A purchase for several people (say, dinner for you and two friends) has an amount for each person, and the shares must add up exactly to the purchase. When you add a second person, you start with the whole amount and everyone else with a blank box, showing 0.00 only as its hint, so typing an amount there needs no clearing first; your box follows the amount until you change any box. A blank box counts as $0.00 (a typed 0 goes back to blank), and someone at $0.00 stays on the purchase, like a friend you bought food for who owes nothing. **Split Evenly** divides the amount into equal cents, giving any leftover cent to the first people listed; you can change any share before saving. Each friend's share counts toward what they owe you, and *Spent for others* adds up the shares that are not yours.
 
 **Gifts.** Check **Gift** next to a person in **For who** when you bought their share as a gift: it still counts in their shares (and in *Spent for others*), but they do not owe it back, so it stays off their **Balance** on the People tab unless **Include gifts in Balance** is checked there. Refunds on a gift share are left out the same way. Your own share cannot be a gift, a payback cannot be linked to a gift share, and a share someone has already paid back toward cannot become a gift.
 
@@ -576,7 +576,12 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.46**.
+Current release: **v1.2.47**.
+
+### v1.2.47
+
+- The transaction window asks **What** before **Amount**, and opens with the cursor in What.
+- Share and payback boxes for $0.00 stay blank, with 0.00 only as the hint, so typing an amount there needs no select-all first; a blank box still saves as $0.00 and keeps the person on the purchase.
 
 ### v1.2.46
 

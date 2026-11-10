@@ -384,19 +384,21 @@ class BrowserTests(unittest.TestCase):
         page.reload()
         expect(page.locator("#statusLeft")).to_have_text("Ready")
 
-        # Adding someone gives you the whole amount and them $0.00; your box follows the amount until you change one.
+        # Adding someone gives you the whole amount and them a blank box ($0.00, with 0.00 as its hint); your box follows the
+        # amount until you change one.
         page.click("#newTransactionButton")
         page.fill("#txAmount", "30")
         self.set_checks(page, "#txPeople", ["Me (you)", "Dana"] if page.locator("#txPeople .menu-dropdown button", has_text="(you)").count() else ["Me", "Dana"])
         shares = page.locator("#txShares input[data-person]")
         expect(shares.nth(0)).to_have_value("30.00")
-        expect(shares.nth(1)).to_have_value("0.00")
+        expect(shares.nth(1)).to_have_value("")
+        expect(shares.nth(1)).to_have_attribute("placeholder", "0.00")
         page.fill("#txAmount", "40")
         expect(shares.nth(0)).to_have_value("40.00")
-        # 0 is a valid share and formats like any amount; a blank share is $0.00 too.
+        # 0 is a valid share; it is left blank like a new box, so typing an amount there needs no clearing first.
         shares.nth(1).fill("0")
         shares.nth(1).blur()
-        expect(shares.nth(1)).to_have_value("0.00")
+        expect(shares.nth(1)).to_have_value("")
         shares.nth(1).fill("")
         page.fill("#txDescription", "Groceries")
         page.click("#txSaveButton")
@@ -411,7 +413,7 @@ class BrowserTests(unittest.TestCase):
         self.set_checks(page, "#txPayers", ["Dana", "Eli"])
         payers = page.locator("#txPayerShares input[data-person]")
         expect(payers.nth(0)).to_have_value("25.00")
-        expect(payers.nth(1)).to_have_value("0.00")
+        expect(payers.nth(1)).to_have_value("")
         page.click("#txPayerShares button:has-text('Split Evenly')")
         page.fill("#txDescription", "Venmo")
         page.click("#txSaveButton")

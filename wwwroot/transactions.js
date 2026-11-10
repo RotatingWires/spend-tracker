@@ -485,7 +485,7 @@ export function openTransactionEditor(tx = null, defaults = {}) {
   editor.method.setOptions(methodOptions(tx?.paymentMethodId), tx?.paymentMethodId ?? lastPurchase?.paymentMethodId);
   editor.tags.setOptions(labelOptions(state.snapshot.tags, tx?.tagIds ?? []), tx?.tagIds ?? []);
   editor.collections.setOptions(labelOptions(state.snapshot.collections, tx?.collectionIds ?? []), tx?.collectionIds ?? []);
-  editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), formatAmount(share.amountCents)]));
+  editor.shareInputs = new Map((tx?.shares ?? []).map(share => [String(share.personId), shareText(share.amountCents)]));
   editor.gifts = new Set((tx?.shares ?? []).filter(share => share.gift).map(share => String(share.personId)));
   editor.people.setOptions(peopleOptions(tx), tx?.shares?.length ? tx.shares.map(share => share.personId) : [state.model.self.id]);
   editor.autoShare = null;
@@ -499,7 +499,8 @@ export function openTransactionEditor(tx = null, defaults = {}) {
   applyEditorKind({ personId: tx?.personId ?? defaults.personId, linkedId: tx?.linkedId ?? defaults.linkedId });
 
   $('#transactionDialog').showModal();
-  $('#txAmount').focus();
+  // What is the first box to type in, above Amount.
+  $('#txDescription').focus();
 }
 
 /** "Archived. Me #4 Alex #3 food #12": each number opens that person's, tag's, or merchant's numbered list. */
@@ -607,10 +608,15 @@ function shareCents(text) {
   return String(text ?? '').trim() === '' ? 0 : parseMoney(text, { allowZero: true });
 }
 
-/** Rewrites a share box as "12.50" (or "0.00") once the user leaves it. */
+/** A share box's text: $0.00 stays blank, showing 0.00 only as the hint, so typing an amount needs no clearing first. */
+function shareText(cents) {
+  return cents === 0 ? '' : formatAmount(cents);
+}
+
+/** Rewrites a share box as "12.50" (or blank for $0.00) once the user leaves it. */
 function formatShareInput(input) {
   const cents = shareCents(input.value);
-  if (cents != null) input.value = formatAmount(cents);
+  if (cents != null) input.value = shareText(cents);
 }
 
 /** The box that still takes the whole amount follows the amount as it is typed. */
@@ -623,7 +629,7 @@ function followAmount() {
 
 /**
  * One person takes the whole amount; several people each get an amount box that must add up to the total. When a
- * purchase becomes split, you start with the whole amount and everyone else with $0.00, ready for Split Evenly; a
+ * purchase becomes split, you start with the whole amount and everyone else blank ($0.00), ready for Split Evenly; a
  * payback starts with its first payer. Everyone but you also gets a Gift box on a purchase: a gift share is bought for
  * them but not owed back.
  */
@@ -665,7 +671,7 @@ function renderShareRows() {
       amount.placeholder = '0.00';
       amount.dataset.person = String(personId);
       const auto = editor.autoShare === String(personId);
-      amount.value = auto ? (amountCents == null ? '' : formatAmount(amountCents)) : editor.shareInputs.get(String(personId)) ?? '0.00';
+      amount.value = auto ? (amountCents == null ? '' : formatAmount(amountCents)) : editor.shareInputs.get(String(personId)) ?? '';
       amount.addEventListener('input', () => {
         editor.autoShare = null; // typed amounts stay as typed
         updateShareTotal();
@@ -734,7 +740,7 @@ function splitEvenly() {
   editor.autoShare = null;
   const inputs = shareInputs();
   evenShares(amount, inputs.map(input => input.dataset.person))
-    .forEach((share, index) => { inputs[index].value = formatAmount(share.amountCents); });
+    .forEach((share, index) => { inputs[index].value = shareText(share.amountCents); });
   $('#txError').textContent = '';
   updateShareTotal();
 }
