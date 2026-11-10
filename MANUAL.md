@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.51
+# SpendTracker v1.2.52
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -398,7 +398,7 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 data/
   spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
   auth.json             salted password hash, created at first-run setup
-  keys/                 sign-in cookie keys when there is no Windows profile key ring (Linux, Task Scheduler)
+  keys/                 sign-in cookie keys (machine-scope DPAPI on Windows)
   backups/              recovery copies written automatically before each restore (File > Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
@@ -576,7 +576,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.51**.
+Current release: **v1.2.52**.
+
+### v1.2.52
+
+- Restarting the server no longer signs you out on Windows: sign-in keys always live in `data/keys/` (protected with machine-scope DPAPI), not in the Windows profile's key ring, which a service account does not always have loaded when the app starts (then the keys only lived in memory). Everyone signs in once more after updating.
 
 ### v1.2.51
 

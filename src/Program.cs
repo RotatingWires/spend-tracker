@@ -54,21 +54,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 
-// Session-cookie keys must outlive restarts, or every restart signs you out. On Windows with a loaded user profile
-// (signed in and started from a terminal), they stay in that profile's ASP.NET key ring. Otherwise (Linux, including
-// services under systemd ProtectHome, and Windows Task Scheduler without a loaded profile) they live in data/keys;
-// Windows then uses machine-scope DPAPI, since user-scope DPAPI fails when the profile isn't loaded. Same as NewsReview.
+// Session-cookie keys must outlive restarts, or every restart signs you out, so they always live in data/keys, the same
+// in every app. A Windows profile's own ASP.NET key ring was used before when the profile looked available, but a
+// service account's profile is not always loaded when the app starts (say, at boot), and then the keys only lived in
+// memory. On Windows they are encrypted with machine-scope DPAPI, which works whether or not a profile is loaded.
 var keysDirectory = Path.Combine(dataDir, "keys");
-var profileKeyRing = OperatingSystem.IsWindows()
-    && Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) is { Length: > 0 } localAppData
-    && Directory.Exists(localAppData);
-var dataProtection = builder.Services.AddDataProtection().SetApplicationName("SpendTracker");
-if (!profileKeyRing)
-{
-    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
-    if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
-}
-var keyLocation = profileKeyRing ? "this Windows profile's ASP.NET key ring" : keysDirectory;
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("SpendTracker")
+    .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
+if (OperatingSystem.IsWindows()) dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+var keyLocation = keysDirectory;
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
