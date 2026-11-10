@@ -47,6 +47,18 @@ export const Charts = (() => {
     tooltip.style.top = `${y + 12 + height + 10 > window.innerHeight ? Math.max(10, y - height - 12) : y + 12}px`;
   }
 
+  /** With onSelect, clicking (or tapping) a bar's or point's column calls it with that index; the pointer shows it. */
+  function selectable(canvas, onSelect, indexAt, count) {
+    canvas.style.cursor = onSelect ? 'pointer' : '';
+    canvas.onclick = onSelect ? event => {
+      const index = indexAt(event.clientX - canvas.getBoundingClientRect().left);
+      if (index >= 0 && index < count) {
+        hideTooltip();
+        onSelect(index);
+      }
+    } : null;
+  }
+
   /** Rounds a raw gridline spacing up to 1, 2, 2.5, or 5 times a power of ten (cents for money, units for counts). */
   function niceStep(rough) {
     if (rough <= 0) return 1;
@@ -67,9 +79,9 @@ export const Charts = (() => {
 
   /**
    * labels: one per bar. titles: tooltip heading per bar. series: [{ label, color (1-8), values, count, format }].
-   * Hovering a bar lists every series' value there, the hovered section in bold.
+   * Hovering a bar lists every series' value there, the hovered section in bold. onSelect(index) opens what a bar stands for.
    */
-  function bars(canvas, { labels, titles, series }) {
+  function bars(canvas, { labels, titles, series, onSelect = null }) {
     const ratio = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -176,14 +188,15 @@ export const Charts = (() => {
       ], event.clientX, event.clientY);
     };
     canvas.onpointerleave = hideTooltip;
+    selectable(canvas, onSelect, pointerX => Math.floor((pointerX - padding.left) / slot), labels.length);
   }
 
   /**
    * labels: one per point. titles: tooltip heading per point. series: [{ label, color (1-8), values, format, dashed, count }].
    * A null value leaves a gap, so a period still in progress stops at today while the one it is compared with goes on.
-   * As in bars, counts shown together with money get their own axis on the right.
+   * As in bars, counts shown together with money get their own axis on the right, and onSelect(index) opens a point.
    */
-  function lines(canvas, { labels, titles, series }) {
+  function lines(canvas, { labels, titles, series, onSelect = null }) {
     const ratio = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -298,6 +311,7 @@ export const Charts = (() => {
       ], event.clientX, event.clientY);
     };
     canvas.onpointerleave = hideTooltip;
+    selectable(canvas, onSelect, pointerX => (labels.length > 1 ? Math.round((pointerX - padding.left) / slot) : 0), labels.length);
   }
 
   return { bars, lines, hideTooltip };

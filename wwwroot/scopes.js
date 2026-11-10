@@ -3,13 +3,20 @@
  * #3. Opened from rows on the People, Payment Methods, Tags, Collections, and Merchants tabs and from the numbers at the
  * top of the transaction editor.
  */
-import { $, SCOPE_NAMES, describeTransaction, formatDate, formatMonth, monthOf, numberIn, plural, shareOf, state, whoLabel } from './app.js';
+import { $, SCOPE_NAMES, collectionIdsOf, describeTransaction, formatDate, formatMonth, monthOf, numberIn, plural, shareOf, state, tagIdsOf, whoLabel } from './app.js';
 import { moneyCell, renderTable } from './widgets.js';
 import { KIND_LABELS, openTransactionEditor } from './transactions.js';
-import { merchantIdsOf } from './summaries.js';
+import { merchantIdsOf, showCollectionStats } from './summaries.js';
 import { manageButtons } from './manage.js';
 
 const SCOPE_TITLES = { person: 'Person', tag: 'Tag', collection: 'Collection', merchant: 'Merchant', method: 'Payment method' };
+// The lists whose dialog holds the item's Rename, Archive, and Delete buttons: [API path, model map, the item's IDs on an entry].
+const MANAGED_SCOPES = {
+  method: ['payment-methods', 'methods', tx => [tx.paymentMethodId]],
+  tag: ['tags', 'tags', tagIdsOf],
+  collection: ['collections', 'collections', collectionIdsOf],
+  merchant: ['merchants', 'merchants', merchantIdsOf]
+};
 let scopeListTarget = null;
 
 /** With month ("YYYY-MM"), only that month's entries are listed (Stats > Heatmaps > Tags × Month). */
@@ -22,15 +29,21 @@ export function openScopeList(scope, scopeId, { month = null } = {}) {
 export function renderScopeList() {
   if (!scopeListTarget) return;
   const { scope, scopeId, month } = scopeListTarget;
-  // A merchant's dialog holds its Rename, Archive, and Delete buttons; deleting it closes the dialog.
-  const merchant = scope === 'merchant' ? state.model.merchants.get(scopeId) : null;
-  if (scope === 'merchant' && !merchant) {
+  // A payment method's, tag's, collection's, or merchant's dialog holds its Rename, Archive, and Delete buttons (and a
+  // collection's Stats); deleting it closes the dialog.
+  const managed = MANAGED_SCOPES[scope];
+  const item = managed ? state.model[managed[1]].get(scopeId) : null;
+  if (managed && !item) {
     scopeListTarget = null;
     $('#scopeDialog').close();
     return;
   }
-  $('#scopeActions').replaceChildren(...(merchant
-    ? [manageButtons('merchants', merchant, state.model.transactions.filter(tx => merchantIdsOf(tx).includes(scopeId)).length)]
+  const leading = scope === 'collection' ? [['Stats', () => {
+    $('#scopeDialog').close();
+    showCollectionStats(item);
+  }, `Show stats for ${item.name}`]] : [];
+  $('#scopeActions').replaceChildren(...(item
+    ? [manageButtons(managed[0], item, state.model.transactions.filter(tx => managed[2](tx).includes(scopeId)).length, leading)]
     : []));
   const entries = state.model.transactions
     .filter(tx => !month || monthOf(tx.date) === month)

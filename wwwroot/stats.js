@@ -2,10 +2,10 @@
  * Stats tab. Every number is computed only from recorded entries; nothing is estimated or categorized
  * automatically. Refunds count on their own date and under the person, tags, collections, and merchant of their purchase.
  */
-import { $, $$, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, addDays, collectionIdsOf, dayNumber, daysInMonth, describeTransaction, el, formatDate, formatDateRange, formatMoney, formatMonth, keyFromDayNumber, methodName, monthEnd, monthOf, monthStart, numberFormat, othersShare, pad2, percentFormat, plural, shiftMonth, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf, writeSetting } from './app.js';
+import { $, $$, SCOPE_NAMES, WEEKDAY_NAMES, WEEKDAYS, addDays, collectionIdsOf, dayNumber, daysInMonth, describeTransaction, el, formatDate, formatDateRange, formatMoney, formatMonth, keyFromDayNumber, methodName, monthEnd, monthOf, monthStart, numberFormat, othersShare, pad2, percentFormat, plural, shiftMonth, shortMonth, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf, writeSetting } from './app.js';
 import { createMultiSelect, createSingleSelect, renderMetrics, renderTable, statCard } from './widgets.js';
 import { monthTotals } from './transactions.js';
-import { dailyNet } from './calendar.js';
+import { dailyNet, openDayDialog } from './calendar.js';
 import { merchantIdsOf } from './summaries.js';
 import { openScopeList } from './scopes.js';
 import { switchTab } from './ui.js';
@@ -19,6 +19,16 @@ let chartStyleSelect = null;
 const CHART_STYLES = [{ value: 'bars', label: 'Bars' }, { value: 'lines', label: 'Lines' }];
 
 /** Charts over time follow the Charts choice (bars or lines); charts of categories are always bars. */
+/** What a chart's day or month opens: a day's entries, or a month's ledger, like the heatmaps and the Months table. */
+export function openPeriodKey(key) {
+  if (key.length > 7) {
+    openDayDialog(key);
+    return;
+  }
+  state.timeFrame = { all: false, months: [key] };
+  switchTab('transactions');
+}
+
 export function drawTimeChart(canvas, data) {
   if (state.chartStyle === 'lines') Charts.lines(canvas, data);
   else Charts.bars(canvas, data);
@@ -404,9 +414,10 @@ export function renderStatsChart(stats) {
   const points = byDay
     ? Array.from({ length: Math.max(0, dayNumber(stats.countedEnd) - dayNumber(stats.range.start) + 1) }, (_, index) => keyFromDayNumber(dayNumber(stats.range.start) + index))
       .filter(stats.included)
-      .map(key => ({ label: key.slice(8), title: formatDate(key), bucket: stats.days.get(key) ?? empty }))
+      .map(key => ({ key, label: key.slice(8), title: formatDate(key), bucket: stats.days.get(key) ?? empty }))
     : stats.months.map(month => ({
-      label: `${MONTH_NAMES[Number(month.month.slice(5)) - 1].slice(0, 3)} ${month.month.slice(2, 4)}`,
+      key: month.month,
+      label: shortMonth(month.month),
       title: formatMonth(month.month),
       bucket: month
     }));
@@ -429,7 +440,7 @@ export function renderStatsChart(stats) {
     item.append(swatch, metric.label);
     return item;
   }));
-  drawTimeChart($('#statsChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series });
+  drawTimeChart($('#statsChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series, onSelect: index => openPeriodKey(points[index].key) });
 }
 
 function renderStatsTables(stats) {

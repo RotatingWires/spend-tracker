@@ -1,12 +1,11 @@
 /*
  * Payment Methods, Tags, Collections, and Merchants tabs: totals per item from the purchases that have it and the refunds
- * on those purchases, with an Add form and Rename/Archive/Delete on each row. Selecting a row lists that scope's
- * entries; a collection can also be opened as a Stats period.
+ * on those purchases, with an Add form. Selecting a row lists that scope's entries in a dialog that also holds the
+ * item's Rename/Archive/Delete buttons (scopes.js); a collection's has Stats too, to open it as a Stats period.
  */
 import { $, collectionIdsOf, formatDateRange, formatMoney, numberFormat, state, tagIdsOf } from './app.js';
 import { renderTable } from './widgets.js';
 import { archivedLabel, monthTotals } from './transactions.js';
-import { manageButtons } from './manage.js';
 import { openScopeList } from './scopes.js';
 import { switchTab } from './ui.js';
 
@@ -15,13 +14,10 @@ export function merchantIdsOf(tx) {
   return source.merchantId == null ? [] : [source.merchantId];
 }
 
-/** With actionsInDialog, the row has no Rename/Archive/Delete buttons; they sit in the dialog the row opens. */
-function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, stats = false, actionsInDialog = false }) {
+function renderLabelSummary(table, scope, items, idsOf, { label, empty }) {
   const rows = items.map(item => {
     const entries = state.model.transactions.filter(tx => tx.kind !== 'Payback' && idsOf(tx).includes(item.id));
-    const uses = state.model.transactions.filter(tx => idsOf(tx).includes(item.id)).length;
     const totals = monthTotals(entries);
-    const actions = actionsInDialog ? null : manageButtons(path, item, uses, stats ? [['Stats', () => showCollectionStats(item), `Show stats for ${item.name}`]] : []);
     return {
       onClick: () => openScopeList(scope, item.id),
       cells: [
@@ -31,8 +27,7 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
         { text: formatMoney(totals.spent), num: true },
         { text: formatMoney(totals.refunded), num: true },
         { text: formatMoney(totals.net), num: true },
-        entries.length ? formatDateRange(entries[0].date, entries.at(-1).date) : '—',
-        ...(actions ? [actions] : [])
+        entries.length ? formatDateRange(entries[0].date, entries.at(-1).date) : '—'
       ]
     };
   });
@@ -43,8 +38,7 @@ function renderLabelSummary(table, scope, path, items, idsOf, { label, empty, st
     { label: 'Spent', num: true },
     { label: 'Refunds', num: true, title: 'Refunds on these purchases, whenever they were refunded.' },
     { label: 'Net Spent', num: true, title: 'Spent minus refunds.' },
-    { label: 'Dates', title: 'From the first to the last entry.' },
-    ...(actionsInDialog ? [] : [{ label: '' }])
+    { label: 'Dates', title: 'From the first to the last entry.' }
   ], rows, { empty });
 }
 
@@ -60,29 +54,28 @@ export function searchEmpty(tab, singular, emptyText) {
 }
 
 export function renderMethodsTab() {
-  renderLabelSummary($('#methodsTable'), 'method', 'payment-methods', searchedItems('methods', state.snapshot.paymentMethods), tx => [tx.paymentMethodId],
+  renderLabelSummary($('#methodsTable'), 'method', searchedItems('methods', state.snapshot.paymentMethods), tx => [tx.paymentMethodId],
     { label: 'Payment Method', empty: searchEmpty('methods', 'payment method', 'No payment methods yet. Add one above.') });
 }
 
 export function renderTagsTab() {
-  renderLabelSummary($('#tagsTable'), 'tag', 'tags', searchedItems('tags', state.snapshot.tags), tagIdsOf,
+  renderLabelSummary($('#tagsTable'), 'tag', searchedItems('tags', state.snapshot.tags), tagIdsOf,
     { label: 'Tag', empty: searchEmpty('tags', 'tag', 'No tags yet. Add one above, then choose it on purchases in the editor.') });
 }
 
 export function renderCollectionsTab() {
-  renderLabelSummary($('#collectionsTable'), 'collection', 'collections', searchedItems('collections', state.snapshot.collections), collectionIdsOf,
-    { label: 'Collection', empty: searchEmpty('collections', 'collection', 'No collections yet. Add one above, then choose it on purchases in the editor.'), stats: true });
+  renderLabelSummary($('#collectionsTable'), 'collection', searchedItems('collections', state.snapshot.collections), collectionIdsOf,
+    { label: 'Collection', empty: searchEmpty('collections', 'collection', 'No collections yet. Add one above, then choose it on purchases in the editor.') });
 }
 
 export function renderMerchantsTab() {
-  renderLabelSummary($('#merchantsTable'), 'merchant', 'merchants', searchedItems('merchants', state.snapshot.merchants), merchantIdsOf, {
+  renderLabelSummary($('#merchantsTable'), 'merchant', searchedItems('merchants', state.snapshot.merchants), merchantIdsOf, {
     label: 'Merchant',
-    actionsInDialog: true,
     empty: searchEmpty('merchants', 'merchant', 'No merchants yet. Add one above, then choose it in the editor.')
   });
 }
 
-function showCollectionStats(collection) {
+export function showCollectionStats(collection) {
   state.statsPeriod = [`c:${collection.id}`];
   switchTab('stats');
 }

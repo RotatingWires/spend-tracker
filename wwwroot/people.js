@@ -43,7 +43,7 @@ export function outstandingText(cents) {
   return 'Settled';
 }
 
-/** Everyone, you first: balances for other people, plus Rename/Archive/Delete on each row. */
+/** Everyone, you first: balances for other people. A row opens the person's dialog, which holds Rename/Archive/Delete. */
 export function renderPeople() {
   const rows = searchedItems('people', state.snapshot.people)
     .map(person => ({ person, ledger: personLedger(person.id) }))
@@ -60,8 +60,7 @@ export function renderPeople() {
         formatMoney(ledger.refunded),
         formatMoney(ledger.paidBack),
         person.isSelf ? { text: '—', num: true } : { text: outstandingText(ledger.outstanding), sort: ledger.outstanding, num: true, className: ledger.outstanding > 0 ? '' : 'money-in' },
-        ledger.lastPayback ? formatDate(ledger.lastPayback) : '—',
-        manageButtons('people', person, ledger.entries.length)
+        ledger.lastPayback ? formatDate(ledger.lastPayback) : '—'
       ]
     }));
 
@@ -74,8 +73,7 @@ export function renderPeople() {
     { label: 'Refunded', num: true, title: 'Refunds on purchases made for this person.' },
     { label: 'Paid Back', num: true },
     { label: 'Balance', num: true, title: 'Their shares, minus refunds on those purchases, minus everything they paid back. Gifts and refunds on them are left out unless Include gifts is checked.' },
-    { label: 'Last Payback' },
-    { label: '' }
+    { label: 'Last Payback' }
   ], rows, { empty: searchEmpty('people', 'person', 'No people yet.') });
 }
 
@@ -87,8 +85,14 @@ export function openPersonDialog(personId) {
 
 export function renderPersonDialog() {
   const personId = personDialogId;
-  if (personId == null || !state.model.people.has(personId)) return;
+  // Deleting the person from their own dialog closes it.
+  if (personId == null || !state.model.people.has(personId)) {
+    personDialogId = null;
+    $('#personDialog').close();
+    return;
+  }
   const ledger = personLedger(personId);
+  $('#personActions').replaceChildren(manageButtons('people', state.model.people.get(personId), ledger.entries.length));
   $('#personDialogTitle').textContent = personName(personId);
   renderMetrics($('#personSummary'), [
     ['Their shares', formatMoney(ledger.fronted)],

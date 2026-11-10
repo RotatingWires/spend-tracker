@@ -41,7 +41,7 @@ export const state = {
   statsTab: readSetting('spend-tracker-stats-tab') || 'overview',
   // Bars or lines for charts over time, remembered in this browser.
   chartStyle: readSetting('spend-tracker-chart-style') === 'lines' ? 'lines' : 'bars',
-  heat: { measure: 'net', year: null, rows: 'tags' },
+  heat: { measure: 'net', years: [], rows: 'tags' },
   // Searches applied with a Search button (or Enter), not while typing; empty means none.
   ledgerQuery: '',
   // Ledger filters checked in the Filters dropdown, such as "method:2" or "tag:5".
@@ -197,6 +197,11 @@ export function typedDate(iso) {
 export function formatMonth(monthKey) {
   const [year, month] = monthKey.split('-').map(Number);
   return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
+/** A month in a chart label or heading where room is short: "Jan '26" for "2026-01" (or any date in it). */
+export function shortMonth(key) {
+  return `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} '${key.slice(2, 4)}`;
 }
 
 export function formatDateRange(start, end) {

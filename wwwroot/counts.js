@@ -2,11 +2,12 @@
  * Stats > Counts: how many entries rather than how much money. Purchases, refunds, and paybacks over time and by
  * weekday, purchases by size, and the merchants and tags used most. Like the rest of Stats, archived entries count.
  */
-import { $, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, dayNumber, el, formatDate, formatMonth, keyFromDayNumber, monthOf, numberFormat, tagIdsOf, tagName, weekdayOf } from './app.js';
+import { $, SCOPE_NAMES, WEEKDAY_NAMES, WEEKDAYS, dayNumber, el, formatDate, formatMonth, keyFromDayNumber, monthOf, numberFormat, shortMonth, tagIdsOf, tagName, weekdayOf } from './app.js';
 import { renderMetrics } from './widgets.js';
 import { merchantIdsOf } from './summaries.js';
+import { openScopeList } from './scopes.js';
 import { Charts } from './charts.js';
-import { drawTimeChart } from './stats.js';
+import { drawTimeChart, openPeriodKey } from './stats.js';
 import { SIZE_BUCKETS } from './insights.js';
 
 const COUNT_KINDS = [
@@ -75,12 +76,14 @@ export function renderCounts(stats) {
   Charts.bars($('#countMerchantChart'), {
     labels: merchants.map(entry => shortLabel(SCOPE_NAMES.merchant(entry.id))),
     titles: merchants.map(entry => SCOPE_NAMES.merchant(entry.id)),
+    onSelect: index => openScopeList('merchant', merchants[index].id),
     series: [{ label: 'Visits', color: 5, count: true, format: countFormat, values: merchants.map(entry => entry.count) }]
   });
   const tags = topCounts(stats.purchases, tagIdsOf).slice(0, 12);
   Charts.bars($('#countTagChart'), {
     labels: tags.map(entry => shortLabel(tagName(entry.id))),
     titles: tags.map(entry => tagName(entry.id)),
+    onSelect: index => openScopeList('tag', tags[index].id),
     series: [{ label: 'Purchases', color: 5, count: true, format: countFormat, values: tags.map(entry => entry.count) }]
   });
 }
@@ -106,14 +109,14 @@ function renderCountsOverTime(stats) {
       .filter(stats.included)
       .map(key => ({ label: key.slice(8), title: formatDate(key), key }))
     : stats.months.map(month => ({
-      label: `${MONTH_NAMES[Number(month.month.slice(5)) - 1].slice(0, 3)} ${month.month.slice(2, 4)}`,
+      label: shortMonth(month.month),
       title: formatMonth(month.month),
       key: month.month
     }));
   $('#countTimeLegend').textContent = `Entries per ${byDay ? 'Day' : 'Month'}`;
   const series = kindSeries(points.map(point => buckets.get(point.key) ?? emptyCounts()));
   renderChartKey($('#countTimeKey'), series);
-  drawTimeChart($('#countTimeChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series });
+  drawTimeChart($('#countTimeChart'), { labels: points.map(point => point.label), titles: points.map(point => point.title), series, onSelect: index => openPeriodKey(points[index].key) });
 }
 
 function renderCountsByWeekday(stats) {

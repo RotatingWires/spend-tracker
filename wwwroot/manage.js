@@ -1,6 +1,6 @@
 /*
  * Adding, renaming, archiving, and deleting payment methods, people, tags, collections, and merchants. Each has its own
- * tab with an Add form at the top and these actions on every row.
+ * tab with an Add form at the top; these actions sit in the dialog a row opens.
  */
 import { $$, api, applyListItem, plural, state } from './app.js';
 import { bindSearchForm, confirmAction, promptText, rowActionButtons, setStatus, showError } from './widgets.js';
@@ -16,7 +16,7 @@ const MANAGED = {
   merchants: { singular: 'merchant', maxLength: 120, archivable: () => true }
 };
 
-/** Rename, Archive or Restore, and Delete buttons for one row, after any leading ones; you can only rename yourself. */
+/** Rename, Archive or Restore, and Delete buttons for one item's dialog, after any leading ones; you can only rename yourself. */
 export function manageButtons(path, item, uses, leading = []) {
   const config = MANAGED[path];
   const actions = [...leading, ['Rename', () => renameManaged(path, item), `Rename ${item.name}`]];

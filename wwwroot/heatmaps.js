@@ -1,11 +1,12 @@
 /*
  * Stats > Heatmaps, drawn like TaskList Stats' heatmaps: a year of days, months by year, tags or merchants by month,
- * and weekdays by week of the month. One Show choice applies to all four. Darker cells hold more; the darkest shade
+ * and weekdays by week of the month. The year grid shows each year checked in its dropdown, newest first. One Show
+ * choice applies to all four. Darker cells hold more; the darkest shade
  * starts at the 90th percentile of the heatmap's cells, so one huge purchase does not wash out every other day. A net
  * of zero or less (refunds only) is the lightest.
  */
-import { $, MONTH_NAMES, SCOPE_NAMES, WEEKDAYS, WEEKDAY_NAMES, addDays, compareNames, dayNumber, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthOf, numberFormat, pad2, plural, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf } from './app.js';
-import { createSingleSelect } from './widgets.js';
+import { $, MONTH_NAMES, SCOPE_NAMES, WEEKDAY_NAMES, WEEKDAYS, addDays, compareNames, dayNumber, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthOf, numberFormat, pad2, plural, shortMonth, state, tagIdsOf, todayKey, transactionsInRange, weekdayOf } from './app.js';
+import { createMultiSelect, createSingleSelect } from './widgets.js';
 import { dailyNet, openDayDialog } from './calendar.js';
 import { merchantIdsOf } from './summaries.js';
 import { openScopeList } from './scopes.js';
@@ -79,16 +80,19 @@ function heatYears() {
   return Array.from({ length: end - first + 1 }, (_, index) => end - index);
 }
 
+/** This year, unless nothing is recorded in it yet; then the latest year with entries. */
+function defaultHeatYear() {
+  const latest = Number((state.model.transactions.at(-1)?.date ?? todayKey()).slice(0, 4));
+  return Math.min(Number(todayKey().slice(0, 4)), latest);
+}
+
 export function renderHeatmaps(stats) {
   heatMeasureSelect.setOptions(HEAT_MEASURES, state.heat.measure);
   heatRowsSelect.setOptions(HEAT_ROWS, state.heat.rows);
   const years = heatYears();
-  if (!years.includes(state.heat.year)) {
-    // This year, unless nothing is recorded in it yet; then the latest year with entries.
-    const latest = Number((state.model.transactions.at(-1)?.date ?? todayKey()).slice(0, 4));
-    state.heat.year = Math.min(Number(todayKey().slice(0, 4)), latest);
-  }
-  heatYearSelect.setOptions(years.map(year => ({ value: year, label: String(year) })), state.heat.year);
+  state.heat.years = state.heat.years.filter(year => years.includes(year));
+  if (!state.heat.years.length) state.heat.years = [defaultHeatYear()];
+  heatYearSelect.setOptions(years.map(year => ({ value: year, label: String(year) })), state.heat.years);
 
   renderYearHeatmap();
   renderMonthYearHeatmap();
@@ -96,10 +100,18 @@ export function renderHeatmaps(stats) {
   renderWeekHeatmap(stats);
 }
 
-/** One square per day of the chosen year, a column per week (Sunday first), as on TaskList Stats. */
+/** Each checked year, newest first, under its own heading when there are several. */
 function renderYearHeatmap() {
+  const years = [...state.heat.years].sort((a, b) => b - a);
+  $('#yearHeatmap').replaceChildren(...years.flatMap(year => [
+    ...(years.length > 1 ? [el('div', 'year-heatmap-title', String(year))] : []),
+    yearGrid(year)
+  ]));
+}
+
+/** One square per day of a year, a column per week (Sunday first), as on TaskList Stats. */
+function yearGrid(year) {
   const measure = heatMeasure();
-  const year = state.heat.year;
   const days = dailyNet(transactionsInRange(`${year}-01-01`, `${year}-12-31`));
   const max = heatScale([...days.values()].map(measure.of));
   const first = `${year}-01-01`;
@@ -136,7 +148,7 @@ function renderYearHeatmap() {
       grid.append(cell);
     }
   }
-  $('#yearHeatmap').replaceChildren(grid);
+  return grid;
 }
 
 /** Every month of every year with entries, all time. */
@@ -224,7 +236,7 @@ function renderLabelMonthHeatmap(stats) {
   grid.style.gridTemplateColumns = `minmax(90px, max-content) repeat(${months.length}, 56px)`;
   grid.append(document.createElement('div'));
   for (const month of months) {
-    const head = el('div', 'month-year-head', `${MONTH_NAMES[Number(month.slice(5)) - 1].slice(0, 3)} ${month.slice(2, 4)}`);
+    const head = el('div', 'month-year-head', shortMonth(month));
     grid.append(head);
   }
   for (const id of ids) {
@@ -289,9 +301,13 @@ export function initializeHeatmaps() {
       renderStats();
     }
   });
-  heatYearSelect = createSingleSelect($('#heatYear'), {
-    onChange: value => {
-      state.heat.year = Number(value);
+  // Check boxes, applied when the dropdown closes; closing it with none checked goes back to the usual year.
+  heatYearSelect = createMultiSelect($('#heatYear'), {
+    deferChange: true,
+    summary: names => names.length > 2 ? `${names.length} years` : names.join(', '),
+    onChange: values => {
+      state.heat.years = values.length ? values.map(Number) : [defaultHeatYear()];
+      if (!values.length) heatYearSelect.setOptions(heatYears().map(year => ({ value: year, label: String(year) })), state.heat.years);
       renderYearHeatmap();
     }
   });

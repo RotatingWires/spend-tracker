@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.2.48
+# SpendTracker v1.2.49
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -297,11 +297,11 @@ Stats has six sub-tabs, like TaskList Stats' tabs; the one you were last on is r
 
 ### People
 
-An **Add** form, then one row per person, you first (*(you)*, with no balance) and then everyone by name, as in every list of people: purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. Each row has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself); people on transactions cannot be deleted, so archive them instead.
+An **Add** form, then one row per person, you first (*(you)*, with no balance) and then everyone by name, as in every list of people: purchases made for them, **Their Shares** (their part of those purchases), **Gifts** (their shares marked as gifts), refunds on those purchases, paybacks, and the **balance** (their shares − refunded − paid back; gifts and refunds on them are left out unless **Include gifts in Balance** is checked, a choice saved in this browser). A positive balance is owed to you; a negative one means they paid back more than they owe. Select a person for their purchases (showing their share of split ones) and paybacks, each entry's number for that person (**No.**), each share's unpaid amount, and **Record Payback**. Balances include archived entries. That dialog also has **Rename**, **Archive** / **Restore**, and **Delete** (you can only rename yourself), so the rows have no buttons; people on transactions cannot be deleted, so archive them instead.
 
 ### Payment Methods, Tags, Collections, and Merchants
 
-Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, the dates from its first to its last entry, and **Rename**, **Archive** / **Restore**, and **Delete** (on the Merchants tab these sit in the dialog a merchant's row opens, not on the row) buttons. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row (not its buttons) for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
+Four tabs with the same layout: an **Add** form, then one row per payment method, tag, collection, or merchant with its permanent **ID**, purchases, spent, refunds on those purchases, net spent, and the dates from its first to its last entry. **Rename**, **Archive** / **Restore**, and **Delete** sit in the dialog a row opens, not on the row. **Rename** asks for the new name with **Cancel** and **Save** (Enter saves). Each Add box is exactly as tall as its **Add** button. Refunds count under their purchase's tags, collections, and merchant; a purchase with two tags (or collections) counts toward both. Select a row for its numbered list of entries. On the Collections tab, that dialog's **Stats** opens the Stats tab with that collection as the period. There is no separate Manage tab: each kind is managed on its own tab. Select a row for its numbered list: every entry in it, newest number first, with each entry's ID, date, type, description, who it was for, and amount (a person's own share for split purchases). Archived entries are included and marked. Gaps in the numbers mean an entry was deleted or left that scope. Select an entry to edit it.
 
 ### History
 
@@ -372,13 +372,13 @@ Refunds count under the tags, collections, and merchant of their purchase.
 - **Compare:** spent, refunds, net spent, purchases, average purchase, average per day, days counted, spending and no-spend days, paid back, spent for others, and largest purchase for A and B, with A − B and the change as a share of B; then net spent per tag and per merchant in each, the biggest change first.
 - **Months:** purchases, spent, refunds, net, change in net from the previous month, and paybacks. The current month is marked *(partial)*.
 
-The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar right against the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme.
+The chart shows one bar per day for periods of 62 counted days or fewer, otherwise one per month. **Show** is a dropdown of check items, so the chart can show several measures at once, stacked as colored sections of one bar per day or month (negative values stack below the zero line): net spent (the default), spent, refunds, paid back to you, number of purchases, number of entries, average purchase, and running net spent (the total so far through the period). Each measure has its own color, listed in the key above the chart; hover or tap a key entry for its definition. Counts cannot share the money scale, so when both are shown, counts stack in a second, narrower bar right against the money bar, on an axis at the right. Hovering a bar shows every chosen measure for it, with the hovered section in bold. The last measure cannot be unchecked, and the choice is saved in this browser. Hovering (or tapping) a bar shows its tooltip below the pointer in TaskList Stats' chart tooltip style: dark in the Light theme, light in the Dark theme. Clicking a bar (or a point, in the Lines style) opens what it stands for, like the heatmaps: a day's entries in its day dialog, or a month's ledger. The running-total chart opens a day the same way, the Counts tab's entries-over-time chart does too, and its merchant and tag bars open that merchant's or tag's list. Month labels on charts shorten the year with an apostrophe, such as *Jan '26*.
 
 ### Heatmaps
 
 Drawn like TaskList Stats' heatmaps, with the same colors in both themes. **Show** picks what every heatmap measures: net spent (the default), spent, refunds, or number of purchases. Darker cells hold more. The darkest shade starts at the 90th percentile of the heatmap's cells, so one very large purchase does not wash out everything else; a cell with nothing (or a net of zero or less, from refunds only) is the lightest. Hover a cell for its exact value.
 
-- **Year Heatmap:** every day of the chosen **Year** (this year to start), a column per week, Sunday first, whatever the Period. Purchase counts show inside the squares. Select a day with entries to open its day dialog, as on the Calendar; empty days cannot be selected.
+- **Year Heatmap:** every day of each year checked in **Years** (this year to start), a column per week, Sunday first, whatever the Period. **Years** is a dropdown of check boxes, applied when it closes: check several to see their grids one under another, newest first, each under its year (closing it with none checked goes back to this year). Purchase counts show inside the squares. Select a day with entries to open its day dialog, as on the Calendar; empty days cannot be selected.
 - **Month × Year:** every month of every year with entries, all time. Select a month to open it on the Transactions tab.
 - **Tags × Month** (or **Merchants × Month**, from **Rows**): one row per tag or merchant with anything in the period, biggest first, and one column per month of the period. A purchase with two tags counts in both rows, and refunds count under their purchase's tags and merchant. Select a cell for that tag's or merchant's entries in that month.
 - **Weekday × Week of Month:** each weekday in each week of the month (days 1–7, 8–14, 15–21, 22–28, and 29–31), as an average per day: the total on those days divided by how many of them the period has, so the short fifth week compares fairly.
@@ -576,7 +576,14 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.2.48**.
+Current release: **v1.2.49**.
+
+### v1.2.49
+
+- People, Payment Methods, Tags, and Collections work like Merchants: **Rename**, **Archive** / **Restore**, and **Delete** (and a collection's **Stats**) are in the dialog a row opens, not on every row.
+- Stats: month labels on charts show the year with an apostrophe, such as *Jan '26*.
+- Stats > Heatmaps: **Years** is a dropdown of check boxes; check several to see their year grids one under another.
+- Stats: clicking a bar (or a point on a line) opens what it stands for: a day's entries or a month's ledger on Trends and Counts, and a merchant's or tag's list on the Counts tab's top-merchant and top-tag charts.
 
 ### v1.2.48
 

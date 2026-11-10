@@ -3,14 +3,14 @@
  * and People & Places (breakdowns, balances over time, merchant loyalty, recurring purchases). Like the rest of
  * Stats, everything comes from recorded entries; recurring purchases are found from exact repeats only.
  */
-import { $, MONTH_NAMES, SCOPE_NAMES, addDays, dayNumber, daysInMonth, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthEnd, monthOf, numberFormat, pad2, percentFormat, plural, shiftMonth, state, todayKey, transactionsInRange } from './app.js';
+import { $, MONTH_NAMES, SCOPE_NAMES, addDays, dayNumber, daysInMonth, el, formatDate, formatMoney, formatMonth, keyFromDayNumber, monthEnd, monthOf, numberFormat, pad2, percentFormat, plural, shiftMonth, shortMonth, state, todayKey, transactionsInRange } from './app.js';
 import { createSingleSelect, renderMetrics, renderTable } from './widgets.js';
 import { openTransactionEditor } from './transactions.js';
 import { dailyNet } from './calendar.js';
 import { openPersonDialog, outstandingText, personLedger } from './people.js';
 import { openScopeList } from './scopes.js';
 import { Charts } from './charts.js';
-import { averageMoney, computeStats, drawTimeChart, periodRange, renderBreakdowns, renderMonthsTable, renderStatsChart, share, statsPeriodOptions } from './stats.js';
+import { averageMoney, computeStats, drawTimeChart, openPeriodKey, periodRange, renderBreakdowns, renderMonthsTable, renderStatsChart, share, statsPeriodOptions } from './stats.js';
 
 // ---------------------------------------------------------------- Trends
 
@@ -56,7 +56,7 @@ function renderRunningTotal(stats) {
   const spansYears = keys.length && keys[0].slice(0, 4) !== keys.at(-1).slice(0, 4);
   // Day numbers for a month, "Mar 5" within a year, and month names on the 1st across years.
   const label = key => (span <= 62 ? String(Number(key.slice(8)))
-    : spansYears ? (key.endsWith('-01') ? `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} ${key.slice(2, 4)}` : '')
+    : spansYears ? (key.endsWith('-01') ? shortMonth(key) : '')
       : `${MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3)} ${Number(key.slice(8))}`);
   const money = value => formatMoney(Math.round(value));
   const series = [{ label: stats.range.label, color: 1, format: money, values: runningTotals(keys, stats.days, stats.countedEnd) }];
@@ -76,7 +76,7 @@ function renderRunningTotal(stats) {
     item.append(swatch, s.label);
     return item;
   }));
-  Charts.lines($('#runningChart'), { labels: keys.map(label), titles, series });
+  Charts.lines($('#runningChart'), { labels: keys.map(label), titles, series, onSelect: index => openPeriodKey(keys[index]) });
 
   let note = 'Net spent added up day by day through the period.';
   if (previous) {
@@ -271,7 +271,7 @@ function renderBalancesOverTime(stats) {
   $('#balanceChart').closest('.chart-frame').hidden = rows.length === 0;
   if (rows.length) {
     Charts.lines($('#balanceChart'), {
-      labels: months.map(month => `${MONTH_NAMES[Number(month.slice(5)) - 1].slice(0, 3)} ${month.slice(2, 4)}`),
+      labels: months.map(month => shortMonth(month)),
       titles: months.map(month => `End of ${formatMonth(month)}`),
       series
     });

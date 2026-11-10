@@ -213,16 +213,21 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#tagsTable")).to_contain_text("food")
         box, button = (page.locator(f'form[data-add="tags"] {part}').bounding_box() for part in ("input", "button"))
         self.assertEqual(box["height"], button["height"], "the Add box is as tall as its Add button")
-        # Rename asks with Cancel, then Save; Enter saves.
-        page.locator("#tagsTable tbody tr", has_text="food").locator("button", has_text="Rename").click()
+        # A tag's row opens its dialog, which holds Rename, Archive, and Delete. Rename asks with Cancel, then Save; Enter saves.
+        expect(page.locator("#tagsTable button")).to_have_count(0)
+        page.locator("#tagsTable tbody tr", has_text="food").click()
+        expect(page.locator("#scopeActions button")).to_have_text(["Rename", "Archive", "Delete"])
+        page.locator("#scopeActions button", has_text="Rename").click()
         expect(page.locator("#promptDialog .dialog-buttons button")).to_have_text(["Cancel", "Save"])
         page.fill("#promptInput", "groceries")
         page.keyboard.press("Enter")
         expect(page.locator("#tagsTable")).to_contain_text("groceries")
-        page.locator("#tagsTable tbody tr", has_text="groceries").locator("button", has_text="Rename").click()
+        expect(page.locator("#scopeDialogTitle")).to_have_text("Tag: groceries")
+        page.locator("#scopeActions button", has_text="Rename").click()
         page.fill("#promptInput", "food")
         page.locator("#promptDialog button", has_text="Save").click()
         expect(page.locator("#tagsTable")).to_contain_text("food")
+        page.locator("#scopeDialog button", has_text="Close").click()
         # The editor only chooses merchants from the ones added on the Merchants tab.
         page.click('.tabs [data-tab="merchants"]')
         for name in ("BK", "Diner", "After backup"):
@@ -624,7 +629,9 @@ class BrowserTests(unittest.TestCase):
         page.click('.tabs [data-tab="collections"]')
         row = page.locator("#collectionsTable tbody tr", has_text="Beach trip")
         expect(row).to_contain_text("1$600.00$100.00$500.00")
-        row.locator("button", has_text="Stats").click()
+        row.click()
+        expect(page.locator("#scopeActions button")).to_have_text(["Stats", "Rename", "Archive", "Delete"])
+        page.locator("#scopeActions button", has_text="Stats").click()
         expect(page.locator("#statsTotals")).to_contain_text("Spent$600.00")
         expect(page.locator("#statsTotals")).to_contain_text("Net spent$500.00")
         # Stats lists people, tags, collections, and merchants in the same table layout; a row opens its numbered list.
@@ -830,6 +837,9 @@ class BrowserTests(unittest.TestCase):
         expect(rows).to_have_count(2)
         expect(rows.nth(0)).to_contain_text("#4")
         expect(rows.nth(1)).to_contain_text("$150.00")  # her share of the split purchase
+        # A person's Rename, Archive, and Delete are in their dialog too, not on the row.
+        expect(page.locator("#personActions button")).to_have_text(["Rename", "Archive", "Delete"])
+        expect(page.locator("#peopleTable button")).to_have_count(0)
         page.locator("#personDialog button", has_text="Close").click()
         page.click('.tabs [data-tab="merchants"]')
         # Merchant rows have no buttons; Rename, Archive, and Delete are in the dialog a row opens.
@@ -1064,11 +1074,23 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#sizeSummary")).to_contain_text("Median purchase$7.50")
         expect(page.locator("#runningKey .chart-key-item")).to_have_text(["March 2025", "February 2025"])
         expect(page.locator("#runningNote")).to_contain_text("By day 31: $31.00, $31.00 more than February 2025")
+        # A bar opens what it stands for: in March 2025's chart, one bar per day, and March 10's opens that day.
+        chart = page.locator("#statsChart")
+        box = chart.bounding_box()
+        slot = (box["width"] - 70 - 12) / 31  # the chart's left and right padding, then 31 days
+        chart.click(position={"x": 70 + slot * 9.5, "y": box["height"] / 2})
+        expect(page.locator("#dayDialogTitle")).to_contain_text("03/10/2025")
+        page.locator("#dayDialog button", has_text="Close").click()
 
         # Heatmaps: the year grid marks March 10 darkest, and an empty day cannot be selected.
         page.click('[data-stats-tab="heatmaps"]')
-        self.pick(page, "#heatYear", "2025")
+        self.set_checks(page, "#heatYear", ["2025"])
         expect(page.locator('#yearHeatmap [data-date="2025-03-10"]')).to_have_class(re.compile(r"\bh4\b"))
+        # Years are check boxes: two checked draw two grids, each under its year.
+        this_year = str(date.today().year)
+        self.set_checks(page, "#heatYear", [this_year, "2025"])
+        expect(page.locator("#yearHeatmap .year-heatmap-title")).to_have_text([this_year, "2025"])
+        expect(page.locator("#yearHeatmap .heatmap-grid")).to_have_count(2)
         expect(page.locator('#yearHeatmap span[data-date="2025-03-11"]')).to_have_count(1)
         expect(page.locator('#monthYearHeatmap [data-month="2025-03"]')).to_have_text("$31")
         expect(page.locator("#labelMonthHeatmap")).to_contain_text("groceries")

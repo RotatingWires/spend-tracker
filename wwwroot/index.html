@@ -124,7 +124,7 @@
           <div class="stats-panel" data-stats-panel="heatmaps" role="tabpanel" hidden>
             <div class="control-row"><span class="control-label" id="heatMeasureLabel">Show:</span><div id="heatMeasure" aria-labelledby="heatMeasureLabel"></div></div>
             <fieldset class="groupbox"><legend>Year Heatmap</legend>
-              <div class="control-row small-row"><span class="control-label" id="heatYearLabel">Year:</span><div id="heatYear" aria-labelledby="heatYearLabel"></div></div>
+              <div class="control-row small-row"><span class="control-label" id="heatYearLabel">Years:</span><div id="heatYear" aria-labelledby="heatYearLabel"></div></div>
               <div id="yearHeatmap" class="year-heatmap"></div>
               <div class="heat-legend" aria-hidden="true">Less <span class="heat h0"></span><span class="heat h1"></span><span class="heat h2"></span><span class="heat h3"></span><span class="heat h4"></span> More</div>
               <div class="note">Every day of the year, whatever the period. Select a day with entries to list them.</div>
@@ -321,7 +321,7 @@
     <form method="dialog" class="dialog-window">
       <div class="dialog-title" id="personDialogTitle">Person</div>
       <div class="dialog-body"><div id="personSummary" class="metric-list"></div><div class="section-title">Purchases and paybacks</div><div class="table-wrap"><table id="personTable"></table></div></div>
-      <div class="dialog-buttons"><button type="button" id="personPaybackButton">Record Payback</button><span class="spacer"></span><button type="button" data-close="personDialog">Close</button></div>
+      <div class="dialog-buttons"><span id="personActions" class="scope-actions"></span><button type="button" id="personPaybackButton">Record Payback</button><span class="spacer"></span><button type="button" data-close="personDialog">Close</button></div>
     </form>
   </dialog>
 
