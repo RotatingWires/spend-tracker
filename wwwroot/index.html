@@ -406,7 +406,7 @@
     <form method="dialog" class="dialog-window" id="aliasesForm">
       <div class="dialog-title" id="aliasesTitle">Aliases</div>
       <div class="dialog-body aliases-body">
-        <p>Entries from the iPhone Shortcut get this merchant when their merchant name is this merchant's name, or starts with one of these aliases as whole words: <strong>BURGER KING</strong> matches "BURGER KING #1234" but not "BURGER KINGDOM". Case does not matter.</p>
+        <p>Entries from the iPhone Shortcut get this merchant when their merchant name starts with one of these aliases as whole words: <strong>BURGER KING</strong> matches "BURGER KING #1234" but not "BURGER KINGDOM". Aliases win over another merchant's matching name, and case does not matter.</p>
         <label for="aliasesInput">One alias per line</label>
         <textarea id="aliasesInput" class="retro-input" rows="6" spellcheck="false" autocomplete="off"></textarea>
         <div id="aliasesError" class="form-error" role="alert" aria-live="polite"></div>

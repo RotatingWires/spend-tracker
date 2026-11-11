@@ -371,12 +371,13 @@ class SpendTrackerApiTests(unittest.TestCase):
         bk = self.merchant_id("BK")
         self.api.put(f"/api/merchants/{bk}/aliases", {"aliases": ["BURGER KING"]})
         shop = self.merchant_id("Corner Shop")
+        branch = self.merchant_id("BURGER KING #99")  # an alias beats a merchant whose name matches exactly
         self.api.patch(f"/api/payment-methods/{self.debit}", {"archived": True})
         lines = [
             self.entry("2026-11-10-1"),                                                        # alias, Wallet's "$12.34"
             self.entry("2026-11-10-2", amount=4.5, merchant="corner shop", method="cash"),     # exact name in any case; a number
-            self.entry("2026-11-10-3", amount="1,234.56", merchant="BURGER KINGDOM", description="Lunch"),  # whole words only
-            self.entry("2026-11-10-4", merchant=None, description="Parking", note="meter"),    # quick add without a merchant
+            self.entry("2026-11-10-3", amount="1,234.56", merchant="BURGER  KINGDOM ", description="Lunch"),  # whole words only; new
+            self.entry("2026-11-10-4", merchant="burger king #99", description="Parking", note="meter"),
             "",                                                                                # blank lines are skipped
             self.entry("2026-11-10-5", method="debit card"),                                   # an archived payment method
             self.entry("2026-11-10-6", amount="12.345"),
@@ -405,14 +406,17 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertTrue(reply["message"].startswith("Saved 5 entries. 1 was already saved. Not saved, add them by hand: BURGER KING #1234"), reply["message"])
 
         snapshot = self.api.get("/api/snapshot")
-        # A payment method SpendTracker does not have yet is added, so the purchase is kept.
+        # A payment method or merchant SpendTracker does not have yet is added, so the purchase is kept.
         apple = next(m for m in snapshot["paymentMethods"] if m["name"] == "Apple Card")
-        self.assertFalse(apple["archived"])
-        self.assertTrue(any(e["action"] == "Created" and e["entity"] == "PaymentMethod" and e["entityId"] == apple["id"] for e in self.history()))
+        kingdom = next(m for m in snapshot["merchants"] if m["name"] == "BURGER KINGDOM")
+        self.assertFalse(apple["archived"] or kingdom["archived"])
+        created = {(e["entity"], e["entityId"]) for e in self.history() if e["action"] == "Created"}
+        self.assertLessEqual({("PaymentMethod", apple["id"]), ("Merchant", kingdom["id"])}, created)
+        self.assertNotIn(branch, [tx["merchantId"] for tx in snapshot["transactions"]])
         saved = sorted(snapshot["transactions"], key=lambda tx: tx["id"])
         self.assertEqual([(tx["merchantId"], tx["description"], tx["amountCents"], tx["paymentMethodId"]) for tx in saved],
-                         [(bk, "", 1234, self.card), (shop, "", 450, self.cash), (None, "Lunch (BURGER KINGDOM)", 123456, self.card),
-                          (None, "Parking", 1234, self.card), (shop, "", 200, apple["id"])])
+                         [(bk, "", 1234, self.card), (shop, "", 450, self.cash), (kingdom["id"], "Lunch", 123456, self.card),
+                          (bk, "Parking", 1234, self.card), (shop, "", 200, apple["id"])])
         for tx in saved:
             self.assertEqual((tx["kind"], tx["date"], tx["shares"]), ("Purchase", "2026-11-10", [{"personId": self.me, "amountCents": tx["amountCents"], "gift": False}]))
         self.assertEqual(saved[3]["note"], "meter")
@@ -424,16 +428,26 @@ class SpendTrackerApiTests(unittest.TestCase):
         self.assertEqual((status, reply["saved"], reply["duplicates"], reply["message"]), (200, 0, 4, "Saved 0 entries. 4 were already saved."))
         self.assertEqual(len(self.api.get("/api/snapshot")["transactions"]), 4)
 
-        # A new payment method goes away again with an entry that is refused.
-        status, reply = self.shortcut([self.entry("2026-11-10-12", method="Gift Card", description="x" * 501)], key)
+        # A new payment method and merchant go away again with an entry that is refused.
+        status, reply = self.shortcut([self.entry("2026-11-10-12", method="Gift Card", merchant="Brand New Shop", description="x" * 501)], key)
         self.assertIn("500 characters", reply["rejected"][0]["error"])
-        self.assertNotIn("Gift Card", [m["name"] for m in self.api.get("/api/snapshot")["paymentMethods"]])
+        snapshot = self.api.get("/api/snapshot")
+        self.assertNotIn("Gift Card", [m["name"] for m in snapshot["paymentMethods"]])
+        self.assertNotIn("Brand New Shop", [m["name"] for m in snapshot["merchants"]])
         self.assertIn("paymentMethod is required", self.shortcut([self.entry("2026-11-10-13", method=" ")], key)[1]["rejected"][0]["error"])
 
-        # An archived merchant is not matched, so its text goes in the description instead.
+        # Quick Add without a merchant keeps it that way.
+        self.shortcut([self.entry("2026-11-10-16", merchant=None, description="Meter")], key)
+        self.assertEqual(max(self.api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])["merchantId"], None)
+
+        # A merchant you archived, matched by alias or by name, is refused rather than used or added again.
         self.api.patch(f"/api/merchants/{bk}", {"archived": True})
-        self.shortcut([self.entry("2026-11-10-10")], key)
-        self.assertEqual(max(self.api.get("/api/snapshot")["transactions"], key=lambda tx: tx["id"])["description"], "BURGER KING #1234")
+        self.api.patch(f"/api/merchants/{shop}", {"archived": True})
+        status, reply = self.shortcut([self.entry("2026-11-10-14"), self.entry("2026-11-10-15", merchant="CORNER SHOP")], key)
+        self.assertEqual(reply["saved"], 0)
+        self.assertEqual([r["error"].split(": ", 1)[1] for r in reply["rejected"]], [
+            "BK is an archived merchant. Restore it on the Merchants tab, or give the Shortcut's merchant to another one with an alias.",
+            "Corner Shop is an archived merchant. Restore it on the Merchants tab, or give the Shortcut's merchant to another one with an alias."])
 
         for body, message in ((["", " "], "at least one entry"), ([self.entry(f"2026-11-10-n{i}") for i in range(501)], "at most 500")):
             status, reply = self.shortcut(body, key)

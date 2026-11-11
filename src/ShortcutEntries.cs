@@ -118,12 +118,8 @@ sealed partial class Store
         var amount = ParseShortcutAmount(entry.Amount);
         var methodId = ResolvePaymentMethod(connection, transaction, entry.PaymentMethod);
 
-        // Merchant text no merchant or alias matches goes in the description, so the entry is still recognizable.
-        var merchantText = NormalizeMerchantText(OptionalText(entry.Merchant, MaxMerchantLength, "merchant"));
-        var merchantId = ResolveMerchant(connection, transaction, merchantText);
+        var merchantId = ResolveMerchant(connection, transaction, NormalizeMerchantText(OptionalText(entry.Merchant, MaxMerchantLength, "merchant")));
         var description = OptionalText(entry.Description, MaxDescriptionLength, "description");
-        if (merchantId is null && merchantText.Length > 0)
-            description = description.Length == 0 ? merchantText : $"{description} ({merchantText})";
 
         var self = Convert.ToInt64(Scalar(connection, transaction, "SELECT id FROM people WHERE is_self = 1;"), CultureInfo.InvariantCulture);
         return new TransactionRequest("Purchase", date, amount, methodId, null, null,
@@ -152,30 +148,40 @@ sealed partial class Store
     }
 
     /// <summary>
-    /// The active merchant for a merchant name as a payment app shows it: the merchant of exactly that name (ignoring
-    /// case), or else the one with the longest alias the text starts with as whole words, so "BURGER KING" matches
-    /// "BURGER KING #1234" but not "BURGER KINGDOM". Null when nothing matches.
+    /// The merchant for a merchant name as a payment app shows it. Aliases come first, since each is a rule you set: the
+    /// merchant with the longest alias the text starts with as whole words, so "BURGER KING" matches "BURGER KING #1234"
+    /// but not "BURGER KINGDOM". Then the merchant of exactly that name, ignoring case. A name neither matches is added
+    /// as a merchant, undone with the entry if the entry is refused. A match you archived is refused instead of being
+    /// used unasked. Null when no merchant was sent.
     /// </summary>
     static long? ResolveMerchant(SqliteConnection connection, SqliteTransaction transaction, string text)
     {
         if (text.Length == 0) return null;
-        var exact = Scalar(connection, transaction, "SELECT id FROM merchants WHERE name = $name AND archived = 0;", ("$name", text));
-        if (exact is not null) return Convert.ToInt64(exact, CultureInfo.InvariantCulture);
-
-        long? best = null;
-        var bestLength = 0;
-        using var command = Sql(connection, transaction, "SELECT a.alias, a.merchant_id FROM merchant_aliases a JOIN merchants m ON m.id = a.merchant_id WHERE m.archived = 0;");
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        long? matched = null;
+        var matchedLength = 0;
+        using (var command = Sql(connection, transaction, "SELECT alias, merchant_id FROM merchant_aliases;"))
+        using (var reader = command.ExecuteReader())
         {
-            var alias = reader.GetString(0);
-            if (alias.Length <= bestLength || !text.StartsWith(alias, StringComparison.OrdinalIgnoreCase)) continue;
-            var wholeWords = text.Length == alias.Length || !char.IsLetterOrDigit(alias[^1]) || !char.IsLetterOrDigit(text[alias.Length]);
-            if (!wholeWords) continue;
-            best = reader.GetInt64(1);
-            bestLength = alias.Length;
+            while (reader.Read())
+            {
+                var alias = reader.GetString(0);
+                if (alias.Length <= matchedLength || !text.StartsWith(alias, StringComparison.OrdinalIgnoreCase)) continue;
+                var wholeWords = text.Length == alias.Length || !char.IsLetterOrDigit(alias[^1]) || !char.IsLetterOrDigit(text[alias.Length]);
+                if (!wholeWords) continue;
+                matched = reader.GetInt64(1);
+                matchedLength = alias.Length;
+            }
         }
-        return best;
+        matched ??= Scalar(connection, transaction, "SELECT id FROM merchants WHERE name = $name;", ("$name", text)) is { } exact
+            ? Convert.ToInt64(exact, CultureInfo.InvariantCulture) : null;
+        if (matched is null) return InsertMerchant(connection, transaction, text).Id;
+
+        using var lookup = Sql(connection, transaction, "SELECT name, archived FROM merchants WHERE id = $id;", ("$id", matched));
+        using var found = lookup.ExecuteReader();
+        found.Read();
+        if (found.GetInt64(1) != 0)
+            throw RequestException.Invalid($"{found.GetString(0)} is an archived merchant. Restore it on the Merchants tab, or give the Shortcut's merchant to another one with an alias.");
+        return matched;
     }
 
     /// <summary>Dollars as a number (12.34) or text ("$1,234.56"), to cents; at most two decimal places.</summary>

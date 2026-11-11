@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.4.1
+# SpendTracker v1.4.2
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -501,11 +501,13 @@ Only a SHA-256 hash of the key is kept, in `data/shortcut-key.json`. Backups nev
 
 A payment app shows merchants its own way, such as `BURGER KING #1234`. In a merchant's dialog on the **Merchants** tab, **Aliases...** lists text, one per line, that means that merchant. A Shortcut entry's merchant text is matched like this:
 
-1. A merchant whose name is exactly that text (ignoring case) is used.
-2. Otherwise the merchant with the longest alias the text **starts with, as whole words**: `BURGER KING` matches `BURGER KING #1234` and `Burger King 0042`, but not `BURGER KINGDOM`. An alias ending in a symbol, such as `SQ *`, matches whatever follows it.
-3. Otherwise the entry has no merchant, and the text goes in its description (after the Shortcut's own description, in brackets, if it sent one), so you can still recognize it. Give that merchant an alias and later entries match it.
+1. The merchant with the longest alias the text **starts with, as whole words**: `BURGER KING` matches `BURGER KING #1234` and `Burger King 0042`, but not `BURGER KINGDOM`. An alias ending in a symbol, such as `SQ *`, matches whatever follows it. Aliases come first because each is a rule you set, so they win over a merchant that happens to have the exact name.
+2. Otherwise a merchant whose name is exactly that text, ignoring case.
+3. Otherwise SpendTracker adds a merchant with that name, recorded on the History tab like one you add, and uses it.
 
-Spaces around an alias are trimmed and runs of spaces become one, in aliases and in the text sent. Each alias belongs to one merchant. Archived merchants are not matched. Aliases apply when an entry arrives; they never change entries already saved. A merchant with aliases counts as in use, so Fresh Start's **Unused labels** keeps it; deleting a merchant deletes its aliases. Alias changes are recorded on the History tab as merchant edits.
+So `BURGER KING #1234` first arrives as a merchant of its own. To put later ones on BK, give BK the alias `BURGER KING`; to move the entries already saved, select them in the ledger (File > Select...), use **Set merchant** to choose BK, then delete the extra merchant on the Merchants tab.
+
+If the match is a merchant you archived, by alias or by name, the entry is refused instead: restore the merchant, or give the text to another merchant with an alias. Spaces around an alias are trimmed and runs of spaces become one, in aliases and in the text sent; a new merchant is named the same way. Each alias belongs to one merchant. Aliases apply when an entry arrives; they never change entries already saved. A merchant with aliases counts as in use, so Fresh Start's **Unused labels** keeps it; deleting a merchant deletes its aliases. Alias changes are recorded on the History tab as merchant edits.
 
 ### Building the Shortcuts
 
@@ -666,7 +668,7 @@ The queue file, as it is: JSON entries one after another (one per line, or sprea
 | `date` | yes | The purchase date, `YYYY-MM-DD`. |
 | `amount` | yes | Dollars, as a number (`12.34`) or text (`"$1,234.56"`), $0.01 to $10,000,000.00, at most two decimal places. |
 | `paymentMethod` | yes | A payment method's name, ignoring case, 60 characters at most. A new name is added as a payment method; an archived one is refused. |
-| `merchant` | no | Merchant text, matched as in [Merchant aliases](#merchant-aliases); 120 characters at most. |
+| `merchant` | no | Merchant text, matched as in [Merchant aliases](#merchant-aliases), or added as a new merchant; 120 characters at most. |
 | `description` | no | What it was; 500 characters at most. |
 | `note` | no | A note; 2000 characters at most. |
 
@@ -780,6 +782,8 @@ Nothing was changed; the message names the problem. Only files saved with **File
 - "The Shortcut key is missing or wrong": the key in the Shortcut is not the current one. Create or replace it in **File > iPhone Shortcut...** and paste it into the `Authorization` header as `Bearer stk_...`.
 - "... is an archived payment method": restore it on the Payment Methods tab, or type another payment method's name in the Shortcut.
 - A new payment method appeared, named like a Wallet card: the Shortcut sent a name SpendTracker did not have, so it was added. Rename it, or type your payment method's name in the automation.
+- A new merchant appeared, named like `BURGER KING #1234`: no alias or merchant name matched, so it was added. Give the merchant you want an alias, move the entries with **Set merchant**, and delete the extra one; see [Merchant aliases](#merchant-aliases).
+- "... is an archived merchant": an alias or name matched a merchant you archived. Restore it, or give that text to another merchant with an alias.
 - The entries are there but the page does not show them: use **File > Refresh**.
 
 ### The page shows "Could not load data"
@@ -807,7 +811,13 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.4.1**.
+Current release: **v1.4.2**.
+
+### v1.4.2
+
+- An iPhone Shortcut entry whose merchant matches no alias or merchant name adds that merchant, instead of putting the text in the description.
+- Merchant aliases now win over a merchant whose name matches exactly, so an alias you add takes over from a merchant the Shortcut added.
+- A Shortcut entry matching an archived merchant, by alias or by name, is refused, like an archived payment method.
 
 ### v1.4.1
 

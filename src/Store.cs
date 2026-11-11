@@ -981,12 +981,19 @@ sealed partial class Store
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
         EnsureNameFree(connection, transaction, "merchants", name, null, "A merchant with that name already exists.");
+        var created = InsertMerchant(connection, transaction, name);
+        transaction.Commit();
+        return created;
+    }
+
+    /// <summary>Adds a merchant whose name is already validated and free, with its history, in the caller's transaction.</summary>
+    static Merchant InsertMerchant(SqliteConnection connection, SqliteTransaction transaction, string name)
+    {
         var id = Convert.ToInt64(Scalar(connection, transaction,
             "INSERT INTO merchants (name, created_at) VALUES ($name, $now); SELECT last_insert_rowid();",
             ("$name", name), ("$now", Now())), CultureInfo.InvariantCulture);
         var created = ReadMerchants(connection, transaction).Single(m => m.Id == id);
         RecordHistory(connection, transaction, "Created", "Merchant", id, null, created);
-        transaction.Commit();
         return created;
     }
 
