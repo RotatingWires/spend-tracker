@@ -516,7 +516,7 @@ In the Shortcuts app on the iPhone, make the three below, in this order. Each st
 Before you start:
 
 - **Choosing a variable.** Tap a field, then **Select Variable** in the bar above the keyboard, and tap the action whose result you want; "step 2" below means the result of step 2.
-- **Choosing a part of the Apple Pay purchase.** In the automation, tap the *Shortcut Input* bubble you inserted, set **Type** to **Transaction**, and pick the part (**Amount**, **Merchant**, or **Card or Pass**) from the list. The bubble then shows that part's name.
+- **Choosing a part of the Apple Pay purchase.** The purchase is the *Transaction* that comes out of the automation's first action, **When Any Card is tapped**: tap a field, **Select Variable**, tap that action, then tap the *Transaction* bubble and pick the part (**Amount**, **Merchant**, or **Card or Pass**). The bubble then shows that part's name. Do not use *Shortcut Input* here: it is empty when the automation runs, so the entry arrives without an amount and is refused. (If your automation has no **When ... is tapped** action, use *Shortcut Input* with **Type** set to **Transaction** instead.)
 - **If** actions come with their own **Otherwise** and **End If**. Put the actions a step says are "inside" an If between the If and its Otherwise; leave an Otherwise empty unless a step goes there.
 
 #### Shortcut 1: Send to SpendTracker
@@ -600,9 +600,9 @@ In the **Automation** tab, tap **+**, choose **Transaction**, choose the cards i
    | --- | --- |
    | `id` | *Text* (step 4) |
    | `date` | *Formatted Date* (step 1) |
-   | `amount` | *Shortcut Input*, Type **Transaction**, **Amount** |
-   | `merchant` | *Shortcut Input*, Type **Transaction**, **Merchant** |
-   | `paymentMethod` | *Shortcut Input*, Type **Transaction**, **Card or Pass**; or type a SpendTracker payment method's name |
+   | `amount` | *Transaction*, **Amount** |
+   | `merchant` | *Transaction*, **Merchant** |
+   | `paymentMethod` | *Transaction*, **Card or Pass**; or type a SpendTracker payment method's name |
 
 6. **Run Shortcut**
    - Shortcut: **Send to SpendTracker**
