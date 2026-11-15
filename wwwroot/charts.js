@@ -1,4 +1,4 @@
-/** The page font (Tahoma, or W95FA with View → Use Retro Font) for text drawn on charts. */
+/** The page font (Tahoma, or Good Old DOS with View → Use Retro Font) for text drawn on charts. */
 import { el } from './app.js';
 
 const chartFont = () => getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim() || 'Tahoma, Arial, sans-serif';

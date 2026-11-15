@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.4.2
+# SpendTracker v1.5.0
 
 A self-hosted personal spending tracker with a Windows 95-style interface, built to replace a spending spreadsheet.
 
@@ -44,7 +44,8 @@ The quickstart uses plain HTTP on loopback. HTTP does not encrypt passwords, ses
 - **Sessions:** HttpOnly, SameSite=Strict cookies lasting up to 30 days, marked Secure when the request uses HTTPS. Setup/login allow 5 attempts per source IP per minute.
 - **No third parties:** SpendTracker makes no outbound network requests. Nothing is cached for offline use, like NewsReview.
 - **iPhone Shortcut:** its key is stored only as a SHA-256 hash, can only add entries, and can be replaced or turned off in File > iPhone Shortcut....
-- **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash or the Shortcut key.
+- **Database encryption:** run as the systemd service with the `spendtracker-database-key` credential (one command, in the [manual](MANUAL.md#encrypted-database-on-linux)), `data/spendtracker.db` is encrypted with ChaCha20-Poly1305 (SQLite3 Multiple Ciphers), so a copied data folder or disk is unreadable. On Windows it is encrypted automatically with a DPAPI-protected key. Started from a terminal without a key, it stays unencrypted.
+- **Backups** are ZIPs holding a copy of the database with every entry and the full history, but never the password hash or the Shortcut key. A downloaded backup is not encrypted, so any SpendTracker can restore it; keep it private.
 
 See the manual for [authentication](MANUAL.md#authentication), [statistics definitions](MANUAL.md#statistics), [configuration](MANUAL.md#configuration-and-running), and [troubleshooting](MANUAL.md#troubleshooting).
 
@@ -59,4 +60,4 @@ TaskList, TaskList Stats, NewsReview, and SpendTracker are four small self-hoste
 
 ## Credits
 
-**View > Use Retro Font** uses [W95FA](https://fontsarena.com/w95fa-by-alina-sava/) by Alina Sava, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).
+**View > Use Retro Font** uses [Good Old DOS](https://www.dafont.com/good-old-dos.font) by Vasily Draigo, bundled in `wwwroot/fonts/` under the SIL Open Font License 1.1 (`wwwroot/fonts/OFL.txt`).

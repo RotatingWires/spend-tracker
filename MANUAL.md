@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.4.2
+# SpendTracker v1.5.0
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -44,7 +44,7 @@ The interface uses the same Windows 95-style visual language as TaskList and Tas
 ## Technology stack
 
 - C# / ASP.NET Core Minimal API on .NET 10 (Kestrel)
-- SQLite through `Microsoft.Data.Sqlite` (no ORM)
+- SQLite through `Microsoft.Data.Sqlite` (no ORM), with [SQLite3 Multiple Ciphers](https://utelle.github.io/SQLite3MultipleCiphers/) for an encrypted database
 - Plain HTML, CSS, and JavaScript; no frontend framework or build step
 - Canvas API for the chart; no chart library
 - Web manifest for adding to a phone's home screen (no offline copy, like NewsReview)
@@ -65,6 +65,7 @@ src/
   SingleFileLogger.cs   capped logs/console.log writer
   PasswordAuth.cs       setup token, password file, and sign-in cookie (the same file in all four apps)
   SignInKeys.cs         where the sign-in keys live and how they are encrypted (the same file in all four apps)
+  DatabaseKey.cs        the key spendtracker.db is encrypted with: a systemd credential on Linux, DPAPI on Windows
 appsettings.json        listen address and log level
 deploy/spendtracker.service
                         example systemd unit
@@ -129,7 +130,7 @@ dotnet run
 | `--urls URL` | Listening address, for example `http://0.0.0.0:8715` for LAN access |
 | `--data-dir PATH` | Data folder (database, password, sign-in keys, recovery backups) |
 | `--version` | Print the version and exit |
-| `backup --output FILE [--database FILE]` | Consistent SQLite copy of `data/spendtracker.db` (or `--database`), checked with `PRAGMA integrity_check`; refuses to overwrite an existing file |
+| `backup --output FILE [--database FILE]` | Consistent, unencrypted SQLite copy of `data/spendtracker.db` (or `--database`; an encrypted one needs its key, see [Encrypted database on Linux](#encrypted-database-on-linux)), checked with `PRAGMA integrity_check`; refuses to overwrite an existing file |
 
 Releases before v1.2.18 named the database `spend-tracker.db`; SpendTracker renames it on its first start, and backups made before v1.2.18 still restore.
 
@@ -147,6 +148,27 @@ head -c 32 /dev/urandom | sudo systemd-creds encrypt --name=spendtracker-sign-in
 ```
 
 Keys already in `data/keys/` are encrypted in place on that start, so nobody is signed out. The startup log says how the keys are kept (`Sign-in keys: ..., encrypted with the spendtracker-sign-in-keys systemd credential`). Without the credential (or when started from a terminal) the service still runs and the key files stay unencrypted but readable only by the service account, in an owner-only folder. Once keys are encrypted, starting the app without the credential cannot read them: everyone signs in again, or start it through the service.
+
+### Encrypted database on Linux
+
+The template's `ImportCredential=spendtracker-database-key` hands SpendTracker a second secret, sealed the same way, and `data/spendtracker.db` (and its `-wal` file) is then encrypted with it: ChaCha20-Poly1305 through SQLite3 Multiple Ciphers, with a 256-bit key derived from the secret (`src/DatabaseKey.cs`). A copied data folder, disk, or recovery backup is unreadable without it. It is kept apart from the sign-in keys' secret, so deleting `data/keys/` never locks your data. Download a backup first, create the secret once, then restart the service:
+
+```sh
+head -c 32 /dev/urandom | sudo systemd-creds encrypt --name=spendtracker-database-key - /etc/credstore.encrypted/spendtracker-database-key
+```
+
+That start encrypts the existing database: it writes an encrypted copy beside it, checks the copy's integrity and row counts, then renames it over the old file, so a crash leaves one whole file or the other. The startup log says `Encrypted spendtracker.db with the database key`, and every start says how the database is kept (`Database ready: ..., encrypted with the spendtracker-database-key systemd credential`).
+
+On Windows the database is encrypted the same way without any setup: the first start creates a random key in `data/database.key`, protected with machine-scope DPAPI, so it opens only on that computer. On macOS, or when the app is started from a terminal without the credential, there is no key and the database stays unencrypted, as before.
+
+Once the database is encrypted, it opens only with that key. Starting without it, or with a different credential, stops SpendTracker with a message and leaves the file alone. If the credential, the machine's credential key (`/var/lib/systemd/credential.secret`), or its TPM is lost, the data cannot be recovered except from a downloaded backup, so keep one. To move SpendTracker to another machine, use **Download Backup** and **Restore** rather than copying the data folder.
+
+The `backup` command reads an encrypted database only with its key. Run it with the credential, for example:
+
+```sh
+sudo systemd-run --pipe --wait -p User=spendtracker -p LoadCredentialEncrypted=spendtracker-database-key:/etc/credstore.encrypted/spendtracker-database-key \
+  /usr/bin/dotnet /opt/spendtracker/SpendTracker.dll backup --database /var/lib/spendtracker/spendtracker.db --output /var/lib/spendtracker/manual-backup.db
+```
 
 `appsettings.json` holds the default listen address (`Urls`) and log level, the same keys in every app. `--urls` and `ASPNETCORE_URLS` override it.
 
@@ -329,7 +351,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 - **File:** New Transaction..., Refresh (loads everything from the server again, for changes made on another device, or for entries the iPhone Shortcut added), Select..., Import/Export..., iPhone Shortcut... (see [iPhone Shortcut](#iphone-shortcut)), Highlight rows on hover, Log Out, and Fresh Start... at the bottom.
 - **View:** switch tabs, **Show Archived**, choose the Light or Dark theme, and **Use Retro Font**. These are saved in this browser.
 
-**View > Use Retro Font** switches the whole app, including the login page and chart labels, to W95FA, an open-source recreation of the Windows 95 MS Sans Serif font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
+**View > Use Retro Font** switches the whole app, including the login page and chart labels, to Good Old DOS, an open-source DOS-style bitmap font bundled in `wwwroot/fonts`, so the interface looks the same on Windows, Linux, macOS, Android, and iOS without installing fonts. It is off by default and saved per browser, separately for each app.
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
 Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, ...). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
@@ -415,11 +437,12 @@ All persistent data is in the `data/` folder of the folder SpendTracker runs fro
 
 ```text
 data/
-  spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist)
+  spendtracker.db      SQLite database (WAL mode, so -wal/-shm sidecar files may exist), encrypted when SpendTracker has a database key
+  database.key         Windows only: the database key, protected with machine-scope DPAPI
   auth.json             salted password hash, created at first-run setup
   shortcut-key.json     SHA-256 hash of the iPhone Shortcut's key, while the Shortcut is turned on
   keys/                 sign-in cookie keys, encrypted (DPAPI on Windows, a systemd credential on Linux)
-  backups/              recovery copies written automatically before each restore (File > Fresh Start can remove them)
+  backups/              recovery copies written automatically before each restore, encrypted like the database (File > Fresh Start can remove them)
 logs/
   console.log           runtime log, capped at about 10 MiB
 ```
@@ -430,7 +453,7 @@ logs/
 
 **Download Backup** downloads `spendtracker-backup-YYYYMMDD-HHMMSS.zip` (local time), the same layout TaskList and NewsReview use. It contains exactly two files:
 
-- `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant and its aliases, collection, transaction, per-scope number, history entry, and the IDs of entries received from the iPhone Shortcut), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool.
+- `spendtracker.db`: a consistent copy of the whole database (every payment method, person, tag, merchant and its aliases, collection, transaction, per-scope number, history entry, and the IDs of entries received from the iPhone Shortcut), taken with SQLite's online backup, so it is safe while SpendTracker is in use. It is a normal SQLite file you can open with any SQLite tool, unencrypted even when the live database is encrypted, so any SpendTracker can restore it.
 - `manifest.json`: format `spendtracker-backup` version 1, the app version, the database schema version, the export time, the database's SHA-256 checksum, and its row count per table.
 
 It never contains `auth.json`, the password hash, or the iPhone Shortcut's key. Treat it like your bank statements.
@@ -446,7 +469,7 @@ The upload is verified before any live data changes. It is rejected when:
 - the database does not match the manifest's checksum or row counts, fails SQLite's integrity check, or has links to missing rows (`PRAGMA foreign_key_check`);
 - the database has different tables or columns than this version has for the backup's schema, or contains triggers, views, or virtual tables.
 
-SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
+SpendTracker then saves the current data to `data/backups/before-restore-<time>-<id>.zip`, a normal backup ZIP that can itself be restored. When the database is encrypted, the database in that ZIP keeps the server's key, so it stays unreadable on disk and only this server can restore it. It copies the rows (never the backup's schema) in one database transaction, keeping their original IDs so links survive. Before committing, it checks every rule the app enforces on normal saves: real dates, amounts, name and text limits, merchant names, tags only on purchases, per-scope numbers that belong to the entry's own people, tags, merchant, and payment method and stay within their counters (numbers a backup lacks, say from before a scope existed, are given out after the checks), exactly one self person, at least one active payment method, readable history, and the refund and payback rules in [Transactions](#transactions). If anything fails, the transaction rolls back, the recovery copy is removed, and the current data is untouched.
 
 Uploads are limited to 256 MiB and the database inside to 1 GiB. Backups from v1.2 and v1.3 (schemas 6 and 7) restore too: they have no merchant aliases or received Shortcut entries, so those are left empty. Backups from v0.1.0, which were JSON files, cannot be restored by this version.
 
@@ -473,7 +496,7 @@ The database part runs in one SQLite transaction, so a failure changes nothing. 
 
 ### Copying the database directly
 
-To back up the files instead, stop SpendTracker first, then copy the whole `data/` folder, including any `-wal` and `-shm` files.
+To back up the files instead, stop SpendTracker first, then copy the whole `data/` folder, including any `-wal` and `-shm` files. An encrypted database copied this way opens only with its key (the same systemd credential, or `data/database.key` on the same Windows computer).
 
 ### Schema and migrations
 
@@ -735,7 +758,7 @@ Amounts are integer cents. Dates are `YYYY-MM-DD` calendar dates with no time zo
 ## Security and privacy
 
 - **Network exposure:** loopback by default. Expose it to a LAN only deliberately with `--urls`, behind a firewall. Use HTTPS (for example a private reverse proxy) across untrusted networks; plain HTTP does not protect passwords, cookies, or data in transit.
-- **At rest:** the database and backups are not encrypted. Protect the `data/` folder, downloaded backups, and CSV exports with filesystem permissions.
+- **At rest:** with a database key, `data/spendtracker.db` and the recovery backups in `data/backups/` are encrypted (ChaCha20-Poly1305; see [Encrypted database on Linux](#encrypted-database-on-linux)); without one they are not. Downloaded backups and CSV exports are never encrypted. Protect the `data/` folder, downloaded backups, and CSV exports with filesystem permissions.
 - **Least privilege:** the account running SpendTracker needs read access to the project files and write access to `data/` and `logs/` only.
 - **No outbound traffic:** SpendTracker does not contact any external service. It keeps no offline copy of its pages; without a connection the browser shows its own offline page, which makes a connection problem obvious instead of opening a stale app that cannot reach its data. It can still be added to a phone's home screen from the web manifest. `sw.js` only removes the service worker and cache that releases before v1.2.23 installed.
 - **iPhone Shortcut key:** only its SHA-256 hash is stored, and it can only add entries. Anyone with the key can add purchases, so replace it (File > iPhone Shortcut... > Replace Key) if the phone is lost. Over plain HTTP the key crosses the network unencrypted, so use it over your LAN or VPN, or HTTPS.
@@ -771,6 +794,14 @@ This version stores merchants, numbers, and split purchases differently and does
 ### A save is refused
 
 The message explains which rule was broken (for example a refund larger than what is left of its purchase). Nothing was saved. See the rules under [Transactions](#transactions).
+
+### "spendtracker.db is encrypted, but this run has no database key"
+
+The database was encrypted by a start with the `spendtracker-database-key` credential, and this start has none, usually because it was started from a terminal. Start it through the systemd service. On Windows, the database was encrypted on another computer or `data/database.key` was removed: put the key file back, or restore a downloaded backup into a new data folder.
+
+### "spendtracker.db cannot be opened with this run's database key"
+
+The credential is not the one the database was encrypted with, for example after re-creating it. Put the original `/etc/credstore.encrypted/spendtracker-database-key` back. If it is gone, move `data/spendtracker.db` aside, start SpendTracker to create a new database, and restore your latest downloaded backup.
 
 ### Restore failed
 
@@ -811,7 +842,15 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.4.2**.
+Current release: **v1.5.0**.
+
+### v1.5.0
+
+- `data/spendtracker.db` can be encrypted: on Linux with a new `spendtracker-database-key` systemd credential (imported by the template; create it once with the command in [Encrypted database on Linux](#encrypted-database-on-linux)), and on Windows automatically with a DPAPI-protected key in `data/database.key`. It uses ChaCha20-Poly1305 through SQLite3 Multiple Ciphers. An existing database is encrypted on the first start with a key, by writing an encrypted copy, checking it, and renaming it over the old file.
+- Recovery backups in `data/backups/` are encrypted like the database. Downloaded backups stay unencrypted, so they restore on any SpendTracker; old backups restore as before.
+- A start without the key, or with a different one, stops with a message saying what to do and leaves the database alone. The `backup` command reads an encrypted database with the credential and writes an unencrypted copy.
+- **View > Use Retro Font** now uses Good Old DOS by Vasily Draigo (SIL Open Font License) instead of W95FA. Its letters are as tall as Tahoma's, so the app no longer looks smaller with it on.
+- Menus are as wide as their longest item, so View no longer cuts off long names like Payment Methods with the retro font.
 
 ### v1.4.2
 

@@ -1,7 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
-/// <summary>Where the database file lives, and the offline backup command, the same as NewsReview's.</summary>
+/// <summary>Where the database file lives, and the offline backup command, as in NewsReview but able to read an encrypted database.</summary>
 static class DatabaseFiles
 {
     /// <summary>
@@ -35,7 +35,10 @@ static class DatabaseFiles
         }
     }
 
-    /// <summary><c>backup --output FILE [--database FILE]</c>: a consistent SQLite copy, checked before it is kept.</summary>
+    /// <summary>
+    /// <c>backup --output FILE [--database FILE]</c>: a consistent, plain SQLite copy, checked before it is kept. An
+    /// encrypted database needs its key (src/DatabaseKey.cs), from the credential systemd passes or data/database.key.
+    /// </summary>
     public static int BackupCommand(string appName, string defaultDatabase, string[] args)
     {
         string database = defaultDatabase, output = "";
@@ -49,16 +52,28 @@ static class DatabaseFiles
         var source = Path.GetFullPath(database);
         var destination = Path.GetFullPath(output);
         if (!File.Exists(source)) return Usage(appName, "Source database does not exist");
+        string? password = null;
+        if (!DatabaseKey.IsPlain(source))
+        {
+            password = DatabaseKey.Load(Path.GetDirectoryName(source)!, create: false);
+            if (password is null)
+                return Usage(appName, $"{Path.GetFileName(source)} is encrypted and this run has no database key; run the backup with the {DatabaseKey.CredentialName} credential (see 'Encrypted database on Linux' in MANUAL.md) or use Download Backup in the app");
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         try { File.Open(destination, FileMode.CreateNew).Dispose(); }
         catch (IOException) when (File.Exists(destination)) { return Usage(appName, "Output already exists; choose a new filename"); }
         try
         {
-            using var src = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = source, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-            using var dst = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = destination, Pooling = false }.ToString());
-            src.Open();
-            dst.Open();
+            using var src = Store.OpenFile(source, password, SqliteOpenMode.ReadOnly);
+            using var dst = Store.OpenFile(destination, password, SqliteOpenMode.ReadWriteCreate);
             src.BackupDatabase(dst);
+            if (password is not null)
+            {
+                // SQLite copies an encrypted database only into one with the same key, so the key comes off afterwards.
+                using var plain = dst.CreateCommand();
+                plain.CommandText = "PRAGMA journal_mode=DELETE; PRAGMA rekey='';";
+                plain.ExecuteNonQuery();
+            }
             using var check = dst.CreateCommand();
             check.CommandText = "PRAGMA integrity_check;";
             var result = Convert.ToString(check.ExecuteScalar());

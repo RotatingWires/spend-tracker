@@ -107,6 +107,8 @@ input, textarea, td, .dialog-body p { user-select: text; -webkit-user-select: te
   top: calc(100% + 1px);
   left: 0;
   min-width: 165px;
+  width: max-content;
+  max-width: calc(100vw - 20px);
   padding: 2px;
   color: var(--ink);
   background: var(--face);

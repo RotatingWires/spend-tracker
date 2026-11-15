@@ -3,7 +3,9 @@
 import hashlib
 import io
 import json
+import os
 import sqlite3
+import subprocess
 import tempfile
 import unittest
 import urllib.error
@@ -855,6 +857,130 @@ class DataFolderTests(unittest.TestCase):
         self.assertTrue((Path(folder.name) / "spendtracker.db").exists())
         self.assertTrue((Path(folder.name) / "auth.json").exists())
         self.assertFalse(server.data_dir.exists())
+
+
+class EncryptionTests(unittest.TestCase):
+    """With the spendtracker-database-key credential, spendtracker.db is encrypted; backups stay restorable anywhere."""
+
+    PLAIN_HEADER = b"SQLite format 3\x00"
+
+    def credential(self):
+        """A folder like the one systemd passes in $CREDENTIALS_DIRECTORY, holding a new random database key."""
+        folder = tempfile.TemporaryDirectory(prefix="spend-tracker-credentials-")
+        self.addCleanup(folder.cleanup)
+        (Path(folder.name) / "spendtracker-database-key").write_bytes(os.urandom(32))
+        return {"CREDENTIALS_DIRECTORY": folder.name}
+
+    def start(self, env=None, prepare=None):
+        server = Server(env=env, prepare=prepare)
+        self.addCleanup(server.stop)
+        return server, server.logged_in_client()
+
+    @staticmethod
+    def purchase(api, merchant):
+        snapshot = api.get("/api/snapshot")
+        me = next(p["id"] for p in snapshot["people"] if p["isSelf"])
+        merchant_id = api.post("/api/merchants", {"name": merchant})["id"]
+        api.post("/api/transactions", {"kind": "Purchase", "date": "2026-11-01", "amountCents": 1234, "paymentMethodId": snapshot["paymentMethods"][0]["id"],
+                                       "personId": None, "linkedId": None, "merchantId": merchant_id, "description": "", "note": "", "tagIds": [],
+                                       "shares": [{"personId": me, "amountCents": 1234}]})
+
+    @staticmethod
+    def merchants(api):
+        return [m["name"] for m in api.get("/api/snapshot")["merchants"]]
+
+    def assert_encrypted(self, server, secret):
+        database = server.data_dir / "spendtracker.db"
+        self.assertNotEqual(database.read_bytes()[:16], self.PLAIN_HEADER)
+        for path in (database, database.with_name("spendtracker.db-wal")):
+            if path.exists():
+                self.assertNotIn(secret.encode(), path.read_bytes(), f"{path.name} holds readable data")
+
+    def test_new_database_is_encrypted_and_reopens_after_a_restart(self):
+        env = self.credential()
+        server, api = self.start(env)
+        self.purchase(api, "Secret Merchant")
+        self.assert_encrypted(server, "Secret Merchant")
+        self.assertIn("encrypted with the spendtracker-database-key systemd credential", "".join(server.output))
+        server.restart(env)
+        self.assertIn("Secret Merchant", self.merchants(server.logged_in_client()))
+        self.assert_encrypted(server, "Secret Merchant")
+
+    def test_plain_database_is_encrypted_on_the_first_start_with_a_key(self):
+        server, api = self.start()
+        self.purchase(api, "Older Merchant")
+        self.assertEqual((server.data_dir / "spendtracker.db").read_bytes()[:16], self.PLAIN_HEADER)
+        server.restart(self.credential())
+        self.assertIn("Encrypted spendtracker.db with the database key", "".join(server.output))
+        self.assertIn("Older Merchant", self.merchants(server.logged_in_client()))
+        self.assert_encrypted(server, "Older Merchant")
+        self.assertFalse((server.data_dir / "spendtracker.db.encrypting").exists())
+
+    def test_encrypted_database_without_its_key_stops_startup_and_is_left_alone(self):
+        env = self.credential()
+        server, api = self.start(env)
+        self.purchase(api, "Kept Merchant")
+        server._stop_process()
+        before = (server.data_dir / "spendtracker.db").read_bytes()
+        for other, message in ((None, "has no database key"), (self.credential(), "different spendtracker-database-key credential")):
+            with self.assertRaises(RuntimeError) as failure:
+                server.restart(other)
+            self.assertIn(message, str(failure.exception))
+            self.assertEqual((server.data_dir / "spendtracker.db").read_bytes(), before)
+        server.restart(env)
+        self.assertIn("Kept Merchant", self.merchants(server.logged_in_client()))
+
+    def test_fresh_start_compacts_and_keeps_the_database_encrypted(self):
+        server, api = self.start(self.credential())
+        self.purchase(api, "Compacted Merchant")
+        api.post("/api/fresh-start", {"confirmation": "RESET SELECTED", "selections": {"history": True}})
+        self.assertIn("Compacted Merchant", self.merchants(api))
+        self.assert_encrypted(server, "Compacted Merchant")
+
+    def test_downloaded_backup_is_plain_and_restores_on_another_server(self):
+        server, api = self.start(self.credential())
+        self.purchase(api, "Moved Merchant")
+        archive = api.download("/api/backup")
+        with zipfile.ZipFile(io.BytesIO(archive)) as backup:
+            database = backup.read("spendtracker.db")
+        self.assertEqual(database[:16], self.PLAIN_HEADER, "a downloaded backup can be restored by any SpendTracker")
+        _, other = self.start()
+        other.upload_zip("/api/restore", archive)
+        self.assertIn("Moved Merchant", self.merchants(other))
+
+    def test_recovery_backup_stays_encrypted_and_restores_only_on_its_server(self):
+        server, api = self.start(self.credential())
+        self.purchase(api, "Recovered Merchant")
+        result = api.upload_zip("/api/restore", api.download("/api/backup"))
+        recovery = (server.data_dir / "backups" / result["recoveryFile"]).read_bytes()
+        with zipfile.ZipFile(io.BytesIO(recovery)) as backup:
+            database = backup.read("spendtracker.db")
+        self.assertNotEqual(database[:16], self.PLAIN_HEADER)
+        self.assertNotIn(b"Recovered Merchant", database)
+        api.upload_zip("/api/restore", recovery)
+        self.assertIn("Recovered Merchant", self.merchants(api))
+        _, other = self.start()
+        with self.assertRaises(ApiError) as failure:
+            other.upload_zip("/api/restore", recovery)
+        self.assertEqual(failure.exception.status, 400)
+        self.assertIn("another SpendTracker server's database key", str(failure.exception.body))
+
+    def test_backup_command_writes_a_plain_copy_only_with_the_key(self):
+        env = self.credential()
+        server, api = self.start(env)
+        self.purchase(api, "Command Merchant")
+        dll = Path(__file__).resolve().parent.parent / "bin" / "Debug" / "net10.0" / "SpendTracker.dll"
+        output = Path(tempfile.mkdtemp()) / "copy.db"
+        command = ["dotnet", str(dll), "backup", "--database", str(server.data_dir / "spendtracker.db"), "--output", str(output)]
+        refused = subprocess.run(command, capture_output=True, text=True, env={k: v for k, v in os.environ.items() if k != "CREDENTIALS_DIRECTORY"})
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("encrypted and this run has no database key", refused.stderr)
+        self.assertFalse(output.exists())
+        subprocess.run(command, check=True, capture_output=True, env={**os.environ, **env})
+        with sqlite3.connect(output) as copy:
+            self.assertIn("Command Merchant", [row[0] for row in copy.execute("SELECT name FROM merchants")])
+        copy.close()
+
 
 def rebuild(archive, sql=None, manifest=None, extra=None, drop=None, resign=True):
     """Repackages a real backup ZIP after changing its database or manifest."""

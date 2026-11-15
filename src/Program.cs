@@ -136,21 +136,25 @@ var shortcutKeyPath = ShortcutKey.PathIn(dataDir);
 
 var databasePath = DatabaseFiles.Locate(dataDir, "spendtracker.db", "spend-tracker.db", app.Logger);
 Onboarding.Initialize(dataDir, databasePath);
-var store = new Store(databasePath);
+Store store;
 string journalMode;
 try
 {
+    // Encrypted when this run has a database key: a systemd credential on Linux, a DPAPI-protected key on Windows (src/DatabaseKey.cs).
+    store = new Store(databasePath, DatabaseKey.Load(dataDir, create: true));
     journalMode = store.Initialize();
 }
 catch (InvalidOperationException error)
 {
-    // A database this version cannot use: say why and stop, without touching the file.
+    // A database this version cannot use, or cannot open with this run's key: say why and stop, without touching the file.
     app.Logger.LogError("{Error}", error.Message);
     Environment.ExitCode = 1;
     return;
 }
 app.Logger.LogInformation("SpendTracker v{Version}, data folder {DataDirectory}.", appVersion, dataDir);
-app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms.", journalMode);
+if (store.EncryptedAtStartup)
+    app.Logger.LogInformation("Encrypted spendtracker.db with the database key; it was not encrypted before.");
+app.Logger.LogInformation("Database ready: journal_mode={JournalMode}, synchronous=NORMAL, busy_timeout=5000 ms, {Encryption}.", journalMode, DatabaseKey.Describe(store.DatabasePassword));
 app.Logger.LogInformation("Sign-in keys: {Location}.", keyLocation);
 
 string? setupToken = PasswordAuth.IsConfigured(authPath) ? null : PasswordAuth.GenerateSetupToken();

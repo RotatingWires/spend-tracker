@@ -22,16 +22,19 @@ static class Transfer
 
     static readonly JsonSerializerOptions ManifestJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    /// <summary>Writes a backup ZIP to <paramref name="outputPath"/>.</summary>
-    public static BackupManifest CreateArchive(Store store, string outputPath, string version)
+    /// <summary>
+    /// Writes a backup ZIP to <paramref name="outputPath"/>. Its database is plain, so any SpendTracker can restore it,
+    /// unless <paramref name="keepEncrypted"/> keeps this server's database key on it, for recovery backups kept in data/backups.
+    /// </summary>
+    public static BackupManifest CreateArchive(Store store, string outputPath, string version, bool keepEncrypted = false)
     {
         var workDirectory = Directory.CreateTempSubdirectory("spend-tracker-export-");
         try
         {
             var snapshotPath = Path.Combine(workDirectory.FullName, DatabaseEntry);
-            store.CopyTo(snapshotPath);
+            store.CopyTo(snapshotPath, keepEncrypted);
             Dictionary<string, long> totals;
-            using (var snapshot = OpenReadOnly(snapshotPath))
+            using (var snapshot = OpenReadOnly(store, snapshotPath))
                 totals = Store.CountRows(snapshot);
 
             var manifest = new BackupManifest(Format, FormatVersion, version, Store.SchemaVersion,
@@ -67,7 +70,7 @@ static class Transfer
                 Directory.CreateDirectory(recoveryDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             var recoveryName = $"before-restore-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}.zip";
             var recoveryPath = Path.Combine(recoveryDirectory, recoveryName);
-            CreateArchive(store, recoveryPath, version);
+            CreateArchive(store, recoveryPath, version, keepEncrypted: true);
 
             var transactions = manifest.Totals["transactions"];
             try
@@ -135,7 +138,15 @@ static class Transfer
             if (!string.Equals(Sha256(databasePath), manifest.Sha256, StringComparison.Ordinal))
                 throw RequestException.Invalid("The backup database does not match its checksum; the file is damaged.");
 
-            using var imported = OpenReadOnly(databasePath);
+            using var imported = OpenReadOnly(store, databasePath);
+            try
+            {
+                Scalar(imported, "SELECT COUNT(*) FROM sqlite_master;");
+            }
+            catch (SqliteException) when (!DatabaseKey.IsPlain(databasePath))
+            {
+                throw RequestException.Invalid("This backup's database is encrypted with another SpendTracker server's database key (a recovery backup from its data/backups), or it is damaged. Restore it on the server that made it.");
+            }
             if (Convert.ToString(Scalar(imported, "PRAGMA integrity_check;"), CultureInfo.InvariantCulture) != "ok")
                 throw RequestException.Invalid("The backup database failed SQLite's integrity check.");
             // Like TaskList and NewsReview: every link must point at a row that exists.
@@ -177,7 +188,7 @@ static class Transfer
             throw RequestException.Invalid("The backup's tables do not match this version of SpendTracker.");
 
         // The live database was created or upgraded by this build at startup, so its layout is the expected one.
-        using var live = OpenReadOnly(store.DatabasePath);
+        using var live = OpenReadOnly(store, store.DatabasePath);
         foreach (var table in expected)
         {
             if (!Store.TableLayout(live, table).SequenceEqual(Store.TableLayout(imported, table)))
@@ -213,10 +224,10 @@ static class Transfer
         }
     }
 
-    static SqliteConnection OpenReadOnly(string path)
+    /// <summary>Opens a database file read-only, with the live database's key when the file is encrypted.</summary>
+    static SqliteConnection OpenReadOnly(Store store, string path)
     {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-        connection.Open();
+        var connection = Store.OpenFile(path, DatabaseKey.IsPlain(path) ? null : store.DatabasePassword, SqliteOpenMode.ReadOnly);
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA trusted_schema=OFF;";
         command.ExecuteNonQuery();

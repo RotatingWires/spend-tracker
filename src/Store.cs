@@ -53,20 +53,30 @@ sealed partial class Store
 
     readonly string connectionString;
     readonly string databasePath;
+    readonly string? password;
 
-    public Store(string databasePath)
+    /// <summary><paramref name="password"/> is the database key (src/DatabaseKey.cs), or null for an unencrypted database.</summary>
+    public Store(string databasePath, string? password)
     {
         this.databasePath = databasePath;
-        connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString();
+        this.password = password;
+        connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true, Password = password ?? "" }.ToString();
     }
 
     public string DatabasePath => databasePath;
+
+    /// <summary>The key the live database is encrypted with, or null when it is not encrypted.</summary>
+    public string? DatabasePassword => password;
+
+    /// <summary>True when this start encrypted a database that was not encrypted before.</summary>
+    public bool EncryptedAtStartup { get; private set; }
 
     // ---------------------------------------------------------------- schema
 
     /// <summary>Creates the schema on first run and returns the journal mode in use.</summary>
     public string Initialize()
     {
+        PrepareFile();
         using var connection = Open();
         var journalMode = CanUseWal(databasePath)
             ? Convert.ToString(Scalar(connection, null, "PRAGMA journal_mode=WAL;"), CultureInfo.InvariantCulture) ?? "unknown"
@@ -1068,14 +1078,19 @@ sealed partial class Store
 
     // ---------------------------------------------------------------- backup and restore
 
-    /// <summary>Writes a consistent online copy of the database, safe to take while SpendTracker is in use.</summary>
-    public void CopyTo(string destinationPath)
+    /// <summary>
+    /// Writes a consistent online copy of the database, safe to take while SpendTracker is in use. The copy is a plain
+    /// SQLite file that any SpendTracker can restore, unless <paramref name="keepEncrypted"/> keeps this server's key on
+    /// it (the recovery backups kept in data/backups).
+    /// </summary>
+    public void CopyTo(string destinationPath, bool keepEncrypted = false)
     {
         using var source = Open();
-        using var destination = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = destinationPath, Pooling = false }.ToString());
-        destination.Open();
+        // SQLite copies an encrypted database only into one with the same key, so the key comes off afterwards.
+        using var destination = OpenFile(destinationPath, password, SqliteOpenMode.ReadWriteCreate);
         source.BackupDatabase(destination);
         Execute(destination, null, "PRAGMA journal_mode=DELETE;"); // One self-contained file with no -wal sidecar.
+        if (password is not null && !keepEncrypted) Execute(destination, null, "PRAGMA rekey='';");
     }
 
     /// <summary>Rows per table, for the tables of <paramref name="schemaVersion"/>; a backup's manifest records the same counts.</summary>
@@ -1104,8 +1119,7 @@ sealed partial class Store
     /// </summary>
     public void ReplaceAllData(string importedPath, int schemaVersion, object restoreDetails)
     {
-        using var imported = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = importedPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-        imported.Open();
+        using var imported = OpenFile(importedPath, DatabaseKey.IsPlain(importedPath) ? null : password, SqliteOpenMode.ReadOnly);
         Execute(imported, null, "PRAGMA trusted_schema=OFF;");
 
         using var connection = Open();
@@ -1379,6 +1393,98 @@ sealed partial class Store
         connection.Open();
         Execute(connection, null, "PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;");
         return connection;
+    }
+
+    /// <summary>An unpooled connection to a database file, such as a backup copy, opened with <paramref name="filePassword"/> when it is encrypted.</summary>
+    public static SqliteConnection OpenFile(string path, string? filePassword, SqliteOpenMode mode)
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = mode, Pooling = false, Password = filePassword ?? "" }.ToString());
+        connection.Open();
+        return connection;
+    }
+
+    /// <summary>
+    /// Matches spendtracker.db to the key before it is used. With a key, a plain database is encrypted (the first start
+    /// with a key); a new one is created encrypted. An encrypted database without its key stops startup with what to do.
+    /// </summary>
+    void PrepareFile()
+    {
+        if (!File.Exists(databasePath) || new FileInfo(databasePath).Length == 0) return;
+        var plain = DatabaseKey.IsPlain(databasePath);
+        if (plain && password is not null)
+        {
+            Encrypt();
+            return;
+        }
+        if (plain) return;
+        if (password is null)
+            throw new InvalidOperationException($"spendtracker.db is encrypted, but this run has no database key. Start SpendTracker through its systemd service, which passes the {DatabaseKey.CredentialName} credential (on Windows, on the computer that encrypted it). See Troubleshooting in MANUAL.md.");
+        try
+        {
+            using var check = OpenFile(databasePath, password, SqliteOpenMode.ReadOnly);
+            Scalar(check, null, "SELECT COUNT(*) FROM sqlite_master;");
+        }
+        catch (SqliteException error) when (error.SqliteErrorCode == 26)
+        {
+            throw new InvalidOperationException($"spendtracker.db cannot be opened with this run's database key: it was encrypted with a different {DatabaseKey.CredentialName} credential (or data/database.key on Windows). Use the credential it was made with, or restore a downloaded backup into a new data folder. See Troubleshooting in MANUAL.md.");
+        }
+    }
+
+    /// <summary>
+    /// Encrypts a plain spendtracker.db: an encrypted copy is written beside it and checked, then renamed over it, so a
+    /// crash at any point leaves either the old file or the new one, never half of each.
+    /// </summary>
+    void Encrypt()
+    {
+        var temporary = databasePath + ".encrypting";
+        File.Delete(temporary);
+        try
+        {
+            WriteEncryptedCopy(temporary);
+        }
+        catch
+        {
+            SqliteConnection.ClearAllPools();
+            File.Delete(temporary);
+            throw;
+        }
+        SqliteConnection.ClearAllPools();
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temporary, File.GetUnixFileMode(databasePath));
+        foreach (var suffix in new[] { "-wal", "-shm" })
+            if (File.Exists(databasePath + suffix)) File.Delete(databasePath + suffix);
+        File.Move(temporary, databasePath, overwrite: true);
+        EncryptedAtStartup = true;
+    }
+
+    /// <summary>Writes the plain database, with its WAL, to <paramref name="temporary"/> encrypted, and checks the copy.</summary>
+    void WriteEncryptedCopy(string temporary)
+    {
+        using var source = OpenFile(databasePath, null, SqliteOpenMode.ReadWrite);
+        // Empties the WAL into the file, so no plain WAL can later be applied to the encrypted file.
+        Execute(source, null, "PRAGMA wal_checkpoint(TRUNCATE);");
+        using (var destination = OpenFile(temporary, null, SqliteOpenMode.ReadWriteCreate))
+        {
+            source.BackupDatabase(destination);
+            Execute(destination, null, "PRAGMA journal_mode=DELETE;");
+            Execute(destination, null, $"PRAGMA rekey=\"{password}\";");
+        }
+        using var encrypted = OpenFile(temporary, password, SqliteOpenMode.ReadOnly);
+        if (Convert.ToString(Scalar(encrypted, null, "PRAGMA integrity_check;"), CultureInfo.InvariantCulture) != "ok")
+            throw new InvalidOperationException("Encrypting spendtracker.db failed SQLite's integrity check; the unencrypted file was left as it was.");
+        foreach (var table in TableNames(source))
+        {
+            if (!Equals(Scalar(source, null, $"SELECT COUNT(*) FROM \"{table}\";"), Scalar(encrypted, null, $"SELECT COUNT(*) FROM \"{table}\";")))
+                throw new InvalidOperationException($"Encrypting spendtracker.db lost rows in {table}; the unencrypted file was left as it was.");
+        }
+    }
+
+    static List<string> TableNames(SqliteConnection connection)
+    {
+        var names = new List<string>();
+        using var command = Sql(connection, null, "SELECT name FROM sqlite_master WHERE type = 'table';");
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) names.Add(reader.GetString(0));
+        return names;
     }
 
     static SqliteCommand Sql(SqliteConnection connection, SqliteTransaction? transaction, string text, params (string Name, object? Value)[] parameters)
