@@ -363,9 +363,16 @@ class BrowserTests(unittest.TestCase):
         page.keyboard.press("Enter")
         expect(rows).to_have_count(2)
         expect(page.locator("#transactionsTable tfoot td").last).to_have_text("$0.00")  # Diner $40 and its $40 refund
+        # The status bar's entry count follows what the ledger lists; other tabs count every entry.
+        expect(page.locator("#statusRight")).to_have_text(re.compile(r"^2 of \d+ entries • "))
+        page.click('.tabs [data-tab="people"]')
+        expect(page.locator("#statusRight")).to_have_text(re.compile(r"^\d+ entries • "))
+        page.click('.tabs [data-tab="transactions"]')
+        expect(page.locator("#statusRight")).to_have_text(re.compile(r"^2 of \d+ entries • "))
         page.fill("#ledgerSearch", "")
         page.keyboard.press("Enter")
         expect(rows).to_have_count(4)
+        expect(page.locator("#statusRight")).to_have_text(re.compile(r"^4 (of \d+ )?entries • "))
         expect(page.locator("#fileMenu")).not_to_contain_text("Search")  # File > Search... is gone
 
         # Invalid input shows the server's message and keeps the dialog open.

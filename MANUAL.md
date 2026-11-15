@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.5.1
+# SpendTracker v1.5.2
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -356,7 +356,7 @@ Every create, edit, delete, and restore, newest first, with the item and the cha
 - **Menu bar:** File, View, and Help highlight in the title color on mouse hover and while their menu is open, like the top bar in NewsReview.
 
 Every color is a token in `wwwroot/theme.css`, defined once for Light and once for Dark, with the same token names TaskList, TaskList Stats, and NewsReview use (`--face`, `--surface`, `--ink`, `--muted`, `--light-edge`, `--dark-edge`, `--title`, ...). The other stylesheets and scripts contain no color values, apart from the two browser `theme-color` values `theme.js` writes to the page metadata.
-- **Status bar:** messages such as "Added purchase ..." appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList.
+- **Status bar:** messages such as "Added purchase ..." appear at the bottom left; entry, people, and tag totals at the bottom right, as in TaskList. The entry count follows the view: on the Transactions tab it counts what the ledger lists for the time frame, search, filters, and **Show Archived**; on the Calendar, the time frame's entries; on other tabs, every entry. A narrower count reads *12 of 340 entries*.
 - **Help:** a short explanation of the concepts above, ending with about.lehighradio.com above the version, as in TaskList, TaskList Stats, and NewsReview.
 
 ## Statistics
@@ -843,7 +843,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.5.1**.
+Current release: **v1.5.2**.
+
+### v1.5.2
+
+- The entry count at the bottom right follows the time frame, search, and filters (*12 of 340 entries*) on the Transactions tab, and the time frame on the Calendar, instead of always counting every entry.
 
 ### v1.5.1
 

@@ -1,7 +1,7 @@
 /* Startup, data loading, tab navigation, toolbar, menus, backup/restore, and session handling. */
-import { $, $$, allMonths, api, buildModel, el, fileStamp, formatMonth, monthOf, monthStart, plural, shiftMonth, singleTimeFrameMonth, sortSnapshotLists, state, timeFrameLabel, timedFetch, todayKey, writeSetting } from './app.js';
+import { $, $$, allMonths, api, buildModel, el, fileStamp, formatMonth, monthOf, monthStart, numberFormat, plural, shiftMonth, singleTimeFrameMonth, sortSnapshotLists, state, timeFrameLabel, timeFrameTransactions, timedFetch, todayKey, writeSetting } from './app.js';
 import { closeMenus, confirmAction, createMultiSelect, menuButton, setStatus, showError, toggleMenu } from './widgets.js';
-import { LEDGER_PAGE, downloadFile, exportTransactionsCsv, initializeTransactionEditor, ledgerLimit, openTransactionEditor, renderTransactions, setLedgerLimit } from './transactions.js';
+import { LEDGER_PAGE, downloadFile, exportTransactionsCsv, initializeTransactionEditor, ledgerLimit, ledgerListedCount, openTransactionEditor, renderTransactions, setLedgerLimit } from './transactions.js';
 import { calendarCollectionId, initializeCalendar, renderCalendar, renderDayDialog, setCalendarCollectionId } from './calendar.js';
 import { initializePeople, renderPeople, renderPersonDialog } from './people.js';
 import { renderCollectionsTab, renderMerchantsTab, renderMethodsTab, renderTagsTab } from './summaries.js';
@@ -95,10 +95,22 @@ export function renderAll() {
   if ($('#dayDialog').open) renderDayDialog();
   if ($('#scopeDialog').open) renderScopeList();
 
-  const count = state.model.transactions.length;
-  // Messages go on the left and totals on the right, as in TaskList.
-  $('#statusRight').textContent = `${plural(count, 'entry', 'entries')} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')} • ${plural(state.snapshot.collections.length, 'collection')}`;
+  updateStatusTotals();
   if ($('#statusLeft').textContent === 'Loading...') setStatus('Ready');
+}
+
+/**
+ * Messages go on the left and totals on the right, as in TaskList. The entry count follows the view: on the
+ * Transactions tab it is what the ledger lists (time frame, search, and filters), on the Calendar the time frame's
+ * entries, and elsewhere every entry; a narrower count reads "12 of 340 entries".
+ */
+export function updateStatusTotals() {
+  if (!state.model) return;
+  const total = state.model.transactions.length;
+  const count = state.activeTab === 'transactions' ? ledgerListedCount
+    : state.activeTab === 'calendar' ? timeFrameTransactions({ listed: true }).length : total;
+  const entries = count === total ? plural(total, 'entry', 'entries') : `${numberFormat.format(count)} of ${plural(total, 'entry', 'entries')}`;
+  $('#statusRight').textContent = `${entries} • ${plural(state.snapshot.people.length - 1, 'other person', 'other people')} • ${plural(state.snapshot.tags.length, 'tag')} • ${plural(state.snapshot.collections.length, 'collection')}`;
 }
 
 export function switchTab(name) {

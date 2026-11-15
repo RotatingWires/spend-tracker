@@ -6,7 +6,7 @@ import { merchantIdsOf } from './summaries.js';
 import { addListItem } from './manage.js';
 import { pruneSelection, selectedIds, selectionCell, selectionMode, setVisibleLedgerIds, toggleSelection, updateBulkControls, visibleLedgerIds } from './bulk.js';
 import { openScopeList } from './scopes.js';
-import { switchTab } from './ui.js';
+import { switchTab, updateStatusTotals } from './ui.js';
 
 export const KIND_LABELS = { Purchase: 'Purchase', Refund: 'Refund', Payback: 'Payback' };
 // The ledger draws 200 rows at first and more on request, so a long time frame stays quick. A new time frame starts
@@ -15,6 +15,8 @@ export const LEDGER_PAGE = 200;
 export let ledgerLimit = LEDGER_PAGE;
 /** Other modules change ledgerLimit through this; an imported binding is read-only. */
 export function setLedgerLimit(value) { return (ledgerLimit = value); }
+/** How many entries the ledger lists after the time frame, search, and filters, for the status bar's count. */
+export let ledgerListedCount = 0;
 let ledgerSearch = null;
 
 export function monthTotals(transactions) {
@@ -142,6 +144,8 @@ export function renderTransactions() {
   $('#archivedNote').hidden = hidden === 0 || rows.length === 0;
   $('#archivedNote').textContent = `${plural(hidden, 'archived entry', 'archived entries')} hidden in this time frame; they still count in Stats. View > Show Archived lists them.`;
   updateBulkControls();
+  ledgerListedCount = rows.length;
+  updateStatusTotals();
 }
 
 /** The ledger's Tags cell: wraps between tags, never inside one, so a long list does not widen the column. */
