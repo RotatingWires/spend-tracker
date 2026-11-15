@@ -1,7 +1,7 @@
 > [!WARNING]
 > This project is fully vibecoded, probably inefficient, but it does what I wanted lol
 
-# SpendTracker v1.5.0
+# SpendTracker v1.5.1
 
 SpendTracker is a self-hosted, single-user spending tracker. It replaces a spreadsheet of purchases with a small web app: a ledger for any time frame, a calendar, a ledger of what other people owe you, collections you put on purchases, an edit history, and statistics.
 
@@ -301,7 +301,7 @@ In the editor, **Type**, **For who**, payment method, and **Tags** are Windows 9
 
 ### Selecting several entries
 
-**File > Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File > Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame. The **Tags**, **Collections**, **People**, and **Merchant** actions' dropdowns end with **Add New...**, which adds one and checks or chooses it.
+**File > Select...** turns on selection mode, as in TaskList. Each ledger row gets a checkbox; click a row or its checkbox to select it, and Shift-click to select every row between the last one clicked and this one. The middle of the menu bar shows **Selected: N** and a split button, with the same sizes and spacing as TaskList. Escape, or **File > Select...** again, leaves selection mode; the choice is remembered in this browser. Selection only covers rows listed in the current time frame. The **Tags**, **Collections**, **People**, **Merchant**, and **Payment Method** actions' dropdowns end with **Add New...**, which adds one and checks or chooses it.
 
 The split button's main action is **Archive** (or **Restore** when every selected entry is archived). Its ▼ menu has:
 
@@ -311,6 +311,7 @@ The split button's main action is **Archive** (or **Restore** when every selecte
 | **Tags...** / **Collections...** | **Change** chooses *Add to the selected entries* or *Remove from the selected entries*, then check any number of tags or collections | adding to a refund or payback, or the entry already has / lacks it |
 | **People...** | the same Add / Remove choice for any number of people, then **splits the purchase evenly** between everyone on it (the first people listed get any leftover cent) | not a purchase, already on / not on it, or the only person on it |
 | **Merchant...** | sets one merchant, chosen from a dropdown of your active merchants (**No merchant** clears it; merchants are added on the Merchants tab) | already has that merchant |
+| **Payment Method...** | sets one payment method on purchases, refunds, and paybacks alike, chosen from a dropdown of your active payment methods | already has that payment method |
 | **Delete** | deletes the entries; refunds and paybacks go first, so a purchase selected with its own refunds is deleted too | the purchase has refunds or paybacks that are not selected |
 
 Every action first asks for confirmation, listing up to 12 selected entries and how many more. Each entry is then saved with an ordinary API call, so the server checks the same rules as a single edit. When it refuses one, for example removing a person with linked paybacks on that purchase, the entry is skipped and the others continue. Afterwards the status bar shows how many changed, and a dialog lists each skipped entry with the reason. Entries stay selected after an action, changed or skipped, so another action can follow; deleted entries leave the selection, and entries an action hides (archived, with Show Archived off) drop out of it.
@@ -842,7 +843,11 @@ GitHub Actions (`.github/workflows/tests.yml`) builds SpendTracker and runs ever
 
 ## Release notes
 
-Current release: **v1.5.0**.
+Current release: **v1.5.1**.
+
+### v1.5.1
+
+- **Payment Method...** in bulk actions sets the payment method of every selected entry, chosen from a dropdown of your active payment methods like **Merchant...**, whose **Add New...** adds one.
 
 ### v1.5.0
 

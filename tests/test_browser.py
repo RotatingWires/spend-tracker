@@ -879,6 +879,19 @@ class BrowserTests(unittest.TestCase):
         page.click("#confirmOkButton")
         expect(page.locator(f'#transactionsTable tr[data-id="{third["id"]}"]')).to_contain_text("Bakery")
 
+        # Payment Method... sets one the same way; the ledger gains that method's column.
+        credit = next(m["id"] for m in api.get("/api/snapshot")["paymentMethods"] if m["name"] == "Credit Card")
+        page.click("#bulkActions .split-arrow")
+        page.locator("#bulkActions .split-dropdown button", has_text="Payment Method...").click()
+        self.pick(page, "#chooseSelect", "Credit Card")
+        page.click("#chooseOkButton")
+        expect(page.locator("#confirmMessage")).to_have_text('Set payment method to "Credit Card" for 1 selected entry?')
+        page.click("#confirmOkButton")
+        expect(page.locator("#statusLeft")).to_have_text("Payment Method: 1 entry changed.")
+        expect(page.locator("#transactionsTable thead")).to_contain_text("Credit Card")
+        methods = {tx["id"]: tx["paymentMethodId"] for tx in api.get("/api/snapshot")["transactions"]}
+        self.assertEqual(methods[third["id"]], credit)
+
         # Archiving hides an entry from the ledger but it still counts in Stats.
         page.click("#bulkActions .split-primary")
         page.click("#confirmOkButton")

@@ -116,6 +116,14 @@ const BULK_ACTIONS = {
     request: (tx, merchantId) => tx.merchantId === merchantId ? { skip: 'already has that merchant' }
       : { body: transactionRequest(tx, { merchantId }) }
   },
+  method: {
+    label: 'Payment Method',
+    // Every entry has a payment method, so there is no "none"; the list can add a new one, like merchants.
+    choose: () => chooseFrom('Payment Method', 'Set payment method to', state.snapshot.paymentMethods.filter(method => !method.archived), 'Set', 'payment-methods')
+      .then(choice => choice && { value: choice.value, label: `Set payment method to "${choice.label}"` }),
+    request: (tx, paymentMethodId) => tx.paymentMethodId === paymentMethodId ? { skip: 'already has that payment method' }
+      : { body: transactionRequest(tx, { paymentMethodId }) }
+  },
   delete: {
     label: 'Delete',
     detail: 'The History tab keeps a record of every deleted entry. A purchase with refunds or paybacks that are not also selected is skipped.',
@@ -271,7 +279,7 @@ export function updateBulkControls() {
   const menu = el('div', 'menu-dropdown split-dropdown');
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  const items = ['archive', 'restore', null, 'tags', 'collections', 'people', 'merchant', null, 'delete'];
+  const items = ['archive', 'restore', null, 'tags', 'collections', 'people', 'merchant', 'method', null, 'delete'];
   menu.append(...items.map(name => {
     if (name == null) return menuSeparator();
     const action = BULK_ACTIONS[name];
