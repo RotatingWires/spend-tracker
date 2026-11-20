@@ -284,6 +284,15 @@ class BrowserTests(unittest.TestCase):
         expect(page.locator("#tagsTable")).to_contain_text("food")
         box, button = (page.locator(f'form[data-add="tags"] {part}').bounding_box() for part in ("input", "button"))
         self.assertEqual(box["height"], button["height"], "the Add box is as tall as its Add button")
+        # Search sits on the left of the row and Add on the right, as on the ledger.
+        search, add, row = (page.locator(f'[data-panel="tags"] {part}').bounding_box() for part in ("#tagSearchForm", 'form[data-add="tags"]', ".tab-actions"))
+        self.assertLess(search["x"] + search["width"], add["x"])
+        self.assertAlmostEqual(search["x"], row["x"], delta=1)
+        self.assertAlmostEqual(add["x"] + add["width"], row["x"] + row["width"], delta=1)
+        page.click('.tabs [data-tab="transactions"]')
+        ledger, panel = (page.locator(f'[data-panel="transactions"] {part}').bounding_box() for part in ("#ledgerSearchForm", ".tab-actions"))
+        self.assertAlmostEqual(ledger["x"], panel["x"], delta=1)
+        page.click('.tabs [data-tab="tags"]')
         # A tag's row opens its dialog, which holds Rename, Archive, and Delete. Rename asks with Cancel, then Save; Enter saves.
         expect(page.locator("#tagsTable button")).to_have_count(0)
         page.locator("#tagsTable tbody tr", has_text="food").click()
@@ -1118,8 +1127,8 @@ class BrowserTests(unittest.TestCase):
         add_box = page.locator('form[data-add="merchants"]').bounding_box()
         search_box = page.locator("#merchantSearchForm").bounding_box()
         self.assertEqual(round(add_box["y"]), round(search_box["y"]))
-        self.assertGreater(search_box["x"], add_box["x"] + add_box["width"])
-        self.assertGreater(search_box["x"] + search_box["width"], page.locator("#merchantsTable").bounding_box()["x"] + page.locator("#merchantsTable").bounding_box()["width"] - 20)  # far right
+        self.assertGreater(add_box["x"], search_box["x"] + search_box["width"])  # search on the left, Add on the right
+        self.assertGreater(add_box["x"] + add_box["width"], page.locator("#merchantsTable").bounding_box()["x"] + page.locator("#merchantsTable").bounding_box()["width"] - 20)  # far right
         names = page.locator("#merchantsTable tbody tr td:nth-child(2)")
         page.locator("#merchantsTable thead th", has_text="Merchant").click()
         listed = names.all_inner_texts()

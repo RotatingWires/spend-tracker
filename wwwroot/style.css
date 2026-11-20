@@ -380,7 +380,7 @@ form.panel-actions[data-add], form.search-form { align-items: stretch; }
 /* An Add form with a Search form beside it, on one row that wraps on narrow screens. */
 .tab-actions { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 18px; }
 .tab-actions > .panel-actions { flex: 1 1 280px; max-width: 460px; }
-.tab-actions > .search-form { margin-left: auto; justify-content: flex-end; }
+.tab-actions > form[data-add] { margin-left: auto; justify-content: flex-end; }
 /* Phones stack the Add and Search rows, so their boxes and buttons line up at the same size. */
 @media (max-width: 650px) {
   .tab-actions { flex-direction: column; align-items: stretch; }
